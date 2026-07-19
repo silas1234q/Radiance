@@ -1,0 +1,250 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String   @unique
+  email     String   @unique
+  firstName String?
+  lastName  String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skinProfile      SkinProfile?
+  quizAnswers      SkinQuizAnswer[]
+  routines         Routine[]
+  skinLogs         SkinLog[]
+  skinScores       SkinScore[]
+  moodEntries      MoodEntry[]
+  productAnalyses  ProductAnalysis[]
+  gamification     UserGamification?
+  dailyCompletions DailyCompletion[]
+  xpEvents         XpEvent[]
+}
+
+model SkinProfile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skinType         String?
+  sensitivityLevel String?
+  skinTone         String?
+  concerns         String[]
+  allergies        String[]
+  skinAge          Int?
+  skinScore        Int?
+  hydration        Int?
+  oilBalance       Int?
+  texture          Int?
+  evenTone         Int?
+  sensitivity      Int?
+  faceMapIssues    Json?
+  aiAnalysisRaw    Json?
+  scanData         Json?
+  analysisSource   String?
+  weeklyPlan       Json?
+  weeklyPlanSource String?
+  photoUrl         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model SkinQuizAnswer {
+  id           String @id @default(uuid())
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId   Int
+  questionText String
+  answer       String
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, questionId])
+  @@index([userId])
+}
+
+model Routine {
+  id       String        @id @default(uuid())
+  userId   String
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type     String        // "AM", "PM", or "CUSTOM"
+  name     String?       // null for AM/PM, user-provided for CUSTOM
+  isActive Boolean       @default(true)
+  steps    RoutineStep[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([userId, type, name])
+  @@index([userId])
+}
+
+model RoutineStep {
+  id          String    @id @default(uuid())
+  routineId   String
+  routine     Routine   @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  order       Int
+  name        String
+  description String?
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id])
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  aiRationale String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([routineId])
+}
+
+model SkinLog {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date             DateTime @default(now())
+  lifestyleFactors String[]
+  notes            String?
+  photoUrl         String?
+  mood             String?
+  feelings         String[]
+  concerns         String[]
+  sleepQuality     String?
+  activityLevel    String?
+  sunExposure      String?
+  waterGlasses     Int?
+  supplements      String?
+  periodStatus     String?
+  otherFactors     String[]
+  completedSteps   String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model SkinScore {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score      Int
+  week       Int
+  date       DateTime @default(now())
+  hydration  Int?
+  oilBalance Int?
+  texture    Int?
+  evenTone   Int?
+  sensitivity Int?
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model MoodEntry {
+  id     String   @id @default(uuid())
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mood   String
+  date   DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model RoutineInsightCache {
+  id                String   @id @default(uuid())
+  userId            String
+  type              String   // "quick" or "detailed"
+  routineHash       String   // hash of step+product IDs to detect changes
+  result            Json     // cached insight result
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, type])
+  @@index([userId])
+}
+
+model Product {
+  id          String        @id @default(uuid())
+  name        String
+  brand       String
+  category    String
+  imageUrl    String?
+  description String?
+  ingredients String[]
+  barcode     String?       @unique
+  sourceUrl   String?
+  source      String        @default("seeded")
+  steps       RoutineStep[]
+  analyses    ProductAnalysis[]
+  createdAt   DateTime      @default(now())
+}
+
+model UserGamification {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalXp           Int      @default(0)
+  currentStreak     Int      @default(0)
+  longestStreak     Int      @default(0)
+  lastCompletionDate DateTime?
+  streakRestoresLeft Int     @default(3)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model DailyCompletion {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime
+  amCompleted Boolean  @default(false)
+  pmCompleted Boolean  @default(false)
+  moodLogged  Boolean  @default(false)
+  isFullDay   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model XpEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  xp        Int
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
+}
+
+model ProductAnalysis {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fitScore        Int
+  pros            String[]
+  cons            String[]
+  ingredientFlags Json
+  createdAt       DateTime @default(now())
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([userId])
+}

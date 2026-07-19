@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  body{margin:0;}
+  @keyframes glowspin{to{transform:rotate(360deg);}}
+  @keyframes glowfade{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes glowpulse{0%,100%{transform:scale(1);opacity:.55;}50%{transform:scale(1.12);opacity:1;}}
+  @keyframes glowscan{0%{top:6%}50%{top:82%}100%{top:6%}}
+  @keyframes glowflash{0%{opacity:0}30%{opacity:.7}100%{opacity:0}}
+  @keyframes glowblink{0%,100%{opacity:.35}50%{opacity:1}}
+  .glow-scroll::-webkit-scrollbar{display:none;}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;background:radial-gradient(120% 90% at 50% -10%, #FFE8E6 0%, #F3F1F6 55%, #ECEAF1 100%);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif;">
+
+  <div style="position:relative;width:393px;height:852px;background:#fff;border-radius:54px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,.08),0 40px 90px -20px rgba(60,20,40,.45),0 0 0 11px #0d0d12,0 0 0 13px #2a2a31;display:flex;flex-direction:column;color:#1c1c1e;">
+
+    <!-- status bar -->
+    <div style="position:relative;z-index:30;height:54px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 32px 9px;font-weight:600;">
+      <span style="font-size:16px;letter-spacing:.3px;">9:41</span>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="19" height="13" viewBox="0 0 19 13" fill="#1c1c1e"><rect x="0" y="8" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="8" rx="1"/><rect x="10" y="2.5" width="3" height="10.5" rx="1"/><rect x="15" y="0" width="3" height="13" rx="1"/></svg>
+        <svg width="17" height="13" viewBox="0 0 17 13" fill="#1c1c1e"><path d="M8.5 2.4c2.4 0 4.6.9 6.3 2.5l1.2-1.3C14 1.6 11.4.6 8.5.6S3 1.6 1 3.6l1.2 1.3C3.9 3.3 6.1 2.4 8.5 2.4z" opacity=".95"/><path d="M8.5 6c1.4 0 2.7.5 3.7 1.5l1.2-1.3C12.2 4.9 10.4 4.2 8.5 4.2S4.8 4.9 3.6 6.2l1.2 1.3C5.8 6.5 7.1 6 8.5 6z"/><circle cx="8.5" cy="10.4" r="1.9"/></svg>
+        <div style="display:flex;align-items:center;gap:2px;"><div style="width:23px;height:12px;border:1.5px solid rgba(28,28,30,.4);border-radius:4px;padding:1.5px;"><div style="width:78%;height:100%;background:#1c1c1e;border-radius:1.5px;"></div></div><div style="width:1.5px;height:4px;background:rgba(28,28,30,.4);border-radius:1px;"></div></div>
+      </div>
+    </div>
+
+    <div style="position:relative;flex:1;overflow:hidden;">
+
+      <!-- ════════ WELCOME ════════ -->
+      <sc-if value="{{ isWelcome }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:8px 30px 40px;background:radial-gradient(110% 70% at 50% 0%, #FFE8E6 0%, #fff 60%);">
+          <div></div>
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;">
+            <div style="width:96px;height:96px;border-radius:30px;background:linear-gradient(150deg,#FF5A5F,#FF6E8A);display:flex;align-items:center;justify-content:center;box-shadow:0 18px 40px -8px rgba(255,90,95,.55);margin-bottom:30px;">
+              <svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 2.5c3.2 4.2 6.2 7.2 6.2 11.1A6.2 6.2 0 0 1 12 19.8a6.2 6.2 0 0 1-6.2-6.2C5.8 9.7 8.8 6.7 12 2.5z" fill="#fff"/><path d="M9.4 13.6a2.6 2.6 0 0 0 2.6 2.6" stroke="#FF5A5F" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <div style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1;">Glow</div>
+            <div style="font-size:21px;font-weight:600;color:#1c1c1e;margin-top:18px;max-width:260px;line-height:1.3;">Skincare that actually understands your skin</div>
+            <div style="font-size:16px;color:#8e8e93;margin-top:12px;max-width:250px;line-height:1.4;">Answer a few questions and we'll build a routine around you.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+            <button onClick="{{ start }}" style="width:100%;height:54px;border:none;border-radius:16px;background:#FF5A5F;color:#fff;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 12px 26px -8px rgba(255,90,95,.6);font-family:inherit;">Get started</button>
+            <div style="font-size:13px;color:#aeaeb2;">Takes about 2 minutes</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ AUTH ════════ -->
+      <sc-if value="{{ isAuth }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;background:#fff;padding:0 26px;">
+          <div style="display:flex;flex-direction:column;align-items:center;padding-top:20px;padding-bottom:18px;">
+            <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(150deg,#FF5A5F,#FF7E82);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px -6px rgba(255,90,95,.45);margin-bottom:14px;">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2.5c3.2 4.2 6.2 7.2 6.2 11.1A6.2 6.2 0 0 1 12 19.8a6.2 6.2 0 0 1-6.2-6.2C5.8 9.7 8.8 6.7 12 2.5z" fill="#fff"/><path d="M9.4 13.6a2.6 2.6 0 0 0 2.6 2.6" stroke="#FF5A5F" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <div style="font-size:28px;font-weight:800;letter-spacing:-.6px;">{{ authHeading }}</div>
+            <div style="font-size:15.5px;color:#8e8e93;margin-top:5px;">{{ authSub }}</div>
+          </div>
+          <!-- tabs -->
+          <div style="display:flex;background:#F2F2F7;border-radius:12px;padding:3px;gap:3px;margin-bottom:24px;">
+            <button onClick="{{ setSignIn }}" style="{{ tabSignIn }}">Sign in</button>
+            <button onClick="{{ setSignUp }}" style="{{ tabSignUp }}">Sign up</button>
+          </div>
+          <!-- fields -->
+          <div style="display:flex;flex-direction:column;gap:13px;margin-bottom:20px;">
+            <input type="email" placeholder="Email address" style="width:100%;height:52px;border:1.5px solid #E5E5EA;border-radius:14px;background:#F7F7FA;padding:0 16px;font-size:17px;font-family:inherit;color:#1c1c1e;outline:none;" />
+            <sc-if value="{{ authIsSignUp }}" hint-placeholder-val="{{ false }}">
+              <input type="text" placeholder="Full name" style="width:100%;height:52px;border:1.5px solid #E5E5EA;border-radius:14px;background:#F7F7FA;padding:0 16px;font-size:17px;font-family:inherit;color:#1c1c1e;outline:none;" />
+            </sc-if>
+            <div style="position:relative;">
+              <input type="{{ pwType }}" placeholder="Password" style="width:100%;height:52px;border:1.5px solid #E5E5EA;border-radius:14px;background:#F7F7FA;padding:0 44px 0 16px;font-size:17px;font-family:inherit;color:#1c1c1e;outline:none;" />
+              <button onClick="{{ togglePw }}" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);border:none;background:transparent;cursor:pointer;color:#8e8e93;font-size:13px;font-weight:600;font-family:inherit;padding:0;">{{ pwLabel }}</button>
+            </div>
+          </div>
+          <!-- primary cta -->
+          <button onClick="{{ goWelcome }}" style="width:100%;height:54px;border:none;border-radius:16px;background:#FF5A5F;color:#fff;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 12px 26px -8px rgba(255,90,95,.55);font-family:inherit;margin-bottom:20px;">{{ authCta }}</button>
+          <!-- divider -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+            <div style="flex:1;height:1px;background:#E5E5EA;"></div>
+            <span style="font-size:13px;color:#aeaeb2;font-weight:600;">or</span>
+            <div style="flex:1;height:1px;background:#E5E5EA;"></div>
+          </div>
+          <!-- social -->
+          <div style="display:flex;flex-direction:column;gap:11px;margin-bottom:28px;">
+            <button onClick="{{ goWelcome }}" style="width:100%;height:52px;border:none;border-radius:14px;background:#000;color:#fff;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;font-family:inherit;">
+              <svg width="18" height="18" viewBox="0 0 814 1000" fill="#fff"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 484.3 0 339.2 0 202.3c0-193 125.7-295 249.6-295 66.1 0 121.2 43.4 162.7 43.4 39.5 0 101.1-46 176.3-46 28.5 0 130.9 2.6 198.3 99.2zm-234-181.5c31.1-36.9 53.1-88.1 53.1-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.5-71.3z"/></svg>
+              Continue with Apple
+            </button>
+            <button onClick="{{ goWelcome }}" style="width:100%;height:52px;border:1.5px solid #E5E5EA;border-radius:14px;background:#fff;color:#1c1c1e;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;font-family:inherit;">
+              <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.7 33.115 29.238 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.221 0-9.672-3.449-11.306-8.266l-6.521 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+              Continue with Google
+            </button>
+          </div>
+          <div style="text-align:center;font-size:14.5px;color:#8e8e93;">{{ authSwitch }} <button onClick="{{ toggleTab }}" style="border:none;background:transparent;color:#FF5A5F;font-weight:700;font-size:14.5px;cursor:pointer;font-family:inherit;padding:0;">{{ authSwitchCta }}</button></div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ FACE SCAN ════════ -->
+      <sc-if value="{{ isFacescan }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;background:#0d0d12;">
+          <div style="padding:10px 22px 0;width:100%;display:flex;align-items:center;justify-content:space-between;">
+            <button onClick="{{ backToWelcome }}" style="width:38px;height:38px;border:none;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <svg width="11" height="18" viewBox="0 0 11 18" fill="none"><path d="M9.5 1.5 2 9l7.5 7.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span style="font-size:17px;font-weight:700;color:#fff;letter-spacing:-.2px;">Skin Analysis</span>
+            <button onClick="{{ startQuiz }}" style="border:none;background:transparent;color:rgba(255,255,255,.5);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Skip</button>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;padding:0 24px 20px;">
+            <div style="font-size:24px;font-weight:800;color:#fff;letter-spacing:-.4px;text-align:center;margin-bottom:8px;">Position your face</div>
+            <div style="font-size:15px;color:rgba(255,255,255,.5);text-align:center;margin-bottom:36px;max-width:230px;line-height:1.4;">Keep still while we read your skin's current condition</div>
+            <!-- viewfinder -->
+            <div style="position:relative;width:230px;height:286px;">
+              <!-- oval face guide -->
+              <div style="position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,255,255,.25);overflow:hidden;">
+                <!-- scan line -->
+                <div style="position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#FF5A5F,transparent);box-shadow:0 0 12px 3px rgba(255,90,95,.7);animation:glowscan 2.4s ease-in-out infinite;"></div>
+              </div>
+              <!-- corner brackets -->
+              <div style="position:absolute;top:-2px;left:-2px;width:28px;height:28px;border-top:3px solid #FF5A5F;border-left:3px solid #FF5A5F;border-radius:6px 0 0 0;animation:glowblink 1.8s ease infinite;"></div>
+              <div style="position:absolute;top:-2px;right:-2px;width:28px;height:28px;border-top:3px solid #FF5A5F;border-right:3px solid #FF5A5F;border-radius:0 6px 0 0;animation:glowblink 1.8s ease infinite .4s;"></div>
+              <div style="position:absolute;bottom:-2px;left:-2px;width:28px;height:28px;border-bottom:3px solid #FF5A5F;border-left:3px solid #FF5A5F;border-radius:0 0 0 6px;animation:glowblink 1.8s ease infinite .8s;"></div>
+              <div style="position:absolute;bottom:-2px;right:-2px;width:28px;height:28px;border-bottom:3px solid #FF5A5F;border-right:3px solid #FF5A5F;border-radius:0 0 6px 0;animation:glowblink 1.8s ease infinite 1.2s;"></div>
+              <!-- face dots scan indicators -->
+              <div style="position:absolute;top:22%;left:26%;width:6px;height:6px;border-radius:50%;background:#FF5A5F;animation:glowblink 1.2s ease infinite;"></div>
+              <div style="position:absolute;top:22%;right:26%;width:6px;height:6px;border-radius:50%;background:#FF5A5F;animation:glowblink 1.2s ease infinite .3s;"></div>
+              <div style="position:absolute;top:42%;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:#FF5A5F;animation:glowblink 1.2s ease infinite .6s;"></div>
+              <div style="position:absolute;top:58%;left:36%;width:6px;height:6px;border-radius:50%;background:rgba(255,90,95,.6);animation:glowblink 1.2s ease infinite .9s;"></div>
+              <div style="position:absolute;top:58%;right:36%;width:6px;height:6px;border-radius:50%;background:rgba(255,90,95,.6);animation:glowblink 1.2s ease infinite 1.1s;"></div>
+            </div>
+            <!-- status bar -->
+            <div style="display:flex;align-items:center;gap:8px;margin-top:28px;">
+              <div style="width:8px;height:8px;border-radius:50%;background:#FF5A5F;animation:glowpulse 1.4s ease infinite;"></div>
+              <span style="font-size:14px;color:rgba(255,255,255,.6);font-weight:600;">Scanning skin condition…</span>
+            </div>
+          </div>
+          <!-- capture -->
+          <div style="width:100%;padding:0 26px 40px;display:flex;flex-direction:column;align-items:center;gap:14px;">
+            <button onClick="{{ startQuiz }}" style="width:72px;height:72px;border:3px solid rgba(255,255,255,.3);border-radius:50%;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+              <div style="width:58px;height:58px;border-radius:50%;background:#FF5A5F;box-shadow:0 0 0 0 rgba(255,90,95,.6);"></div>
+            </button>
+            <span style="font-size:13px;color:rgba(255,255,255,.4);text-align:center;">Tap to capture &amp; continue</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ QUIZ ════════ -->
+      <sc-if value="{{ isQuiz }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;">
+          <!-- header -->
+          <div style="flex:none;padding:6px 22px 0;display:flex;align-items:center;gap:14px;">
+            <button onClick="{{ back }}" style="width:38px;height:38px;flex:none;border:none;border-radius:50%;background:#F2F2F7;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <svg width="11" height="18" viewBox="0 0 11 18" fill="none"><path d="M9.5 1.5 2 9l7.5 7.5" stroke="#1c1c1e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <sc-if value="{{ showProgress }}" hint-placeholder-val="{{ true }}">
+              <div style="flex:1;height:7px;border-radius:21px;background:#EAEAEF;overflow:hidden;">
+                <div style="{{ progressStyle }}"></div>
+              </div>
+            </sc-if>
+            <span style="font-size:14px;font-weight:600;color:#aeaeb2;font-variant-numeric:tabular-nums;">{{ qCount }}</span>
+          </div>
+
+          <!-- scroll body -->
+          <div class="glow-scroll" style="flex:1;overflow-y:auto;padding:26px 24px 8px;">
+            <div>
+              <div style="font-size:30px;font-weight:800;letter-spacing:-.6px;line-height:1.12;">{{ qTitle }}</div>
+              <sc-if value="{{ hasSub }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:15.5px;color:#8e8e93;margin-top:10px;line-height:1.4;">{{ qSub }}</div>
+              </sc-if>
+
+              <!-- choice list -->
+              <sc-if value="{{ isCards }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:11px;margin-top:26px;">
+                  <sc-for list="{{ opts }}" as="o" hint-placeholder-count="4">
+                    <button onClick="{{ o.onClick }}" style="{{ o.style }}">
+                      <span>{{ o.label }}</span>
+                      <sc-if value="{{ o.sel }}" hint-placeholder-val="{{ false }}">
+                        <span style="width:24px;height:24px;flex:none;border-radius:50%;background:#FF5A5F;display:flex;align-items:center;justify-content:center;"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5 5.5 10.5 11.5 3.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      </sc-if>
+                      <sc-if value="{{ o.notSel }}" hint-placeholder-val="{{ true }}">
+                        <span style="width:24px;height:24px;flex:none;border-radius:50%;border:2px solid #D8D8DE;"></span>
+                      </sc-if>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <!-- yes / no -->
+              <sc-if value="{{ isYesno }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:13px;margin-top:30px;">
+                  <sc-for list="{{ opts }}" as="o" hint-placeholder-count="2">
+                    <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <!-- tone swatches -->
+              <sc-if value="{{ isTone }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-wrap:wrap;gap:18px 22px;margin-top:32px;justify-content:center;">
+                  <sc-for list="{{ opts }}" as="o" hint-placeholder-count="6">
+                    <div onClick="{{ o.onClick }}" style="display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;width:78px;">
+                      <div style="{{ o.style }}"></div>
+                      <span style="font-size:13px;font-weight:600;color:{{ o.labelColor }};text-align:center;">{{ o.label }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <!-- free text -->
+              <sc-if value="{{ isText }}" hint-placeholder-val="{{ false }}">
+                <textarea onInput="{{ onText }}" value="{{ textVal }}" placeholder="Type your answer…" style="margin-top:24px;width:100%;height:150px;border:1.5px solid #E5E5EA;border-radius:18px;background:#F7F7FA;padding:16px 18px;font-size:17px;font-family:inherit;color:#1c1c1e;resize:none;outline:none;line-height:1.4;"></textarea>
+              </sc-if>
+            </div>
+          </div>
+
+          <!-- footer -->
+          <sc-if value="{{ showContinue }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:none;padding:10px 24px 26px;">
+              <button onClick="{{ next }}" style="{{ continueStyle }}">Continue</button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ════════ ANALYZING ════════ -->
+      <sc-if value="{{ isAnalyzing }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;padding:40px;background:radial-gradient(100% 60% at 50% 40%, #FFE8E6, #fff 70%);">
+          <div style="position:relative;width:96px;height:96px;">
+            <div style="position:absolute;inset:0;border-radius:50%;border:5px solid #FFD9D7;"></div>
+            <div style="position:absolute;inset:0;border-radius:50%;border:5px solid transparent;border-top-color:#FF5A5F;animation:glowspin .9s linear infinite;"></div>
+            <div style="position:absolute;inset:26px;border-radius:50%;background:linear-gradient(150deg,#FF5A5F,#FF6E8A);"></div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:24px;font-weight:800;letter-spacing:-.4px;">Building your routine</div>
+            <div style="font-size:16px;color:#8e8e93;margin-top:8px;max-width:240px;line-height:1.4;">Matching products to your skin profile…</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ DASHBOARD ════════ -->
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;">
+          <div class="glow-scroll" style="flex:1;overflow-y:auto;padding:6px 22px 120px;">
+
+            <div style="font-size:34px;font-weight:800;letter-spacing:-1px;margin:6px 0 16px;">Good morning,<br>{{ userName }}</div>
+
+            <!-- search -->
+            <div style="display:flex;align-items:center;gap:9px;height:42px;border-radius:13px;background:#EAEAEF;padding:0 14px;margin-bottom:22px;">
+              <svg width="17" height="17" viewBox="0 0 18 18" fill="none"><circle cx="7.5" cy="7.5" r="5.5" stroke="#8e8e93" stroke-width="2"/><path d="m12 12 4 4" stroke="#8e8e93" stroke-width="2" stroke-linecap="round"/></svg>
+              <span style="font-size:17px;color:#8e8e93;">Search products</span>
+            </div>
+
+            <!-- skin score card -->
+            <div onClick="{{ goProgress }}" style="border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;gap:18px;cursor:pointer;">
+              <div style="position:relative;width:84px;height:84px;flex:none;">
+                <div style="{{ scoreRingStyle }};position:absolute;inset:0;"></div>
+                <div style="position:absolute;inset:7px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                  <span style="font-size:27px;font-weight:800;letter-spacing:-1px;line-height:1;">{{ skinScore }}</span>
+                  <span style="font-size:9px;font-weight:700;color:#aeaeb2;letter-spacing:.4px;margin-top:1px;">/100</span>
+                </div>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:19px;font-weight:800;letter-spacing:-.3px;">Skin Score</div>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:5px;">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 11V3M7 3 3 7M7 3l4 4" stroke="#1E9E4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span style="font-size:13.5px;font-weight:700;color:#1E9E4F;">+{{ scoreTrend }} this week</span>
+                </div>
+                <div style="font-size:12.5px;color:#8e8e93;margin-top:6px;">Skin age {{ skinAge }} · from your last scan</div>
+              </div>
+              <button onClick="{{ goScan }}" style="flex:none;width:40px;height:40px;border:none;border-radius:50%;background:#FFF3F1;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                <svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M3 11a8 8 0 0 1 13.5-5.8M19 11A8 8 0 0 1 5.5 16.8" stroke="#FF5A5F" stroke-width="2" stroke-linecap="round"/><path d="M16 3v3h-3M6 19v-3h3" stroke="#FF5A5F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+
+            <!-- AI forecast card -->
+            <div style="position:relative;border-radius:24px;background:linear-gradient(150deg,#2B2336,#191527);padding:20px;margin-bottom:14px;overflow:hidden;color:#fff;">
+              <div style="position:absolute;top:-40px;right:-30px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(255,90,95,.55),transparent 70%);"></div>
+              <div style="position:relative;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:9px;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF8E91"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/><circle cx="18.5" cy="17.5" r="1.6"/></svg>
+                  <span style="font-size:17px;font-weight:800;letter-spacing:-.2px;">Skin forecast</span>
+                </div>
+                <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,.14);padding:4px 9px;border-radius:8px;color:#FFC9CB;">Adapted for you</span>
+              </div>
+              <div style="position:relative;font-size:14.5px;line-height:1.5;color:rgba(255,255,255,.82);">UV index spikes to 9 this week and your skin tends to dehydrate in strong sun. We've added a <b style="color:#fff;">Hyaluronic Mist</b> to tonight's routine to stay ahead of it.</div>
+              <button onClick="{{ goRoutine }}" style="position:relative;margin-top:16px;border:none;background:#FF5A5F;color:#fff;font-size:14px;font-weight:700;padding:10px 16px;border-radius:12px;cursor:pointer;font-family:inherit;">See what changed</button>
+            </div>
+
+            <!-- today's routine card -->
+            <div onClick="{{ goRoutine }}" style="border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px;margin-bottom:18px;cursor:pointer;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <span style="font-size:18px;font-weight:800;letter-spacing:-.3px;">Today's routine</span>
+                <span style="font-size:14px;font-weight:700;color:#FF5A5F;">{{ routineCountLabel }}</span>
+              </div>
+              <div style="height:9px;border-radius:21px;background:#F2F2F7;overflow:hidden;"><div style="{{ routineBarStyle }}"></div></div>
+              <div style="font-size:13px;color:#8e8e93;margin-top:12px;">Check off your steps and keep your streak alive</div>
+            </div>
+
+            <!-- mood card -->
+            <div style="border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px 18px;margin-bottom:18px;">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+                <div><div style="font-size:18px;font-weight:800;letter-spacing:-.3px;">How's your skin today?</div><div style="font-size:13.5px;color:#8e8e93;margin-top:3px;">Track how your skin improves</div></div>
+                <button onClick="{{ openLog }}" style="flex:none;border:none;background:#FFF3F1;color:#FF5A5F;font-weight:700;font-size:13px;padding:7px 13px;border-radius:11px;cursor:pointer;font-family:inherit;">+ Log</button>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:20px;">
+                <sc-for list="{{ moods }}" as="m" hint-placeholder-count="5">
+                  <div onClick="{{ m.onClick }}" style="display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;">
+                    <div style="{{ m.style }}"></div>
+                    <span style="font-size:12px;font-weight:600;color:{{ m.labelColor }};">{{ m.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- recommendations -->
+            <div style="font-size:20px;font-weight:800;letter-spacing:-.4px;margin:6px 2px 3px;">Improve your routine</div>
+            <div style="font-size:13.5px;color:#8e8e93;margin:0 2px 14px;">These tweaks may bring better results</div>
+            <div class="glow-scroll" style="display:flex;gap:14px;overflow-x:auto;margin:0 -22px;padding:0 22px 4px;">
+              <sc-for list="{{ products }}" as="p" hint-placeholder-count="2">
+                <div style="flex:none;width:172px;border-radius:20px;background:#fff;border:1px solid #ECECF0;box-shadow:0 8px 22px -14px rgba(40,20,30,.3);overflow:hidden;">
+                  <div style="position:relative;height:150px;background:#EAF2EC url('assets/serum.jpg') center/cover;">
+                    <span style="position:absolute;top:10px;left:10px;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);font-size:12px;font-weight:800;color:#1c1c1e;padding:4px 9px;border-radius:9px;">{{ p.fit }} fit</span>
+                    <button onClick="{{ p.onHeart }}" style="position:absolute;top:8px;right:8px;width:32px;height:32px;border:none;border-radius:50%;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                      <svg width="17" height="17" viewBox="0 0 20 20" fill="{{ p.heartFill }}"><path d="M10 17.5C-3 9.5 4-1 10 4.5 16-1 23 9.5 10 17.5z" stroke="{{ p.heartStroke }}" stroke-width="1.6"/></svg>
+                    </button>
+                  </div>
+                  <div style="padding:12px 13px 15px;">
+                    <div style="font-size:15px;font-weight:700;letter-spacing:-.2px;line-height:1.2;">{{ p.name }}</div>
+                    <div style="font-size:12.5px;color:#8e8e93;margin-top:3px;">{{ p.brand }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- scan -->
+          <button onClick="{{ goScan }}" style="position:absolute;left:50%;bottom:104px;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:8px;height:50px;padding:0 24px;border:none;border-radius:25px;background:#FF5A5F;color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 14px 30px -8px rgba(255,90,95,.6);font-family:inherit;">
+            <svg width="20" height="20" viewBox="0 0 22 22" fill="none"><rect x="2" y="5" width="18" height="14" rx="3.5" stroke="#fff" stroke-width="2"/><circle cx="11" cy="12" r="3.4" stroke="#fff" stroke-width="2"/><path d="M8 5l1.4-2.2h3.2L14 5" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+            Scan
+          </button>
+        </div>
+      </sc-if>
+
+      <!-- ════════ SKIN LOG ════════ -->
+      <sc-if value="{{ isSkinlog }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;background:#F2F2F7;">
+          <div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:8px 20px 14px;">
+            <button onClick="{{ closeLog }}" style="width:38px;height:38px;border:none;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2 2 12" stroke="#1c1c1e" stroke-width="2.2" stroke-linecap="round"/></svg>
+            </button>
+            <span style="font-size:19px;font-weight:800;letter-spacing:-.3px;">Skin log</span>
+            <button onClick="{{ closeLog }}" style="width:38px;height:38px;border:none;border-radius:50%;background:#FF5A5F;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 16px -4px rgba(255,90,95,.6);">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5 6.5 12 13 4" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <div class="glow-scroll" style="flex:1;overflow-y:auto;padding:6px 20px 20px;">
+            <div style="background:#fff;border-radius:22px;padding:20px;margin-bottom:18px;">
+              <div style="font-size:18px;font-weight:800;letter-spacing:-.3px;margin-bottom:16px;">Lifestyle factors</div>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                <sc-for list="{{ factorChips }}" as="f" hint-placeholder-count="6">
+                  <button onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:#fff;border-radius:22px;padding:20px;">
+              <div style="font-size:18px;font-weight:800;letter-spacing:-.3px;margin-bottom:14px;">What happened today?</div>
+              <textarea placeholder="Share what you think could have affected your skin" style="width:100%;height:120px;border:1.5px solid #E5E5EA;border-radius:16px;background:#F7F7FA;padding:14px 16px;font-size:16px;font-family:inherit;color:#1c1c1e;resize:none;outline:none;line-height:1.4;"></textarea>
+            </div>
+          </div>
+          <div style="flex:none;padding:8px 20px 26px;">
+            <button onClick="{{ closeLog }}" style="width:100%;height:54px;border:none;border-radius:16px;background:#FF5A5F;color:#fff;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 12px 26px -8px rgba(255,90,95,.55);font-family:inherit;">Done</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ RESULTS (AI analysis) ════════ -->
+      <sc-if value="{{ isResults }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;">
+          <div style="flex:none;padding:6px 22px 0;display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:13px;font-weight:700;color:#FF5A5F;letter-spacing:.5px;text-transform:uppercase;">AI Analysis</span>
+            <button onClick="{{ goHome }}" style="border:none;background:transparent;color:#8e8e93;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Skip</button>
+          </div>
+          <div class="glow-scroll" style="flex:1;overflow-y:auto;padding:14px 22px 100px;">
+            <div style="font-size:30px;font-weight:800;letter-spacing:-.8px;line-height:1.1;">Your skin,<br>decoded</div>
+            <div style="font-size:15px;color:#8e8e93;margin-top:8px;">From your scan and {{ qCountTotal }} answers</div>
+
+            <!-- big score + face map -->
+            <div style="display:flex;gap:16px;align-items:center;margin-top:22px;border-radius:24px;background:linear-gradient(150deg,#2B2336,#191527);padding:20px;color:#fff;">
+              <div style="position:relative;width:96px;height:96px;flex:none;">
+                <div style="{{ scoreRingStyle }};position:absolute;inset:0;"></div>
+                <div style="position:absolute;inset:8px;border-radius:50%;background:#221c30;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                  <span style="font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;">{{ skinScore }}</span>
+                  <span style="font-size:9px;font-weight:700;color:rgba(255,255,255,.5);margin-top:2px;">SKIN SCORE</span>
+                </div>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:15px;font-weight:700;">Combination · sensitive</div>
+                <div style="font-size:13.5px;color:rgba(255,255,255,.6);margin-top:5px;line-height:1.45;">Healthy barrier overall. Main focus: hydration and gentle exfoliation.</div>
+              </div>
+            </div>
+
+            <!-- face map -->
+            <div style="margin-top:14px;border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px;">
+              <div style="font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:4px;">What we detected</div>
+              <div style="font-size:13px;color:#8e8e93;margin-bottom:16px;">Mapped from your photo</div>
+              <div style="display:flex;gap:18px;align-items:center;">
+                <div style="position:relative;width:104px;height:128px;flex:none;border-radius:50% 50% 48% 48%/42% 42% 58% 58%;background:linear-gradient(160deg,#FFE2D4,#FFC9B8);box-shadow:inset 0 -8px 20px rgba(200,120,100,.25);">
+                  <sc-for list="{{ faceMarks }}" as="fm" hint-placeholder-count="4">
+                    <div style="{{ fm.dotStyle }}"></div>
+                  </sc-for>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:9px;">
+                  <sc-for list="{{ faceMarks }}" as="fm" hint-placeholder-count="4">
+                    <div style="display:flex;align-items:center;gap:9px;">
+                      <span style="width:9px;height:9px;border-radius:50%;background:#FF5A5F;flex:none;"></span>
+                      <span style="font-size:14px;font-weight:600;color:#1c1c1e;">{{ fm.label }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+
+            <!-- metrics -->
+            <div style="margin-top:14px;border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px;">
+              <div style="font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:16px;">Skin metrics</div>
+              <div style="display:flex;flex-direction:column;gap:14px;">
+                <sc-for list="{{ metrics }}" as="m" hint-placeholder-count="5">
+                  <div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                      <span style="font-size:14px;font-weight:600;color:#1c1c1e;">{{ m.label }}</span>
+                      <span style="font-size:14px;font-weight:800;color:#1c1c1e;font-variant-numeric:tabular-nums;">{{ m.val }}</span>
+                    </div>
+                    <div style="height:8px;border-radius:21px;background:#F2F2F7;overflow:hidden;"><div style="{{ m.barStyle }}"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- concerns -->
+            <div style="margin-top:14px;border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px;">
+              <div style="font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:16px;">Priorities</div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <sc-for list="{{ concerns }}" as="c" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="flex:1;">
+                      <div style="font-size:15px;font-weight:700;letter-spacing:-.2px;">{{ c.title }}</div>
+                      <div style="font-size:13px;color:#8e8e93;margin-top:2px;">{{ c.zone }}</div>
+                    </div>
+                    <span style="{{ c.sevStyle }}">{{ c.sev }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="flex:none;padding:8px 22px 26px;background:linear-gradient(transparent,#fff 30%);">
+            <button onClick="{{ goRoutine }}" style="width:100%;height:54px;border:none;border-radius:16px;background:#FF5A5F;color:#fff;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 12px 26px -8px rgba(255,90,95,.55);font-family:inherit;">See my routine</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ ROUTINE ════════ -->
+      <sc-if value="{{ isRoutine }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;">
+          <div class="glow-scroll" style="flex:1;overflow-y:auto;padding:6px 22px 100px;">
+            <div style="font-size:30px;font-weight:800;letter-spacing:-.8px;margin:6px 0 4px;">{{ routineTitle }}</div>
+            <div style="font-size:14px;color:#8e8e93;margin-bottom:18px;">{{ routineCountLabel }} · personalized for your skin</div>
+
+            <!-- am/pm toggle -->
+            <div style="display:flex;background:#F2F2F7;border-radius:13px;padding:3px;gap:3px;margin-bottom:18px;">
+              <button onClick="{{ setAm }}" style="{{ segAm }}">☀ Morning</button>
+              <button onClick="{{ setPm }}" style="{{ segPm }}">☾ Evening</button>
+            </div>
+
+            <!-- steps -->
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <sc-for list="{{ routineSteps }}" as="st" hint-placeholder-count="4">
+                <div style="display:flex;gap:13px;border-radius:20px;background:#fff;border:1px solid #ECECF0;box-shadow:0 8px 22px -16px rgba(40,20,30,.3);padding:16px;">
+                  <div onClick="{{ st.onToggle }}" style="{{ st.ringStyle }}">
+                    <sc-if value="{{ st.done }}" hint-placeholder-val="{{ false }}">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5 5.5 10.5 11.5 3.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </sc-if>
+                  </div>
+                  <div style="flex:1;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <span style="font-size:11px;font-weight:800;color:#FF5A5F;letter-spacing:.4px;text-transform:uppercase;">Step {{ st.num }} · {{ st.step }}</span>
+                    </div>
+                    <div style="{{ st.nameStyle }};margin-top:3px;">{{ st.product }}</div>
+                    <div style="font-size:13px;color:#8e8e93;margin-top:4px;line-height:1.4;">{{ st.note }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <!-- adapt note -->
+            <div style="margin-top:16px;display:flex;gap:11px;border-radius:20px;background:#FFF3F1;padding:16px;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF5A5F" style="flex:none;"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/></svg>
+              <div style="font-size:13.5px;color:#C24444;line-height:1.45;"><b style="color:#FF5A5F;">AI is adapting.</b> Your routine updates automatically as your skin, the weather and your logs change.</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ PROGRESS ════════ -->
+      <sc-if value="{{ isProgress }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;">
+          <div class="glow-scroll" style="flex:1;overflow-y:auto;padding:6px 22px 100px;">
+            <div style="font-size:30px;font-weight:800;letter-spacing:-.8px;margin:6px 0 18px;">Your progress</div>
+
+            <!-- score trend chart -->
+            <div style="border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px;margin-bottom:14px;">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;">
+                <div><div style="font-size:17px;font-weight:800;letter-spacing:-.3px;">Skin score</div><div style="font-size:13px;color:#8e8e93;margin-top:2px;">Last 7 weeks</div></div>
+                <div style="display:flex;align-items:center;gap:5px;"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 11V3M7 3 3 7M7 3l4 4" stroke="#1E9E4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-size:14px;font-weight:800;color:#1E9E4F;">+16</span></div>
+              </div>
+              <div style="display:flex;align-items:flex-end;gap:8px;height:110px;">
+                <sc-for list="{{ trendBars }}" as="b" hint-placeholder-count="7">
+                  <div style="flex:1;height:100%;display:flex;align-items:flex-end;"><div style="{{ b.barStyle }}"></div></div>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- photo timeline -->
+            <div style="border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px;margin-bottom:14px;">
+              <div style="font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:14px;">Photo timeline</div>
+              <div style="display:flex;gap:12px;">
+                <sc-for list="{{ photoTimeline }}" as="p" hint-placeholder-count="3">
+                  <div style="flex:1;">
+                    <div style="position:relative;aspect-ratio:3/4;border-radius:16px;background:{{ p.g }};overflow:hidden;">
+                      <span style="position:absolute;bottom:7px;left:7px;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);color:#fff;font-size:12px;font-weight:800;padding:3px 7px;border-radius:8px;">{{ p.score }}</span>
+                    </div>
+                    <div style="font-size:12.5px;font-weight:700;color:#8e8e93;text-align:center;margin-top:7px;">{{ p.when }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- improvements -->
+            <div style="border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px;margin-bottom:14px;">
+              <div style="font-size:17px;font-weight:800;letter-spacing:-.3px;margin-bottom:14px;">Since you started</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;">
+                <sc-for list="{{ improvements }}" as="im" hint-placeholder-count="4">
+                  <div style="background:#F7F7FA;border-radius:16px;padding:14px;">
+                    <div style="font-size:21px;font-weight:800;color:#FF5A5F;letter-spacing:-.5px;">{{ im.delta }}</div>
+                    <div style="font-size:13px;color:#8e8e93;font-weight:600;margin-top:2px;">{{ im.label }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- consistency -->
+            <div style="border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);padding:20px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <div style="font-size:17px;font-weight:800;letter-spacing:-.3px;">Consistency</div>
+                <span style="font-size:13px;font-weight:800;color:#FF5A5F;">🔥 12 day streak</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;">
+                <sc-for list="{{ consistency }}" as="d" hint-placeholder-count="28">
+                  <div style="{{ d.dotStyle }}"></div>
+                </sc-for>
+              </div>
+              <div style="font-size:12.5px;color:#8e8e93;margin-top:12px;">Sticking to your routine builds results — keep going.</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ PROFILE ════════ -->
+      <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;">
+          <div class="glow-scroll" style="flex:1;overflow-y:auto;padding:6px 22px 100px;">
+            <div style="display:flex;align-items:center;gap:15px;margin:10px 0 22px;">
+              <div style="width:66px;height:66px;border-radius:50%;background:linear-gradient(150deg,#FF5A5F,#FF8E91);display:flex;align-items:center;justify-content:center;color:#fff;font-size:27px;font-weight:800;flex:none;">{{ userInitial }}</div>
+              <div style="flex:1;"><div style="font-size:23px;font-weight:800;letter-spacing:-.5px;">{{ userName }}</div><div style="font-size:14px;color:#8e8e93;margin-top:2px;">Glow member · 47 days</div></div>
+            </div>
+
+            <!-- skin passport -->
+            <div style="border-radius:24px;background:linear-gradient(150deg,#2B2336,#191527);padding:20px;margin-bottom:14px;color:#fff;">
+              <div style="font-size:12px;font-weight:700;color:#FFC9CB;letter-spacing:.6px;text-transform:uppercase;margin-bottom:12px;">Skin passport</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <sc-for list="{{ profileChips }}" as="c" hint-placeholder-count="5">
+                  <span style="background:rgba(255,255,255,.12);font-size:13.5px;font-weight:600;padding:7px 13px;border-radius:11px;">{{ c }}</span>
+                </sc-for>
+              </div>
+            </div>
+
+            <!-- menu -->
+            <div style="border-radius:24px;background:#fff;border:1px solid #ECECF0;box-shadow:0 10px 30px -16px rgba(40,20,30,.25);overflow:hidden;margin-bottom:14px;">
+              <div onClick="{{ goScan }}" style="display:flex;align-items:center;gap:13px;padding:16px 18px;border-bottom:1px solid #F2F2F7;cursor:pointer;">
+                <svg width="20" height="20" viewBox="0 0 22 22" fill="none"><rect x="2" y="5" width="18" height="14" rx="3.5" stroke="#FF5A5F" stroke-width="2"/><circle cx="11" cy="12" r="3.4" stroke="#FF5A5F" stroke-width="2"/></svg>
+                <span style="flex:1;font-size:16px;font-weight:600;">New skin scan</span>
+                <svg width="8" height="13" viewBox="0 0 9 15" fill="none"><path d="m1.5 1.5 6 6-6 6" stroke="#c7c7cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div onClick="{{ openLog }}" style="display:flex;align-items:center;gap:13px;padding:16px 18px;border-bottom:1px solid #F2F2F7;cursor:pointer;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF5A5F" stroke-width="2"><path d="M4 4h16v16H4z" stroke-linejoin="round"/><path d="M8 9h8M8 13h5" stroke-linecap="round"/></svg>
+                <span style="flex:1;font-size:16px;font-weight:600;">Daily skin log</span>
+                <svg width="8" height="13" viewBox="0 0 9 15" fill="none"><path d="m1.5 1.5 6 6-6 6" stroke="#c7c7cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div style="display:flex;align-items:center;gap:13px;padding:16px 18px;cursor:pointer;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF5A5F" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke-linecap="round"/></svg>
+                <span style="flex:1;font-size:16px;font-weight:600;">Preferences</span>
+                <svg width="8" height="13" viewBox="0 0 9 15" fill="none"><path d="m1.5 1.5 6 6-6 6" stroke="#c7c7cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </div>
+
+            <button onClick="{{ goAuth }}" style="width:100%;height:50px;border:1.5px solid #FFD9D7;border-radius:15px;background:#fff;color:#FF5A5F;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ════════ SHARED TAB BAR ════════ -->
+      <sc-if value="{{ showTabBar }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:0;right:0;bottom:0;z-index:25;height:92px;background:rgba(255,255,255,.86);backdrop-filter:blur(20px);border-top:1px solid #ECECF0;display:flex;align-items:flex-start;padding:11px 14px 0;">
+          <div onClick="{{ goHome }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:{{ tabHomeColor }};">
+            <svg width="25" height="25" viewBox="0 0 24 24" fill="{{ tabHomeColor }}"><path d="M3 11 12 3l9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>
+            <span style="font-size:10.5px;font-weight:700;">Home</span>
+          </div>
+          <div onClick="{{ goRoutine }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:{{ tabRoutineColor }};">
+            <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="{{ tabRoutineColor }}" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" stroke-linecap="round"/></svg>
+            <span style="font-size:10.5px;font-weight:600;">Routine</span>
+          </div>
+          <div onClick="{{ goProgress }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:{{ tabProgressColor }};">
+            <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="{{ tabProgressColor }}" stroke-width="2"><path d="M4 19V5M4 19h16M8 16v-4M12 16V8M16 16v-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span style="font-size:10.5px;font-weight:600;">Progress</span>
+          </div>
+          <div onClick="{{ goProfile }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:{{ tabProfileColor }};">
+            <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="{{ tabProfileColor }}" stroke-width="2"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.4 3.1-5.5 7-5.5s7 2.1 7 5.5" stroke-linecap="round"/></svg>
+            <span style="font-size:10.5px;font-weight:600;">You</span>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+
+    <!-- home indicator -->
+    <div style="position:absolute;left:50%;bottom:9px;transform:translateX(-50%);z-index:40;width:134px;height:5px;border-radius:3px;background:#1c1c1e;opacity:.85;pointer-events:none;"></div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:540,&quot;height&quot;:960},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Auth&quot;,&quot;Onboarding&quot;,&quot;Facescan&quot;,&quot;Results&quot;,&quot;Dashboard&quot;,&quot;Routine&quot;,&quot;Progress&quot;,&quot;Profile&quot;],&quot;default&quot;:&quot;Auth&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;autoAdvance&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;showProgress&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;userName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Chris&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Content&quot;}}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    const screenMap = { Dashboard:'dashboard', Onboarding:'welcome', Facescan:'facescan', Auth:'auth', Results:'results', Routine:'routine', Progress:'progress', Profile:'profile' };
+    const start = screenMap[props.startScreen] || 'auth';
+    this.state = { screen:start, qi:0, answers:{}, mood:null, factors:[], hearts:{0:true,1:true}, authTab:'signin', showPw:false, routineTime:'am', routineDone:{am:{},pm:{}} };
+  }
+
+  get Q(){
+    return [
+      { id:'gender', title:'What is your gender?', sub:'This helps us spot hormonal acne patterns.', type:'cards', options:['Male','Female','Prefer not to say'] },
+      { id:'age', title:'How old are you?', type:'cards', options:['Under 18','18 – 24','24 – 30','30 – 40','40 – 55','Over 55'] },
+      { id:'tone', title:'What is your skin tone?', sub:'Based on the Fitzpatrick scale — pick what looks closest to you, regardless of race.', type:'tone',
+        options:[ {label:'Very fair',color:'#FBE3D3'},{label:'Fair',color:'#F1C9A4'},{label:'Medium',color:'#DFA878'},{label:'Olive',color:'#C68A55'},{label:'Brown',color:'#8D5A38'},{label:'Dark brown',color:'#4E2F1E'} ] },
+      { id:'midday', title:'How does your skin feel by midday, untouched?', sub:'The T-zone is the T-shaped area across your forehead, nose and chin.', type:'cards', options:['Oily all over','Oily T-zone only','Normal','Dry','Tight and flaky'] },
+      { id:'combo', title:'Does your skin feel oily and dry in different areas?', type:'yesno', options:['Yes','No'] },
+      { id:'pores', title:'Do you have visible pores?', type:'yesno', options:['Yes','No'] },
+      { id:'sensitivity', title:'Does your skin react easily to new products?', sub:'Redness, stinging or burning.', type:'cards', options:['Often','Sometimes','Rarely','Never'] },
+      { id:'reaction', title:'Which reaction happens most?', type:'cards', options:['Redness','Stinging','Burning','A mix of these','All of the above'] },
+      { id:'goal', title:"What's the #1 thing you want help with?", type:'cards', options:['Acne','Texture','Redness','Dark spots','Scarring','Fine lines','Large pores'] },
+      { id:'duration', title:'How long has this been a concern?', type:'cards', options:['Weeks','Months','Years'] },
+      { id:'trend', title:'What is the situation now?', type:'cards', options:['Getting better','Getting worse','About the same'] },
+      { id:'breakouts', title:'What type of breakouts do you mostly get?', type:'cards', options:['Blackheads','Whiteheads','Small red bumps','Large painful cysts','A mix'] },
+      { id:'where', title:'Where on the face?', type:'cards', options:['Forehead','Cheeks','Chin & jawline','Nose','All over'] },
+      { id:'cycle', title:'Does it follow your menstrual cycle?', type:'yesno', options:['Yes','No'] },
+      { id:'triggers', title:'Does it flare with specific triggers?', type:'cards', options:['Diet','Sweat','Stress','Certain products','All of these','No clear trigger'] },
+      { id:'marks', title:'Do breakouts leave marks or scars after healing?', type:'yesno', options:['Yes','No'] },
+      { id:'cystic', title:'Have you had cystic or nodular acne?', sub:'Deep, painful bumps under the skin.', type:'yesno', options:['Yes','No'] },
+      { id:'pillow', title:'How often do you change pillowcases?', type:'cards', options:['Always','Often','Occasionally','Rarely','Never'] },
+      { id:'sunscreen', title:'How often do you use sunscreen?', type:'cards', options:['Always','Often','Occasionally','Rarely','Only at the beach','Never'] },
+      { id:'hormonal', title:'Any hormonal conditions right now?', type:'cards', options:['Puberty','Pregnancy','Menopause','Starting/stopping birth control','None of these'] },
+      { id:'sleep', title:'How much sleep do you usually get?', type:'cards', options:['8+ hours','6 hours','5 hours','4 hours','Barely any'] },
+      { id:'tried', title:'What have you already tried?', type:'cards', options:['OTC products','Prescription topicals','Oral medication','Isotretinoin / Accutane','Professional treatments'] },
+      { id:'worse', title:'Did anything make it worse?', sub:'Optional — tell us what you noticed.', type:'text' },
+      { id:'prescription', title:'Are you currently using any prescription skincare?', type:'yesno', options:['Yes','No'] },
+      { id:'allergies', title:'Any known allergies or reactions to ingredients?', type:'yesno', options:['Yes','No'] },
+    ];
+  }
+
+  choose(q, label){
+    const answers = {...this.state.answers};
+    answers[q.id] = label;
+    this.setState({ answers });
+    if (this.props.autoAdvance !== false) setTimeout(() => this.next(), 300);
+  }
+  onText(q, v){ const answers = {...this.state.answers}; answers[q.id] = v; this.setState({ answers }); }
+  next(){
+    if (this.state.qi >= this.Q.length - 1){
+      this.setState({ screen:'analyzing' });
+      setTimeout(() => this.setState({ screen:'results' }), 2500);
+    } else this.setState({ qi: this.state.qi + 1 });
+  }
+  back(){
+    if (this.state.qi <= 0) this.setState({ screen:'facescan' });
+    else this.setState({ qi: this.state.qi - 1 });
+  }
+
+  renderVals(){
+    const A = '#FF5A5F', s = this.state;
+    const Q = this.Q, q = Q[s.qi] || Q[0];
+    const ans = s.answers[q.id];
+    const screen = s.screen;
+
+    const rowBase = { display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px',padding:'16px 18px',borderRadius:'16px',background:'#fff',border:'1.5px solid #E5E5EA',fontSize:'17px',fontWeight:600,color:'#1c1c1e',cursor:'pointer',transition:'all .16s ease',textAlign:'left',width:'100%',fontFamily:'inherit' };
+    const rowSel = { borderColor:A,background:'#FFF3F1',boxShadow:'0 8px 20px -10px rgba(255,90,95,.5)' };
+    const ynBase = { flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'34px 0',borderRadius:'20px',background:'#fff',border:'1.5px solid #E5E5EA',fontSize:'19px',fontWeight:700,color:'#1c1c1e',cursor:'pointer',transition:'all .16s ease',fontFamily:'inherit' };
+    const ynSel = { borderColor:A,background:'#FFF3F1',color:A,boxShadow:'0 10px 24px -10px rgba(255,90,95,.5)' };
+
+    const opts = (q.options || []).map((o) => {
+      const label = (typeof o === 'string') ? o : o.label;
+      const color = (typeof o === 'string') ? null : o.color;
+      const sel = ans === label;
+      const onClick = () => this.choose(q, label);
+      let style;
+      if (q.type === 'tone'){
+        style = { width:'58px',height:'58px',borderRadius:'50%',background:color,transition:'all .16s ease',
+          boxShadow: sel ? ('0 0 0 3px #fff, 0 0 0 6px '+A+', inset 0 0 0 1px rgba(0,0,0,.06)') : 'inset 0 0 0 1px rgba(0,0,0,.08)',
+          transform: sel ? 'scale(1.06)' : 'scale(1)' };
+      } else if (q.type === 'yesno'){
+        style = sel ? {...ynBase,...ynSel} : ynBase;
+      } else {
+        style = sel ? {...rowBase,...rowSel} : rowBase;
+      }
+      return { label, color, sel, notSel: !sel, onClick, style, labelColor: sel ? A : '#1c1c1e' };
+    });
+
+    const moodDefs = [
+      { label:'Bad', c:'#FF6B6B' },{ label:'Meh', c:'#FFB23E' },{ label:'Okay', c:'#FFE14D' },{ label:'Good', c:'#9BE36D' },{ label:'Great', c:'#34C759' }
+    ];
+    const moods = moodDefs.map((m,i) => {
+      const sel = s.mood === i;
+      return { label:m.label, onClick:() => this.setState({mood:i}),
+        labelColor: sel ? '#1c1c1e' : '#aeaeb2',
+        style: { width:'46px',height:'46px',borderRadius:'50%',background:m.c,cursor:'pointer',transition:'all .18s ease',
+          transform: sel ? 'scale(1.12)' : 'scale(1)',
+          boxShadow: sel ? ('0 0 0 3px #fff, 0 0 0 6px '+m.c) : 'inset 0 0 0 1px rgba(0,0,0,.05)' } };
+    });
+
+    const prodDefs = [ {name:'Cera Calming Serum',brand:'iNGU · Green Tea',fit:'91%'},{name:'Confidence Cleanser',brand:'IT · Gentle daily',fit:'78%'} ];
+    const products = prodDefs.map((p,i) => {
+      const liked = !!s.hearts[i];
+      return {...p, onHeart:() => { const h={...s.hearts}; h[i]=!h[i]; this.setState({hearts:h}); },
+        heartFill: liked ? A : 'none', heartStroke: liked ? A : '#8e8e93' };
+    });
+
+    const factorList = ['High UV exposure','Traveling','Drank alcohol','Stressed','Poor sleep','Sick'];
+    const factorChips = factorList.map((f) => {
+      const on = s.factors.includes(f);
+      return { label:f, onClick:() => { const fa=s.factors.slice(); const ix=fa.indexOf(f); ix>=0?fa.splice(ix,1):fa.push(f); this.setState({factors:fa}); },
+        style: { border:'none',borderRadius:'14px',padding:'11px 16px',fontSize:'15px',fontWeight:600,cursor:'pointer',transition:'all .14s ease',fontFamily:'inherit',
+          background: on ? A : '#F2F2F7', color: on ? '#fff' : '#1c1c1e' } };
+    });
+
+    const isText = q.type === 'text';
+    const showContinue = isText || this.props.autoAdvance === false;
+    const answered = isText ? !!(ans && ans.trim()) : !!ans;
+    const contEnabled = isText ? true : answered;
+
+    const isSignUp = s.authTab === 'signup';
+    const tabBase = { flex:1, height:'36px', border:'none', borderRadius:'9px', fontSize:'15px', fontWeight:700, cursor:'pointer', transition:'all .16s ease', fontFamily:'inherit' };
+    const tabActive = { ...tabBase, background:'#fff', color:'#1c1c1e', boxShadow:'0 2px 8px rgba(0,0,0,.1)' };
+    const tabInactive = { ...tabBase, background:'transparent', color:'#8e8e93' };
+
+    // ── AI skin analysis ──
+    const skinScore = 72, scoreTrend = 5, skinAge = 23;
+    const metrics = [
+      {label:'Hydration', val:64, color:'#3BA7DB'},
+      {label:'Oil balance', val:58, color:'#F5A623'},
+      {label:'Texture', val:70, color:'#9B7EDE'},
+      {label:'Even tone', val:55, color:'#FF8A65'},
+      {label:'Sensitivity', val:48, color:'#FF6B6B'},
+    ].map(m => ({...m, barStyle:{width:m.val+'%',height:'100%',background:m.color,borderRadius:'21px',transition:'width .6s ease'}}));
+    const concerns = [
+      {title:'Mild congestion', zone:'T-zone & forehead', sev:'Low', sevStyle:{background:'#E7F8EC',color:'#1E9E4F'}},
+      {title:'Dehydration', zone:'Cheeks', sev:'Moderate', sevStyle:{background:'#FFF3E2',color:'#C77E12'}},
+      {title:'Early sun damage', zone:'Overall', sev:'Monitor', sevStyle:{background:'#FFECEC','color':'#D83A3F'}},
+    ].map(c => ({...c, sevStyle:{...c.sevStyle,fontSize:'12px',fontWeight:700,padding:'4px 10px',borderRadius:'8px'}}));
+    const faceMarks = [
+      {label:'Congestion', dotStyle:{position:'absolute',top:'24%',left:'34%'}},
+      {label:'Dryness',    dotStyle:{position:'absolute',top:'50%',left:'20%'}},
+      {label:'Redness',    dotStyle:{position:'absolute',top:'50%',left:'68%'}},
+      {label:'Texture',    dotStyle:{position:'absolute',top:'74%',left:'46%'}},
+    ].map(f => ({...f, dotStyle:{...f.dotStyle,width:'13px',height:'13px',borderRadius:'50%',background:'rgba(255,90,95,.95)',border:'2px solid #fff',boxShadow:'0 0 0 4px rgba(255,90,95,.28)'}}));
+    const scoreRingStyle = { background:'conic-gradient('+A+' '+(skinScore*3.6)+'deg, #FFE0E1 0deg)', borderRadius:'50%' };
+
+    // ── routine ──
+    const routineData = {
+      am:[
+        {step:'Cleanse', product:'Gentle Gel Cleanser', note:'Removes overnight oil without stripping'},
+        {step:'Treat', product:'10% Vitamin C Serum', note:'Brightens and fights free radicals'},
+        {step:'Moisturize', product:'Cera Calming Cream', note:'Locks in hydration all day'},
+        {step:'Protect', product:'Mineral SPF 50', note:'UV index is high today — keep it on'},
+      ],
+      pm:[
+        {step:'Cleanse', product:'Cleansing Balm', note:'Melts away SPF and grime'},
+        {step:'Treat', product:'0.3% Retinal', note:'Cell turnover · 3 nights a week'},
+        {step:'Hydrate', product:'Hyaluronic Mist', note:'AI added — counters the dryness forecast'},
+        {step:'Repair', product:'Repair Night Cream', note:'Rebuilds your barrier overnight'},
+      ],
+    };
+    const rt = s.routineTime;
+    const doneMap = s.routineDone[rt] || {};
+    const routineSteps = routineData[rt].map((st,i) => {
+      const done = !!doneMap[i];
+      return {...st, num:i+1, done, notDone:!done,
+        onToggle:() => { const rd={am:{...s.routineDone.am},pm:{...s.routineDone.pm}}; rd[rt][i]=!rd[rt][i]; this.setState({routineDone:rd}); },
+        ringStyle:{width:'30px',height:'30px',flex:'none',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',transition:'all .16s ease',
+          background: done?A:'transparent', border: done?('1.5px solid '+A):'2px solid #D8D8DE'},
+        nameStyle:{fontSize:'15.5px',fontWeight:700,letterSpacing:'-.2px',color: done?'#aeaeb2':'#1c1c1e', textDecoration: done?'line-through':'none'} };
+    });
+    const doneCount = routineData[rt].filter((_,i)=>doneMap[i]).length;
+    const segBase = { flex:1,height:'38px',border:'none',borderRadius:'10px',fontSize:'15px',fontWeight:700,cursor:'pointer',transition:'all .16s',fontFamily:'inherit' };
+    const segOn = { background:'#fff',color:'#1c1c1e',boxShadow:'0 2px 8px rgba(0,0,0,.1)' };
+    const segOff = { background:'transparent',color:'#8e8e93' };
+
+    // ── progress ──
+    const trendVals = [56,60,59,64,67,69,72];
+    const trendBars = trendVals.map((v,i) => ({ v, last:i===trendVals.length-1,
+      barStyle:{width:'100%',height:v+'%',borderRadius:'7px 7px 3px 3px',transition:'height .5s ease',
+        background: i===trendVals.length-1 ? A : '#FFD2D3'} }));
+    const improvements = [
+      {label:'Hydration', delta:'+12%'},{label:'Redness', delta:'−8%'},
+      {label:'Breakouts', delta:'−15%'},{label:'Texture', delta:'+9%'},
+    ];
+    const photoTimeline = [
+      {when:'Week 1', score:'56', g:'linear-gradient(150deg,#FFCBA8,#FF9E7A)'},
+      {when:'Week 4', score:'64', g:'linear-gradient(150deg,#FFB59A,#FF8AA0)'},
+      {when:'Today', score:'72', g:'linear-gradient(150deg,#FF9EB0,#FF5A5F)'},
+    ];
+    const consistency = Array.from({length:28}).map((_,i) => ({
+      dotStyle:{width:'100%',aspectRatio:'1',borderRadius:'5px', background: (i%7===5||i%7===6||i>25) ? '#EEE' : ((i+3)%9===0 ? '#FFD2D3' : A), opacity:(i%7===5||i%7===6||i>25)?.5:1 }
+    }));
+
+    // ── profile ──
+    const profileChips = ['Combination','Sensitive','Acne-prone','Fitzpatrick III','Dehydrated'];
+
+    const TAB = '#FF5A5F', TABI = '#aeaeb2';
+    const tabbed = ['dashboard','routine','progress','profile'].includes(screen);
+
+    return {
+      isAuth: screen==='auth', isWelcome: screen==='welcome', isFacescan: screen==='facescan',
+      isQuiz: screen==='quiz', isAnalyzing: screen==='analyzing',
+      isDashboard: screen==='dashboard', isSkinlog: screen==='skinlog',
+      // auth
+      authHeading: isSignUp ? 'Create account' : 'Welcome back',
+      authSub: isSignUp ? 'Start your skin journey today' : 'Good to see you again',
+      authCta: isSignUp ? 'Create account' : 'Sign in',
+      authIsSignUp: isSignUp,
+      tabSignIn: isSignUp ? tabInactive : tabActive,
+      tabSignUp: isSignUp ? tabActive : tabInactive,
+      setSignIn: () => this.setState({ authTab:'signin' }),
+      setSignUp: () => this.setState({ authTab:'signup' }),
+      toggleTab: () => this.setState({ authTab: isSignUp ? 'signin' : 'signup' }),
+      authSwitch: isSignUp ? 'Already have an account?' : "Don't have an account?",
+      authSwitchCta: isSignUp ? 'Sign in' : 'Sign up',
+      pwType: s.showPw ? 'text' : 'password',
+      pwLabel: s.showPw ? 'Hide' : 'Show',
+      togglePw: () => this.setState({ showPw: !s.showPw }),
+      goWelcome: () => this.setState({ screen:'welcome' }),
+      // facescan
+      backToWelcome: () => this.setState({ screen:'welcome' }),
+      startQuiz: () => this.setState({ screen:'quiz', qi:0 }),
+      start: () => this.setState({ screen:'facescan' }),
+      back: () => this.back(), next: () => this.next(),
+      openLog: () => this.setState({ screen:'skinlog' }), closeLog: () => this.setState({ screen:'dashboard' }),
+      qTitle: q.title, qSub: q.sub || '', hasSub: !!q.sub,
+      isCards: q.type==='cards', isYesno: q.type==='yesno', isTone: q.type==='tone', isText,
+      opts, moods, products, factorChips,
+      onText: (e) => this.onText(q, e.target.value), textVal: ans || '',
+      qCount: (s.qi+1) + ' / ' + Q.length,
+      progressStyle: { width: (((s.qi+1)/Q.length)*100)+'%', height:'100%', background:A, borderRadius:'21px', transition:'width .3s ease' },
+      showProgress: this.props.showProgress !== false,
+      showContinue,
+      continueStyle: { width:'100%',height:'54px',border:'none',borderRadius:'16px',fontSize:'18px',fontWeight:700,cursor: contEnabled?'pointer':'default',fontFamily:'inherit',transition:'all .2s ease',
+        background: contEnabled ? A : '#EAEAEF', color: contEnabled ? '#fff' : '#aeaeb2',
+        boxShadow: contEnabled ? '0 12px 26px -8px rgba(255,90,95,.55)' : 'none', pointerEvents: contEnabled?'auto':'none' },
+      userName: this.props.userName || 'Chris',
+      // new screens + tab nav
+      isResults: screen==='results', isRoutine: screen==='routine', isProgress: screen==='progress', isProfile: screen==='profile',
+      showTabBar: tabbed,
+      goHome:()=>this.setState({screen:'dashboard'}), goRoutine:()=>this.setState({screen:'routine'}),
+      goProgress:()=>this.setState({screen:'progress'}), goProfile:()=>this.setState({screen:'profile'}),
+      goScan:()=>this.setState({screen:'facescan'}),
+      tabHomeColor: screen==='dashboard'?TAB:TABI, tabRoutineColor: screen==='routine'?TAB:TABI,
+      tabProgressColor: screen==='progress'?TAB:TABI, tabProfileColor: screen==='profile'?TAB:TABI,
+      // analysis data
+      skinScore, scoreTrend, skinAge, metrics, concerns, faceMarks, scoreRingStyle,
+      // routine data
+      routineSteps, routineTime:rt,
+      segAm: rt==='am' ? {...segBase,...segOn} : {...segBase,...segOff},
+      segPm: rt==='pm' ? {...segBase,...segOn} : {...segBase,...segOff},
+      setAm:()=>this.setState({routineTime:'am'}), setPm:()=>this.setState({routineTime:'pm'}),
+      routineDoneCount: doneCount, routineCountLabel: doneCount+' of 4 done',
+      routineBarStyle:{width:(doneCount/4*100)+'%',height:'100%',background:A,borderRadius:'21px',transition:'width .3s ease'},
+      routineTitle: rt==='am' ? 'Morning routine' : 'Evening routine',
+      // progress + profile data
+      trendBars, improvements, photoTimeline, consistency, profileChips,
+      userInitial: (this.props.userName || 'Chris').trim().charAt(0).toUpperCase(),
+      qCountTotal: Q.length,
+      goAuth:()=>this.setState({screen:'auth'}),
+    };
+  }
+}
+</script>
+</body>
+</html>

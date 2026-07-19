@@ -1,0 +1,48 @@
+# Keep environment variables out of version control
+.env
+.env*.local
+
+# dependencies
+node_modules/
+
+# Prisma generated client
+backend/generated/prisma/
+
+# Backend
+backend/uploads/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+# generated native folders
+frontend/ios
+frontend/android

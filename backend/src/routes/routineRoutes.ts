@@ -1,0 +1,21 @@
+import { Router } from 'express';
+import { requireAuth } from '../middleware/clerkAuth';
+import { syncUser } from '../middleware/syncUser';
+import { getRoutines, createRoutine, createCustomRoutine, addStep, toggleStep, completeRoutine, updateStep, deleteRoutine, deleteStep, reorderSteps } from '../controllers/routineController';
+import { getRoutineInsight, getDetailedInsight } from '../controllers/routineInsightController';
+
+const router = Router();
+router.use(requireAuth(), syncUser);
+router.get('/', getRoutines);
+router.post('/', createRoutine);
+router.post('/custom', createCustomRoutine);
+router.post('/insight', getRoutineInsight);
+router.get('/insight/detailed', getDetailedInsight);
+router.post('/:id/complete', completeRoutine);
+router.delete('/:id', deleteRoutine);
+router.post('/:id/steps', addStep);
+router.patch('/:id/steps/:stepId', toggleStep);
+router.put('/:id/steps/:stepId', updateStep);
+router.put('/:id/steps/reorder', reorderSteps);
+router.delete('/:id/steps/:stepId', deleteStep);
+export default router;
