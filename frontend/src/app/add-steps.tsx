@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, Easing, useAnimatedProps, useAnimatedReaction, FadeIn, FadeInDown, FadeOut, runOnJS } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRoutines, useAddStep, useUpdateStep, useDeleteStep, useReorderSteps, useDetailedInsight } from '../hooks/queries/useRoutines';
 import AddProductSheet, { type AddProductSheetRef } from '../components/routine/AddProductSheet';
 import DraggableStepList from '../components/routine/DraggableStepList';
+import RoutineStepCard from '../components/routine/RoutineStepCard';
 import GlassIconButton from '../components/ui/GlassIconButton';
 import TimePickerSheet from '../components/routine/TimePickerSheet';
 import FrequencyPickerSheet from '../components/routine/FrequencyPickerSheet';
@@ -514,6 +515,9 @@ export default function AddStepsScreen() {
     const key = `${section}-${index}`;
     const added = addedSteps.find((s) => s.templateKey === key);
     const hasProduct = added?.hasProduct ?? false;
+    const description = hasProduct && added?.description
+      ? stripSectionTag(added.description)
+      : (added?.description ? stripSectionTag(added.description) : template.description);
 
     return (
       <Swipeable
@@ -523,130 +527,26 @@ export default function AddStepsScreen() {
         overshootRight={false}
         friction={2}
       >
-        <Pressable
-          onPress={() => handleStepPress(section, index, template)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.5)',
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.6)',
-            borderRadius: 18,
-            paddingVertical: 18,
-            paddingHorizontal: 18,
-            marginBottom: 10,
-          }}
-        >
-          {/* Product image / plus icon */}
-          {hasProduct && added?.productImageUrl ? (
-            <Image
-              source={{ uri: added.productImageUrl }}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                marginRight: 14,
-                backgroundColor: '#F2F2F7',
-              }}
-            />
-          ) : (
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: COLORS.borderLight,
-                borderStyle: 'dashed',
-                backgroundColor: 'rgba(255,255,255,0.3)',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 14,
-              }}
-            >
-              <Ionicons
-                name={added ? 'add' : 'image-outline'}
-                size={20}
-                color={added ? COLORS.primary : COLORS.textTertiary}
-              />
-            </View>
-          )}
-
-          {/* Text content */}
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontFamily: 'SFProRounded_Medium',
-                color: COLORS.textTertiary,
-                letterSpacing: 0.2,
-              }}
-            >
-              {hasProduct ? template.name : added ? 'Tap to add product' : 'Add product'}
-            </Text>
-            <Text
-              style={{
-                fontSize: 15,
-                fontFamily: 'SFProRounded_Semibold',
-                color: COLORS.text,
-                marginTop: 1,
-              }}
-              numberOfLines={1}
-            >
-              {hasProduct ? added?.productName : (added?.stepName || template.name)}
-            </Text>
-            <Text
-              style={{
-                fontSize: 12,
-                fontFamily: 'SFProRounded_Regular',
-                color: COLORS.textSecondary,
-                marginTop: 1,
-              }}
-            >
-              {hasProduct && added?.description ? stripSectionTag(added.description).split(' · ')[0] : (added?.description ? stripSectionTag(added.description) : template.description)}
-            </Text>
-            {hasProduct && added?.description && stripSectionTag(added.description).includes(' · ') && (
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontFamily: 'SFProRounded_Medium',
-                  color: COLORS.primary,
-                  marginTop: 2,
-                }}
-              >
-                {stripSectionTag(added.description).split(' · ')[1]}
-              </Text>
-            )}
-          </View>
-
-          {/* Step number */}
-          <View
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 8,
-              backgroundColor: 'rgba(255,255,255,0.5)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: 10,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 13,
-                fontFamily: 'SFProRounded_Medium',
-                color: COLORS.textTertiary,
-              }}
-            >
-              {(displayIndex ?? index) + 1}
-            </Text>
-          </View>
-        </Pressable>
+        <View style={{ marginBottom: 10 }}>
+          <RoutineStepCard
+            name={added?.stepName || template.name}
+            description={description}
+            productName={hasProduct ? added?.productName : undefined}
+            isCompleted={false}
+            productImageUrl={hasProduct ? added?.productImageUrl : undefined}
+            onImagePress={() => handleStepPress(section, index, template)}
+            onToggle={() => handleStepPress(section, index, template)}
+          />
+        </View>
       </Swipeable>
     );
   };
 
   const renderCustomStepRow = (step: AddedStep, index: number) => {
+    const description = step.description
+      ? stripSectionTag(step.description)
+      : 'Custom skincare step';
+
     return (
       <Swipeable
         key={step.templateKey}
@@ -655,79 +555,16 @@ export default function AddStepsScreen() {
         overshootRight={false}
         friction={2}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.5)',
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.6)',
-            borderRadius: 18,
-            paddingVertical: 18,
-            paddingHorizontal: 18,
-            marginBottom: 10,
-          }}
-        >
-          {step.productImageUrl ? (
-            <Image
-              source={{ uri: step.productImageUrl }}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                marginRight: 14,
-                backgroundColor: '#F2F2F7',
-              }}
-            />
-          ) : (
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: COLORS.borderLight,
-                borderStyle: 'dashed',
-                backgroundColor: 'rgba(255,255,255,0.3)',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 14,
-              }}
-            >
-              <Ionicons name="flask-outline" size={18} color={COLORS.primary} />
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 11, fontFamily: 'SFProRounded_Medium', color: COLORS.textTertiary, letterSpacing: 0.2 }}>
-              {step.stepName || 'Custom step'}
-            </Text>
-            <Text style={{ fontSize: 15, fontFamily: 'SFProRounded_Semibold', color: COLORS.text, marginTop: 1 }} numberOfLines={1}>
-              {step.productName || step.stepName || 'Product'}
-            </Text>
-            <Text style={{ fontSize: 12, fontFamily: 'SFProRounded_Regular', color: COLORS.textSecondary, marginTop: 1 }}>
-              {step.description ? stripSectionTag(step.description).split(' · ')[0] : 'Custom skincare step'}
-            </Text>
-            {step.description && stripSectionTag(step.description).includes(' · ') && (
-              <Text style={{ fontSize: 12, fontFamily: 'SFProRounded_Medium', color: COLORS.primary, marginTop: 2 }}>
-                {stripSectionTag(step.description).split(' · ')[1]}
-              </Text>
-            )}
-          </View>
-          <View
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 8,
-              backgroundColor: 'rgba(255,255,255,0.5)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: 10,
-            }}
-          >
-            <Text style={{ fontSize: 13, fontFamily: 'SFProRounded_Medium', color: COLORS.textTertiary }}>
-              {index + 1}
-            </Text>
-          </View>
+        <View style={{ marginBottom: 10 }}>
+          <RoutineStepCard
+            name={step.stepName || 'Custom step'}
+            description={description}
+            productName={step.productName}
+            isCompleted={false}
+            productImageUrl={step.productImageUrl}
+            onImagePress={() => {}}
+            onToggle={() => {}}
+          />
         </View>
       </Swipeable>
     );

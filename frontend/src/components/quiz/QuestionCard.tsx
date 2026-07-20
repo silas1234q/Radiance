@@ -6,9 +6,10 @@ interface QuestionCardProps {
   label: string;
   selected: boolean;
   onPress: () => void;
+  multiSelect?: boolean;
 }
 
-export default function QuestionCard({ label, selected, onPress }: QuestionCardProps) {
+export default function QuestionCard({ label, selected, onPress, multiSelect }: QuestionCardProps) {
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
@@ -23,7 +24,7 @@ export default function QuestionCard({ label, selected, onPress }: QuestionCardP
     >
       <Text className={`text-base font-poppins-semibold flex-1 ${selected ? 'text-primary' : 'text-skin-text'}`}>{label}</Text>
       <View
-        className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
+        className={`w-6 h-6 ${multiSelect ? 'rounded-[5px]' : 'rounded-full'} border-2 items-center justify-center ${
           selected ? 'bg-primary border-primary' : 'border-skin-border'
         }`}
       >

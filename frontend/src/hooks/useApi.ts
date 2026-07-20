@@ -18,10 +18,14 @@ async function getTokenWithRetry(
 }
 
 export function useApi() {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
 
   const authenticatedFetch = useCallback(
     async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
+      if (!isSignedIn) {
+        throw new Error('Not authenticated');
+      }
+
       const token = await getTokenWithRetry(getToken);
 
       return apiCall<T>(url, {
@@ -32,7 +36,7 @@ export function useApi() {
         },
       });
     },
-    [getToken]
+    [getToken, isSignedIn]
   );
 
   return { fetch: authenticatedFetch };

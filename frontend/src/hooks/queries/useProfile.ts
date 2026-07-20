@@ -40,6 +40,9 @@ export function useUpdateSkinProfile() {
       skinTone?: string;
       concerns?: string[];
       allergies?: string[];
+      routineLength?: string;
+      productBudget?: string;
+      ingredientsToAvoid?: string[];
     }) =>
       api.fetch<SkinProfile>('/skin-profile', {
         method: 'POST',

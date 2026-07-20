@@ -24,17 +24,18 @@ if (!publishableKey) {
 
 async function syncUserWithBackend(
   getToken: () => Promise<string | null>,
-): Promise<void> {
+): Promise<boolean | null> {
   try {
     const token = await getToken();
-    if (!token) return;
+    if (!token) return null;
 
-    await apiCall("/auth/sync", {
+    const data = await apiCall<{ isOnboarded?: boolean }>("/auth/sync", {
       method: "POST",
       headers: authHeaders(token),
     });
+    return !!data?.isOnboarded;
   } catch {
-    // Sync failed — user can still proceed, will retry next launch
+    return null;
   }
 }
 
@@ -54,9 +55,10 @@ function AuthRouter() {
 
       (async () => {
         queryClient.clear();
-        await syncUserWithBackend(getToken);
+        const backendOnboarded = await syncUserWithBackend(getToken);
+        await user.reload();
 
-        const isOnboarded = !!user.publicMetadata?.onboarded;
+        const isOnboarded = backendOnboarded ?? !!user.publicMetadata?.onboarded;
         router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
       })();
     } else {
@@ -71,9 +73,9 @@ function AuthRouter() {
 
   return (
     <Stack screenOptions={{ headerShown: false }} initialRouteName="auth">
-      <Stack.Screen name="auth" />
-      <Stack.Screen name="(onboarding)" />
-      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="auth" options={{ animation: "fade" }} />
+      <Stack.Screen name="(onboarding)" options={{ animation: "fade" }} />
+      <Stack.Screen name="(tabs)" options={{animation:'fade'}}/>
       <Stack.Screen name="skin-log-modal" options={{ presentation: "modal" }} />
       <Stack.Screen
         name="routine-steps"
@@ -129,6 +131,46 @@ function AuthRouter() {
       />
       <Stack.Screen
         name="edit-skin-field"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      />
+      <Stack.Screen
+        name="routine-preferences"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      />
+      <Stack.Screen
+        name="my-shelf"
+        options={{
+          headerShown: false,
+          presentation: "modal",
+          animation: "slide_from_bottom",
+        }}
+      />
+      <Stack.Screen
+        name="faq"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      />
+      <Stack.Screen
+        name="app-settings"
+        options={{
+          headerShown: false,
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      />
+      <Stack.Screen
+        name="contact-us"
         options={{
           headerShown: false,
           presentation: "card",

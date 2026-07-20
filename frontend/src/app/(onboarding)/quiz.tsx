@@ -329,6 +329,7 @@ export default function QuizScreen() {
                   : currentAnswer === opt
               }
               onPress={() => setAnswer(opt)}
+              multiSelect={question.type === 'multiple'}
             />
           </Animated.View>
         ))}
@@ -353,7 +354,7 @@ export default function QuizScreen() {
           <ProgressBar progress={progress} />
         </View>
         <Text className="text-sm font-poppins-semibold text-skin-text-tertiary" style={{ fontVariant: ['tabular-nums'] }}>
-          {safeIndex + 1}/{filteredQuestions.length}
+          {Math.round(progress * 100)}%
         </Text>
       </Animated.View>
 

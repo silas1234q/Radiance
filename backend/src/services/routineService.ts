@@ -10,6 +10,21 @@ interface StepData {
   aiRationale?: string | null;
 }
 
+async function fillMissingProducts(steps: StepData[]): Promise<StepData[]> {
+  for (const step of steps) {
+    if (step.productId) continue;
+    try {
+      const results = await searchProducts(step.name, 3);
+      if (results.length > 0) {
+        step.productId = results[0].id;
+      }
+    } catch {
+      // Skip if search fails
+    }
+  }
+  return steps;
+}
+
 export async function generateRoutines(userId: string): Promise<void> {
   const profile = await prisma.skinProfile.findUnique({ where: { userId } });
   if (!profile) return;
@@ -32,7 +47,9 @@ export async function generateRoutines(userId: string): Promise<void> {
         skinType: profile.skinType,
         sensitivityLevel: profile.sensitivityLevel,
         concerns: profile.concerns,
-        allergies: profile.allergies,
+        allergies: [...(profile.allergies || []), ...(profile.ingredientsToAvoid || [])],
+        routineLength: profile.routineLength,
+        productBudget: profile.productBudget,
       },
       allProducts.map(p => ({
         id: p.id,
@@ -43,14 +60,23 @@ export async function generateRoutines(userId: string): Promise<void> {
       }))
     );
 
+    const recommendedProductIds: string[] = [];
+
     for (const type of ['AM', 'PM'] as const) {
-      const steps: StepData[] = (type === 'AM' ? aiRoutines.am : aiRoutines.pm).map(s => ({
+      let steps: StepData[] = (type === 'AM' ? aiRoutines.am : aiRoutines.pm).map(s => ({
         order: s.order,
         name: s.name,
         description: s.description,
         productId: s.productId,
         aiRationale: s.rationale,
       }));
+
+      steps = await fillMissingProducts(steps);
+
+      // Collect product IDs for shelf tracking
+      for (const step of steps) {
+        if (step.productId) recommendedProductIds.push(step.productId);
+      }
 
       const existing = await prisma.routine.findFirst({
         where: { userId, type, name: null },
@@ -65,6 +91,15 @@ export async function generateRoutines(userId: string): Promise<void> {
           data: { userId, type, steps: { create: steps } },
         });
       }
+    }
+
+    // Track recommended products in user's shelf
+    for (const productId of [...new Set(recommendedProductIds)]) {
+      await prisma.userProduct.upsert({
+        where: { userId_productId: { userId, productId } },
+        update: {},
+        create: { userId, productId, source: 'recommended' },
+      });
     }
   } catch (err) {
     console.error('[RoutineService] AI routine generation failed, falling back:', err);
@@ -118,8 +153,15 @@ function generateSteps(skinType: string, concerns: string[], type: 'AM' | 'PM'):
 }
 
 async function fallbackGenerateRoutines(userId: string, skinType: string, concerns: string[]): Promise<void> {
+  const recommendedProductIds: string[] = [];
+
   for (const type of ['AM', 'PM'] as const) {
-    const steps = generateSteps(skinType, concerns, type);
+    let steps = generateSteps(skinType, concerns, type);
+    steps = await fillMissingProducts(steps);
+
+    for (const step of steps) {
+      if (step.productId) recommendedProductIds.push(step.productId);
+    }
 
     const existing = await prisma.routine.findFirst({
       where: { userId, type, name: null },
@@ -134,5 +176,14 @@ async function fallbackGenerateRoutines(userId: string, skinType: string, concer
         data: { userId, type, steps: { create: steps } },
       });
     }
+  }
+
+  // Track recommended products in user's shelf
+  for (const productId of [...new Set(recommendedProductIds)]) {
+    await prisma.userProduct.upsert({
+      where: { userId_productId: { userId, productId } },
+      update: {},
+      create: { userId, productId, source: 'recommended' },
+    });
   }
 }

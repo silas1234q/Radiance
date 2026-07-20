@@ -32,6 +32,7 @@ model User {
   gamification     UserGamification?
   dailyCompletions DailyCompletion[]
   xpEvents         XpEvent[]
+  userProducts     UserProduct[]
 }
 
 model SkinProfile {
@@ -54,11 +55,14 @@ model SkinProfile {
   aiAnalysisRaw    Json?
   scanData         Json?
   analysisSource   String?
-  weeklyPlan       Json?
-  weeklyPlanSource String?
-  photoUrl         String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  weeklyPlan         Json?
+  weeklyPlanSource   String?
+  photoUrl           String?
+  routineLength      String?   // "minimal" | "standard" | "extensive"
+  productBudget      String?   // "drugstore" | "midrange" | "luxury" | "none"
+  ingredientsToAvoid String[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model SkinQuizAnswer {
@@ -186,9 +190,10 @@ model Product {
   barcode     String?       @unique
   sourceUrl   String?
   source      String        @default("seeded")
-  steps       RoutineStep[]
-  analyses    ProductAnalysis[]
-  createdAt   DateTime      @default(now())
+  steps        RoutineStep[]
+  analyses     ProductAnalysis[]
+  userProducts UserProduct[]
+  createdAt    DateTime      @default(now())
 }
 
 model UserGamification {
@@ -246,5 +251,18 @@ model ProductAnalysis {
 
   @@unique([productId, userId])
   @@index([productId])
+  @@index([userId])
+}
+
+model UserProduct {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  source    String   // "recommended" | "scanned" | "added"
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
   @@index([userId])
 }

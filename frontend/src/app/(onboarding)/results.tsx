@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
@@ -220,6 +220,8 @@ function MetricsGrid({ metrics }: { metrics: { label: string; value: number }[] 
 // --- Main Screen ---
 export default function ResultsScreen() {
   const router = useRouter();
+  const { error } = useLocalSearchParams<{ error?: string }>();
+  const hasError = error === '1';
   const { data: profile, isLoading } = useSkinProfile();
 
   if (isLoading) {
@@ -417,11 +419,13 @@ export default function ResultsScreen() {
         {/* CTA */}
         <Animated.View entering={FadeInDown.delay(cardIndex * 120 + 200).duration(500)} className="px-5 pt-6">
           <Pressable
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => router.replace(hasError ? '/(onboarding)/quiz' : '/(tabs)')}
             className="h-[56px] rounded-2xl bg-primary items-center justify-center"
             style={({ pressed }) => [pressed && { opacity: 0.85 }]}
           >
-            <Text className="text-[16px] font-poppins-semibold text-white tracking-[0.5px]">View My Routine</Text>
+            <Text className="text-[16px] font-poppins-semibold text-white tracking-[0.5px]">
+              {hasError ? 'Try Again' : 'View My Routine'}
+            </Text>
           </Pressable>
         </Animated.View>
       </ScrollView>

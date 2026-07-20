@@ -38,12 +38,12 @@ interface ScanMetricsCardProps {
 type MetricKey = keyof ScanMetrics;
 
 const METRIC_CONFIG: { key: MetricKey; label: string; color: string }[] = [
-  { key: 'acne', label: 'Acne', color: '#EF5350' },
-  { key: 'wrinkle', label: 'Wrinkle', color: '#AB47BC' },
-  { key: 'ageSpot', label: 'Age Spot', color: '#8D6E63' },
-  { key: 'redness', label: 'Redness', color: '#FF7043' },
-  { key: 'pore', label: 'Pore', color: '#26A69A' },
-  { key: 'oiliness', label: 'Oiliness', color: '#FFA726' },
+  { key: 'acne', label: 'Clarity', color: '#EF5350' },
+  { key: 'wrinkle', label: 'Smoothness', color: '#AB47BC' },
+  { key: 'ageSpot', label: 'Even Tone', color: '#8D6E63' },
+  { key: 'redness', label: 'Calm', color: '#FF7043' },
+  { key: 'pore', label: 'Pore Health', color: '#26A69A' },
+  { key: 'oiliness', label: 'Oil Balance', color: '#FFA726' },
   { key: 'texture', label: 'Texture', color: '#66BB6A' },
   { key: 'moisture', label: 'Moisture', color: '#42A5F5' },
 ];

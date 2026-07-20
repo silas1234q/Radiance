@@ -35,6 +35,9 @@ export interface SkinProfile {
   scanData: unknown;
   analysisSource: string | null;
   photoUrl: string | null;
+  routineLength: string | null;
+  productBudget: string | null;
+  ingredientsToAvoid: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -216,4 +219,14 @@ export interface StreakRestoreResult {
   reason?: string;
   streakRestoresLeft?: number;
   currentStreak?: number;
+}
+
+// ── User Product (Shelf) ──
+export interface UserProduct {
+  id: string;
+  userId: string;
+  productId: string;
+  product: Product;
+  source: 'recommended' | 'scanned' | 'added';
+  createdAt: string;
 }

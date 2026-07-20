@@ -31,18 +31,16 @@ export const authService = async (clerkId: string) => {
 
   invalidateUserCache(clerkId);
 
-  // Auto-detect onboarded users: if they have a skin profile in DB but Clerk
-  // metadata is missing (e.g. after switching Clerk to production), set it.
-  const hasSkinProfile = await prisma.skinProfile.findUnique({
+  const hasQuizAnswers = await prisma.skinQuizAnswer.findFirst({
     where: { userId: user.id },
     select: { id: true },
   });
 
-  if (hasSkinProfile && !clerkUser.publicMetadata?.onboarded) {
+  if (!hasQuizAnswers && clerkUser.publicMetadata?.onboarded) {
     clerkClient.users.updateUserMetadata(clerkId, {
-      publicMetadata: { onboarded: true },
-    }).catch(() => {}); // fire-and-forget
+      publicMetadata: { onboarded: null },
+    }).catch(() => {});
   }
 
-  return user;
+  return { user, isOnboarded: !!hasQuizAnswers };
 };

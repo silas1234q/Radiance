@@ -39,6 +39,16 @@ export const getProductById = catchAsync(async (req, res) => {
 export const getProductByBarcodeHandler = catchAsync(async (req, res) => {
   const product = await obfGetByBarcode(req.params.code as string);
   if (!product) throw new NotFoundError('Product not found');
+
+  // Auto-track as "scanned" in user's shelf
+  if (req.user) {
+    await prisma.userProduct.upsert({
+      where: { userId_productId: { userId: req.user.id, productId: product.id } },
+      update: { source: 'scanned' },
+      create: { userId: req.user.id, productId: product.id, source: 'scanned' },
+    });
+  }
+
   res.json(product);
 });
 
@@ -91,6 +101,15 @@ export const createProduct = catchAsync(async (req, res) => {
       source: 'manual',
     },
   });
+
+  // Auto-track as "added" in user's shelf
+  if (req.user) {
+    await prisma.userProduct.upsert({
+      where: { userId_productId: { userId: req.user.id, productId: product.id } },
+      update: { source: 'added' },
+      create: { userId: req.user.id, productId: product.id, source: 'added' },
+    });
+  }
 
   res.status(201).json(product);
 });

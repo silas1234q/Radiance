@@ -1,6 +1,13 @@
-import React, { useEffect } from 'react';
-import { View, Text, Dimensions, ScrollView, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect } from "react";
+import {
+  View,
+  Text,
+  Dimensions,
+  ScrollView,
+  Image,
+  Pressable,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,12 +17,12 @@ import Animated, {
   Easing,
   FadeInDown,
   FadeInUp,
-} from 'react-native-reanimated';
-import { COLORS, GLASS } from '../../constants/theme';
-import { getStepIcon } from '../../utils/stepIcons';
-import type { RoutineStep } from '../../types/api';
+} from "react-native-reanimated";
+import { COLORS, GLASS } from "../../constants/theme";
+import { getStepIcon } from "../../utils/stepIcons";
+import type { RoutineStep } from "../../types/api";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface StepDetailPageProps {
   step: RoutineStep;
@@ -24,9 +31,16 @@ interface StepDetailPageProps {
   concerns: string[];
   skinType: string;
   isCompleted: boolean;
+  onViewProduct?: (productId: string) => void;
 }
 
-function GlassCard({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+function GlassCard({
+  children,
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+}) {
   return (
     <Animated.View
       entering={FadeInUp.delay(delay).duration(500).springify()}
@@ -50,9 +64,10 @@ export default function StepDetailPage({
   concerns,
   skinType,
   isCompleted,
+  onViewProduct,
 }: StepDetailPageProps) {
   const { icon, color } = getStepIcon(step.name);
-  const topConcern = concerns[0] || skinType || 'your skin';
+  const topConcern = concerns[0] || skinType || "your skin";
 
   // Breathing pulse animation for the icon
   const breatheScale = useSharedValue(1);
@@ -60,7 +75,10 @@ export default function StepDetailPage({
   useEffect(() => {
     breatheScale.value = withRepeat(
       withSequence(
-        withTiming(1.08, { duration: 1250, easing: Easing.inOut(Easing.cubic) }),
+        withTiming(1.08, {
+          duration: 1250,
+          easing: Easing.inOut(Easing.cubic),
+        }),
         withTiming(1, { duration: 1250, easing: Easing.inOut(Easing.cubic) }),
       ),
       -1,
@@ -81,7 +99,12 @@ export default function StepDetailPage({
   return (
     <View style={{ width: SCREEN_WIDTH }}>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24, alignItems: 'center' }}
+        contentContainerStyle={{
+          paddingHorizontal: 24,
+          paddingTop: 16,
+          paddingBottom: 24,
+          alignItems: "center",
+        }}
         showsVerticalScrollIndicator={false}
       >
         {/* Step indicator */}
@@ -101,8 +124,8 @@ export default function StepDetailPage({
               height: 100,
               borderRadius: 50,
               backgroundColor: `${color}18`,
-              alignItems: 'center',
-              justifyContent: 'center',
+              alignItems: "center",
+              justifyContent: "center",
               marginBottom: 24,
             },
           ]}
@@ -153,11 +176,11 @@ export default function StepDetailPage({
                 <Image
                   source={{ uri: step.product.imageUrl }}
                   style={{
-                    width: '100%',
+                    width: "100%",
                     height: 160,
                     borderRadius: 14,
                     marginBottom: 12,
-                    backgroundColor: '#f0f0f0',
+                    backgroundColor: "#f0f0f0",
                   }}
                   resizeMode="contain"
                 />
@@ -173,7 +196,7 @@ export default function StepDetailPage({
               {step.product.category && (
                 <View
                   style={{
-                    alignSelf: 'flex-start',
+                    alignSelf: "flex-start",
                     backgroundColor: `${COLORS.primary}15`,
                     borderRadius: 999,
                     paddingHorizontal: 10,
@@ -181,11 +204,42 @@ export default function StepDetailPage({
                     marginTop: 8,
                   }}
                 >
-                  <Text className="text-[12px] font-poppins-medium" style={{ color: COLORS.primary }}>
+                  <Text
+                    className="text-[12px] font-poppins-medium"
+                    style={{ color: COLORS.primary }}
+                  >
                     {step.product.category}
                   </Text>
                 </View>
               )}
+              <Pressable
+                onPress={() => onViewProduct?.(step.product!.id)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  marginTop: 14,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  backgroundColor: `${COLORS.primary}10`,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "600",
+                    color: COLORS.primary,
+                  }}
+                >
+                  View product details
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.primary}
+                />
+              </Pressable>
             </GlassCard>
           </View>
         )}
@@ -203,7 +257,6 @@ export default function StepDetailPage({
             </GlassCard>
           </View>
         )}
-
       </ScrollView>
     </View>
   );
@@ -211,31 +264,31 @@ export default function StepDetailPage({
 
 function getGoalSentence(stepName: string, concern: string): string {
   const name = stepName.toLowerCase();
-  if (name.includes('cleanser') || name.includes('face wash')) {
+  if (name.includes("cleanser") || name.includes("face wash")) {
     return `Cleansing removes impurities and excess oil that can contribute to ${concern}.`;
   }
-  if (name.includes('toner')) {
+  if (name.includes("toner")) {
     return `Toning balances your skin's pH and preps it to better absorb treatments for ${concern}.`;
   }
-  if (name.includes('serum')) {
+  if (name.includes("serum")) {
     return `Serums deliver concentrated active ingredients that directly target ${concern}.`;
   }
-  if (name.includes('moisturizer')) {
+  if (name.includes("moisturizer")) {
     return `Moisturizing strengthens your skin barrier, which is key to managing ${concern}.`;
   }
-  if (name.includes('sunscreen') || name.includes('spf')) {
+  if (name.includes("sunscreen") || name.includes("spf")) {
     return `UV protection prevents damage that can worsen ${concern} and cause premature aging.`;
   }
-  if (name.includes('exfoliat')) {
+  if (name.includes("exfoliat")) {
     return `Exfoliating removes dead skin cells, helping reduce the appearance of ${concern}.`;
   }
-  if (name.includes('eye cream')) {
+  if (name.includes("eye cream")) {
     return `Eye cream targets the delicate eye area, addressing ${concern} where skin is thinnest.`;
   }
-  if (name.includes('retinol')) {
+  if (name.includes("retinol")) {
     return `Retinol accelerates cell turnover, a proven approach for improving ${concern}.`;
   }
-  if (name.includes('mask')) {
+  if (name.includes("mask")) {
     return `Masks provide an intensive treatment boost to help address ${concern}.`;
   }
   return `This step supports your overall skin health and helps target ${concern}.`;

@@ -7,7 +7,7 @@ export const registerUserOrLogin = catchAsync(async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) throw new AuthError('user not authenticated');
 
-  const user = await authService(userId);
+  const { user, isOnboarded } = await authService(userId);
 
-  res.status(200).json(user);
+  res.status(200).json({ ...user, isOnboarded });
 });

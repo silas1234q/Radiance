@@ -52,8 +52,8 @@ export const getSkinProfile = catchAsync(async (req, res) => {
 });
 
 export const createSkinProfile = catchAsync(async (req, res) => {
-  const { skinType, sensitivityLevel, skinTone, concerns, allergies } = req.body;
-  const allowed = { skinType, sensitivityLevel, skinTone, concerns, allergies };
+  const { skinType, sensitivityLevel, skinTone, concerns, allergies, routineLength, productBudget, ingredientsToAvoid } = req.body;
+  const allowed = { skinType, sensitivityLevel, skinTone, concerns, allergies, routineLength, productBudget, ingredientsToAvoid };
   // Remove undefined keys
   const data = Object.fromEntries(Object.entries(allowed).filter(([, v]) => v !== undefined));
 

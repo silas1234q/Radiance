@@ -96,6 +96,10 @@ export default function RoutineStepsScreen() {
               concerns={concerns}
               skinType={skinType}
               isCompleted={item.isCompleted}
+              onViewProduct={(productId) => {
+                router.back();
+                setTimeout(() => router.push({ pathname: '/product-detail', params: { id: productId } }), 100);
+              }}
             />
           )}
         />

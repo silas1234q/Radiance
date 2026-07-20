@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
-import { useRoutines } from "../../hooks/queries/useRoutines";
+import { useRoutines, useDetailedInsight } from "../../hooks/queries/useRoutines";
 import { useProfile, useSkinProfile } from "../../hooks/queries/useProfile";
 import { useLatestScore } from "../../hooks/queries/useSkinScores";
 import { useGamification, useRestoreStreak } from "../../hooks/queries/useGamification";
@@ -14,6 +14,7 @@ import GoalChip from "../../components/routine/GoalChip";
 import SkinDiaryCard from "../../components/dashboard/SkinDiaryCard";
 import RoutineCompatibilityCard from "../../components/dashboard/RoutineCompatibilityCard";
 import HomeSkeleton from "../../components/dashboard/HomeSkeleton";
+import GlassCard from "../../components/ui/GlassCard";
 import { COLORS } from "../../constants/theme";
 
 export default function HomeScreen() {
@@ -34,7 +35,7 @@ export default function HomeScreen() {
   const topConcern = skinProfile?.concerns?.[0] || skinProfile?.skinType || "";
   const skinScore = latestScore?.score ?? skinProfile?.skinScore ?? 0;
 
-  // Routine compatibility - derived from skin data, routine, and concerns
+  // Routine compatibility - from backend insight API (same as routine screen)
   const allSteps = [...amSteps, ...pmSteps];
   const totalProducts = new Set(
     allSteps.filter((s) => s.product).map((s) => s.product?.id),
@@ -44,17 +45,9 @@ export default function HomeScreen() {
     Math.round(totalGoals * (skinScore / 100)),
     totalGoals,
   );
-  const compatibilityScore =
-    hasRoutine && skinScore > 0
-      ? Math.round(
-          Math.min(
-            skinScore * 0.7 +
-              totalProducts * 5 +
-              (goalsMetCount / Math.max(totalGoals, 1)) * 15,
-            100,
-          ),
-        )
-      : 0;
+  const hasStepsWithProducts = allSteps.some((s) => s.product);
+  const { data: insightData } = useDetailedInsight("default", hasRoutine && hasStepsWithProducts);
+  const compatibilityScore = insightData?.compatibilityScore ?? 0;
 
   const hour = new Date().getHours();
   const greeting =
@@ -134,22 +127,7 @@ export default function HomeScreen() {
 
           {/* Streak & XP Card */}
           {gamification && (
-            <View
-              style={{
-                backgroundColor: "#fff",
-                borderRadius: 20,
-                padding: 16,
-                marginBottom: 16,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.06,
-                shadowRadius: 8,
-                elevation: 2,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 14,
-              }}
-            >
+            <GlassCard style={{ marginBottom: 16, flexDirection: "row", alignItems: "center", gap: 14 }}>
               {/* Streak */}
               <View style={{ alignItems: "center", paddingHorizontal: 4 }}>
                 <Text style={{ fontSize: 22 }}>🔥</Text>
@@ -226,7 +204,7 @@ export default function HomeScreen() {
                   {gamification.totalXp.toLocaleString()} / {(glowLevel?.levelMaxXp ?? 500).toLocaleString()} XP
                 </Text>
               </View>
-            </View>
+            </GlassCard>
           )}
 
           {/* Streak Restore Banner */}
@@ -234,16 +212,14 @@ export default function HomeScreen() {
             <Pressable
               onPress={() => restoreStreak.mutate()}
               disabled={restoreStreak.isPending}
-              style={{
-                backgroundColor: "#FFF3E0",
-                borderRadius: 16,
-                padding: 14,
+            >
+              <GlassCard style={{
                 marginBottom: 16,
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 10,
-              }}
-            >
+                backgroundColor: "#FFF3E0",
+              }}>
               <Ionicons name="flame" size={24} color="#FF9500" />
               <View style={{ flex: 1 }}>
                 <Text
@@ -278,6 +254,7 @@ export default function HomeScreen() {
                   Restore
                 </Text>
               </View>
+              </GlassCard>
             </Pressable>
           )}
 
@@ -288,7 +265,7 @@ export default function HomeScreen() {
               goalsMetCount={goalsMetCount}
               totalGoals={totalGoals}
               productCount={totalProducts}
-              onPress={() => router.push("/my-routine")}
+              onPress={() => router.push("/(tabs)/routine")}
             />
           )}
 

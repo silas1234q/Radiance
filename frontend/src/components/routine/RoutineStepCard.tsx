@@ -103,6 +103,7 @@ export default function RoutineStepCard({
             color: isCompleted ? COLORS.textTertiary : COLORS.text,
             fontWeight: '500',
           }}
+          numberOfLines={1}
         >
           {name}
         </Text>
@@ -114,8 +115,9 @@ export default function RoutineStepCard({
               marginTop: 2,
               lineHeight: 18,
             }}
+            numberOfLines={1}
           >
-            {description.replace(/^\[(AM|PM)\]\s*/, '')}
+            {description.replace(/^\[(AM|PM)\]\s*/, '').split('.')[0]}
           </Text>
         )}
         {productName && (
@@ -126,6 +128,7 @@ export default function RoutineStepCard({
               color: isCompleted ? COLORS.textTertiary : COLORS.primary,
               fontWeight: '500',
             }}
+            numberOfLines={1}
           >
             {productName}
           </Text>

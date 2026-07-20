@@ -386,6 +386,8 @@ interface SkinProfileData {
   sensitivityLevel: string | null;
   concerns: string[];
   allergies: string[];
+  routineLength?: string | null;
+  productBudget?: string | null;
 }
 
 interface ProductData {
@@ -499,9 +501,10 @@ Rules:
 - AM routine: always end with sunscreen
 - PM routine: double cleanse if needed, treatments before moisturizer
 - Only use productId values from the provided product list. If no suitable product exists, set productId to null.
-- Each routine should have 4-7 steps
+- Each routine should have 4-7 steps (adjust based on user's routine length preference if provided)
 - Order steps by application sequence (thinnest to thickest consistency)
-- Provide a brief rationale for each step`,
+- Provide a brief rationale for each step
+- If a product budget preference is specified, favor products in that price tier`,
         },
         {
           role: "user",
@@ -509,7 +512,9 @@ Rules:
 - Skin Type: ${profile.skinType || "Normal"}
 - Sensitivity: ${profile.sensitivityLevel || "Not sensitive"}
 - Concerns: ${profile.concerns.join(", ") || "None specified"}
-- Allergies: ${profile.allergies.join(", ") || "None"}
+- Allergies/Ingredients to Avoid: ${profile.allergies.join(", ") || "None"}
+- Routine Length Preference: ${profile.routineLength || "standard"}
+- Budget Preference: ${profile.productBudget || "no preference"}
 
 Available Products:
 ${productList || "No specific products available. Recommend generic step names with productId: null."}`,

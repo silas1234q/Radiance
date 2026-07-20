@@ -75,6 +75,16 @@ export const addStep = catchAsync(async (req, res) => {
     },
     include: { product: true },
   });
+
+  // Track product as "added" in user's shelf
+  if (productId) {
+    await prisma.userProduct.upsert({
+      where: { userId_productId: { userId: req.user!.id, productId } },
+      update: {},
+      create: { userId: req.user!.id, productId, source: 'added' },
+    });
+  }
+
   await invalidateInsightCache(req.user!.id);
   res.status(201).json(step);
 });

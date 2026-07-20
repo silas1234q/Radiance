@@ -149,7 +149,12 @@
       "Bash(find /c/Users/Silas/Documents/radiance -path \"*/types/api*\" -o -path \"*/types/index*\" 2>/dev/null | head -5)",
       "Bash(find /c/Users/Silas/Documents/radiance/frontend/src -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) | xargs grep -l \"questionId\\\\|questionText\" | head -20)",
       "Bash(cat \"/c/Users/Silas/Documents/radiance/frontend/src/app/\\(tabs\\)/profile.tsx\")",
-      "Bash(find /c/Users/Silas/Documents/radiance/frontend/src -name \"*.ts\" -o -name \"*.tsx\" | xargs grep -l \"type SkinProfile\\\\|interface SkinProfile\" 2>/dev/null)"
+      "Bash(find /c/Users/Silas/Documents/radiance/frontend/src -name \"*.ts\" -o -name \"*.tsx\" | xargs grep -l \"type SkinProfile\\\\|interface SkinProfile\" 2>/dev/null)",
+      "Bash(find \"C:/Users/Silas/Documents/radiance/frontend/src/components\" -type f -name \"*.tsx\" 2>/dev/null | head -20)",
+      "Bash(cd \"C:/Users/Silas/Documents/radiance/backend\" && timeout 8 npx ts-node-dev --transpile-only src/server.ts 2>&1 | tail -5)",
+      "Bash(cd \"C:/Users/Silas/Documents/radiance/backend\" && timeout 8 npx ts-node-dev --transpile-only src/server.ts 2>&1 | tail -3)",
+      "Bash(cd \"C:/Users/Silas/Documents/radiance/backend\" && timeout 8 npx ts-node-dev --transpile-only src/server.ts 2>&1 | tail -2)",
+      "Bash(head -100 /c/Users/Silas/Documents/radiance/frontend/src/app/\\\\\\(tabs\\\\\\)/index.tsx)"
     ]
   }
 }
