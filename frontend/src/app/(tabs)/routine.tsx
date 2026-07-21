@@ -299,10 +299,10 @@ export default function RoutineScreen() {
   }
 
   return (
-    <View className="flex-1" style={{ paddingTop: top }}>
+    <View className="flex-1">
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100,paddingTop: top }}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}

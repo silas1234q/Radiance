@@ -28,7 +28,11 @@ export default function QuestionCard({ label, selected, onPress, multiSelect }: 
           selected ? 'bg-primary border-primary' : 'border-skin-border'
         }`}
       >
-        {selected && <Text className="text-white text-[13px] font-poppins-bold">✓</Text>}
+        {selected && (
+          multiSelect
+            ? <Text className="text-white text-[13px] font-poppins-bold">✓</Text>
+            : <View className="w-[10px] h-[10px] rounded-full bg-white" />
+        )}
       </View>
     </Pressable>
   );

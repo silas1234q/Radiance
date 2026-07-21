@@ -49,6 +49,7 @@ export const quizQuestions: QuizQuestion[] = [
   { id: 23, text: "Did anything work?", type: 'text', showIf: (a) => !!a[21] && a[21] !== 'None' },
   { id: 24, text: "Are you currently using any prescription skincare?", subtitle: "Products prescribed by a doctor or dermatologist, like tretinoin or clindamycin", type: 'yesno' },
   { id: 25, text: "Any known allergies or reactions to skincare ingredients?", type: 'yesno' },
+  { id: 28, text: "What ingredients or products are you allergic to?", subtitle: "Select all that have caused a reaction", type: 'multiple', options: ['Fragrances', 'Retinol / Retinoids', 'Salicylic acid', 'Benzoyl peroxide', 'Vitamin C', 'AHA / BHA acids', 'Niacinamide', 'Essential oils', 'Sulfates', 'Alcohol-based products', 'Latex', 'Other'], showIf: (a) => a[25] === 'Yes' },
 
   // Hormonal & lifestyle
   { id: 26, text: "What hormonal condition are you going through?", subtitle: "Hormonal changes can trigger breakouts, oiliness, or dryness. Menopause is when periods stop permanently, usually around age 45–55", type: 'single', options: ['Puberty', 'Pregnancy', 'Menopause', 'Starting/stopping birth control', 'None'], femaleOnly: true },

@@ -41,7 +41,7 @@ export default function AuthScreen() {
           className="w-24 h-24 rounded-[30px] bg-primary items-center justify-center mb-[30px] shadow-primary"
           style={{
             shadowColor: '#F06680',
-            shadowOffset: { width: 0, height: 18 },
+            shadowOffset: { width: 0, height: 18 }, 
             shadowOpacity: 0.55,
             shadowRadius: 40,
             elevation: 12,

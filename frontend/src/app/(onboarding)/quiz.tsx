@@ -212,7 +212,7 @@ export default function QuizScreen() {
       answer,
     }));
     submitQuiz.mutate(formatted, {
-      onSuccess: () => router.push('/(onboarding)/analyzing'),
+      onSuccess: () => router.replace('/(onboarding)/analyzing'),
       onError: () => {
         resetExpandAnimation();
       },
@@ -316,6 +316,9 @@ export default function QuizScreen() {
     // single or multiple choice
     return (
       <View className="gap-[11px] mt-[26px]">
+        {question.type === 'multiple' && (
+          <Text className="text-[13px] font-poppins-medium text-skin-text-tertiary mb-[-4px]">Select all that apply</Text>
+        )}
         {question.options?.map((opt, i) => (
           <Animated.View
             key={`${animKey}-${opt}`}
