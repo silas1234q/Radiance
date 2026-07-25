@@ -2,6 +2,9 @@
 .env
 .env*.local
 
+
+CLAUDE.md
+
 # dependencies
 node_modules/
 
