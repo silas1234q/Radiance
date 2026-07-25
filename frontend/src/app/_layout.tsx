@@ -8,9 +8,11 @@ import {
 } from "@clerk/clerk-expo";
 import {
   QueryClient,
-  QueryClientProvider,
   MutationCache,
+  QueryCache,
 } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import Toast from "react-native-toast-message";
@@ -25,19 +27,45 @@ import AnimatedSplash from "../components/splash/AnimatedSplash";
 import { setNavReady } from "../lib/splash/ready";
 import { toastConfig } from "../components/ui/toastConfig";
 import { toast } from "../lib/toast";
+import { isNetworkError } from "../lib/errors";
+import { persister, persistOptions } from "../lib/queryPersister";
 import "../../global.css";
+
+// Tracks which Clerk user the persisted cache belongs to, so we only wipe it on
+// an actual account change (not on every cold start for the same user).
+const LAST_USER_KEY = "radiance:last-user-id";
 
 // Hold the native splash until our JS overlay has painted, then cross-fade.
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 300, fade: true });
 
 const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Keep cached entries long enough to persist and rehydrate offline. Must
+      // be >= the persister's maxAge (see lib/queryPersister.ts).
+      cacheTime: 1000 * 60 * 60 * 24 * 7, // 7 days
+      // Serve cache first, still attempt the network.
+      networkMode: "offlineFirst",
+      // Fail fast on network errors — the cached data is already on screen, so
+      // there's no point retrying 3× before the "No connection" toast shows.
+      retry: (count, err) => !isNetworkError(err) && count < 2,
+    },
+  },
   // Failed mutations toast by default. Opt out per-mutation with
   // `meta: { suppressErrorToast: true }` when a screen renders its own error UI.
   mutationCache: new MutationCache({
     onError: (err, _vars, _ctx, mutation) => {
       if (mutation.meta?.suppressErrorToast) return;
       toast.fromError(err);
+    },
+  }),
+  // Queries fail silently by default (screens render their own empty/error
+  // states), but a network outage affects the whole app — surface a single
+  // throttled "No connection" toast so the user isn't left with a blank screen.
+  queryCache: new QueryCache({
+    onError: (err) => {
+      if (isNetworkError(err)) toast.fromError(err);
     },
   }),
 });
@@ -80,7 +108,16 @@ function AuthRouter() {
       navigatedForSignIn.current = true;
 
       (async () => {
-        queryClient.clear();
+        // Only wipe the (persisted) cache when a DIFFERENT user signs in — for
+        // the same user resuming, keep it so their data is available offline on
+        // cold start; a background refetch updates it when online.
+        const lastUserId = await AsyncStorage.getItem(LAST_USER_KEY);
+        if (lastUserId !== user.id) {
+          queryClient.clear();
+          await persister.removeClient();
+          await AsyncStorage.setItem(LAST_USER_KEY, user.id);
+        }
+
         const backendOnboarded = await syncUserWithBackend(getToken);
         await user.reload();
 
@@ -91,7 +128,11 @@ function AuthRouter() {
       })();
     } else {
       navigatedForSignIn.current = false;
+      // Signed out: drop the cache and its persisted snapshot so it can't
+      // rehydrate into the next account.
       queryClient.clear();
+      void persister.removeClient();
+      void AsyncStorage.removeItem(LAST_USER_KEY);
 
       if (segments[0] !== "auth") {
         router.replace("/auth");
@@ -247,13 +288,16 @@ export default function RootLayout() {
         <BottomSheetModalProvider>
           <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
             <ClerkLoaded>
-              <QueryClientProvider client={queryClient}>
+              <PersistQueryClientProvider
+                client={queryClient}
+                persistOptions={persistOptions}
+              >
                 <RevenueCatProvider>
                   <NotificationsProvider>
                     <AuthRouter />
                   </NotificationsProvider>
                 </RevenueCatProvider>
-              </QueryClientProvider>
+              </PersistQueryClientProvider>
             </ClerkLoaded>
           </ClerkProvider>
         </BottomSheetModalProvider>

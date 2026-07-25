@@ -122,6 +122,13 @@ export default function ScanScreen() {
   if (!permission.granted) {
     return (
       <View style={styles.permissionContainer}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={[styles.closeButton, styles.closeButtonLight, { top: insets.top + 12 }]}
+        >
+          <Ionicons name="close" size={24} color={COLORS.text} />
+        </Pressable>
         <Ionicons
           name="barcode-outline"
           size={48}
@@ -235,6 +242,15 @@ export default function ScanScreen() {
         <Text style={styles.headerTitle}>Scan Product</Text>
         <Text style={styles.headerSubtitle}>Point at a barcode</Text>
       </View>
+
+      {/* Close */}
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={[styles.closeButton, { top: insets.top + 12 }]}
+      >
+        <Ionicons name="close" size={24} color="#fff" />
+      </Pressable>
 
       {/* Loading overlay */}
       {state === "loading" && (
@@ -381,6 +397,21 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: "center",
     zIndex: 10,
+  },
+  closeButton: {
+    position: "absolute",
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    zIndex: 11,
+  },
+  // Lighter circle for the white permission screen.
+  closeButtonLight: {
+    backgroundColor: "rgba(0,0,0,0.06)",
   },
   headerTitle: {
     color: "#fff",

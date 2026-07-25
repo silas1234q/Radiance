@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Dimensions, InteractionManager, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Brightness from 'expo-brightness';
@@ -92,6 +92,11 @@ export default function FaceScanScreen() {
 
 function FaceScanInner() {
   const router = useRouter();
+  // Launched from the onboarding quiz with `onboarding=1` — in that flow the
+  // scan is a required step, so no close button. Everywhere else (dashboard,
+  // routine, comparison) it's optional and gets a close button.
+  const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
+  const isOnboarding = onboarding === '1';
   const detector = useFaceDetection();
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -217,6 +222,25 @@ function FaceScanInner() {
   if (!permission.granted) {
     return (
       <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
+        {!isOnboarding && (
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={{
+              position: 'absolute',
+              top: 50,
+              right: 20,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.06)',
+            }}
+          >
+            <Ionicons name="close" size={24} color={COLORS.text} />
+          </Pressable>
+        )}
         <Text className="text-[18px] font-poppins-semibold text-skin-text text-center mb-2">
           Camera access needed
         </Text>
@@ -230,7 +254,9 @@ function FaceScanInner() {
           <Text className="text-[14px] font-poppins-semibold text-white">Enable Camera</Text>
         </Pressable>
         <Pressable
-          onPress={() => router.replace('/(onboarding)/results?locked=1')}
+          onPress={() =>
+            isOnboarding ? router.replace('/(onboarding)/results?locked=1') : router.back()
+          }
           className="mt-4 py-2"
         >
           <Text className="text-[14px] font-poppins-medium text-skin-text-tertiary">Not now</Text>
@@ -287,6 +313,27 @@ function FaceScanInner() {
             >
               <Ionicons name={flashOn ? 'flash' : 'flash-off'} size={22} color="#fff" />
             </Pressable>
+
+            {/* Close (hidden during onboarding, where the scan is required) */}
+            {!isOnboarding && (
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={12}
+                style={{
+                  position: 'absolute',
+                  top: 50,
+                  right: 20,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.45)',
+                }}
+              >
+                <Ionicons name="close" size={24} color="#fff" />
+              </Pressable>
+            )}
 
             {/* Top instruction / error */}
             <View className="px-6 pt-4 items-center" pointerEvents="none">

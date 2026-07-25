@@ -43,15 +43,37 @@ async function weeklyStats(userId: string) {
   return { fullDays, streak: gamification?.currentStreak ?? 0 };
 }
 
+// Prisma's "Can't reach database server" — expected transiently with a
+// serverless DB (e.g. Neon auto-suspend). Log tersely instead of a full stack.
+function logJobError(label: string, err: unknown): void {
+  const code = (err as { code?: string })?.code;
+  if (code === 'P1001') {
+    console.warn(`[${label}] Database unreachable — skipping this run.`);
+  } else {
+    console.error(`[${label}] failed:`, err);
+  }
+}
+
 export async function runWeeklySummaryJob(): Promise<void> {
-  const users = await prisma.user.findMany({
-    where: {
-      pushEnabled: true,
-      weeklyProgressEnabled: true,
-      expoPushToken: { not: null },
-    },
-    select: { id: true, expoPushToken: true, timezone: true, lastWeeklySummaryAt: true },
-  });
+  let users: {
+    id: string;
+    expoPushToken: string | null;
+    timezone: string | null;
+    lastWeeklySummaryAt: Date | null;
+  }[];
+  try {
+    users = await prisma.user.findMany({
+      where: {
+        pushEnabled: true,
+        weeklyProgressEnabled: true,
+        expoPushToken: { not: null },
+      },
+      select: { id: true, expoPushToken: true, timezone: true, lastWeeklySummaryAt: true },
+    });
+  } catch (err) {
+    logJobError('weekly-summary', err);
+    return;
+  }
 
   for (const user of users) {
     try {
@@ -85,19 +107,30 @@ export async function runWeeklySummaryJob(): Promise<void> {
 }
 
 export async function runWinbackJob(): Promise<void> {
-  const users = await prisma.user.findMany({
-    where: {
-      pushEnabled: true,
-      winbackEnabled: true,
-      expoPushToken: { not: null },
-    },
-    select: {
-      id: true,
-      expoPushToken: true,
-      createdAt: true,
-      lastWinbackAt: true,
-    },
-  });
+  let users: {
+    id: string;
+    expoPushToken: string | null;
+    createdAt: Date;
+    lastWinbackAt: Date | null;
+  }[];
+  try {
+    users = await prisma.user.findMany({
+      where: {
+        pushEnabled: true,
+        winbackEnabled: true,
+        expoPushToken: { not: null },
+      },
+      select: {
+        id: true,
+        expoPushToken: true,
+        createdAt: true,
+        lastWinbackAt: true,
+      },
+    });
+  } catch (err) {
+    logJobError('winback', err);
+    return;
+  }
 
   for (const user of users) {
     try {

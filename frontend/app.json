@@ -10,10 +10,13 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.radiance",
+      "bundleIdentifier": "com.silas.radiance",
       "infoPlist": {
-        "NSCameraUsageDescription": "$(PRODUCT_NAME) needs access to your Camera to capture photos and videos.",
-        "NSMicrophoneUsageDescription": "$(PRODUCT_NAME) needs access to your Microphone to record audio for video recordings."
+        "NSCameraUsageDescription": "$(PRODUCT_NAME) needs access to your camera to scan your skin and product barcodes.",
+        "NSMicrophoneUsageDescription": "$(PRODUCT_NAME) needs access to your microphone for video capture.",
+        "NSPhotoLibraryUsageDescription": "$(PRODUCT_NAME) needs access to your photos so you can add skin-log and product images from your library.",
+        "NSPhotoLibraryAddUsageDescription": "$(PRODUCT_NAME) needs permission to save photos you capture to your library.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -25,7 +28,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.radiance",
+      "package": "com.silas.radiance",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"

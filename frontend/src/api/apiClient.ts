@@ -8,7 +8,15 @@ export interface ApiError {
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export async function apiCall<T = unknown>(url: string, options: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE_URL}/api${url}`, options);
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/api${url}`, options);
+  } catch {
+    // `fetch` throws a raw `TypeError: Network request failed` when the request
+    // can't reach the server (offline, DNS, backend down). Normalize it to the
+    // ApiError-ish NETWORK_ERROR shape the rest of the app understands.
+    throw { type: 'NETWORK_ERROR', message: 'Network request failed' };
+  }
 
   if (response.status === 204) return null as T;
 

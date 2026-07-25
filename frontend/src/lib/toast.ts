@@ -1,5 +1,10 @@
 import Toast from 'react-native-toast-message';
-import { getErrorMessage } from './errors';
+import { getErrorMessage, isNetworkError } from './errors';
+
+// Many requests can fail at once when offline; only surface one network toast
+// per window so the screen isn't flooded with identical banners.
+const NETWORK_TOAST_THROTTLE_MS = 5000;
+let lastNetworkToastAt = 0;
 
 interface ToastOptions {
   /** Overrides the default heading (text1). */
@@ -43,6 +48,13 @@ export const toast = {
 
   /** Primary call site for catch blocks and the global mutation error handler. */
   fromError(err: unknown, opts: ToastOptions = {}) {
+    if (isNetworkError(err)) {
+      const now = Date.now();
+      if (now - lastNetworkToastAt < NETWORK_TOAST_THROTTLE_MS) return;
+      lastNetworkToastAt = now;
+      this.error(getErrorMessage(err), { title: 'No connection', ...opts });
+      return;
+    }
     this.error(getErrorMessage(err), opts);
   },
 };
