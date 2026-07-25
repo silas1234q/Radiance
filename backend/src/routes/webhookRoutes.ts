@@ -56,7 +56,9 @@ router.post(
 
         await prisma.user.upsert({
           where: { clerkId: data.id },
-          update: { firstName, lastName, email, avatarUrl },
+          // Avatar is managed in-app (PATCH /users/me); only seed it from Clerk
+          // on create so a Clerk profile update doesn't clobber a custom avatar.
+          update: { firstName, lastName, email },
           create: { clerkId: data.id, firstName, lastName, email, avatarUrl },
         });
       } else if (type === 'user.deleted') {

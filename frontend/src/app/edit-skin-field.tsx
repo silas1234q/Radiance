@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSkinProfile, useUpdateSkinProfile } from '../hooks/queries/useProfile';
 import { COLORS } from '../constants/theme';
-import GlassIconButton from '../components/ui/GlassIconButton';
+import CircleIconButton from '../components/ui/CircleIconButton';
 import Button from '../components/ui/Button';
 import QuestionCard from '../components/quiz/QuestionCard';
 import ToneSwatches from '../components/quiz/ToneSwatches';
@@ -163,7 +163,7 @@ export default function EditSkinFieldScreen() {
               gap: 14,
             }}
           >
-            <GlassIconButton icon="chevron-back" onPress={() => router.back()} iconSize={22} />
+            <CircleIconButton icon="chevron-back" onPress={() => router.back()} />
             <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.text }}>
               {config.title}
             </Text>

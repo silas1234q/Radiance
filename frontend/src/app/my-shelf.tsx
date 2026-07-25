@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useUserProducts } from '../hooks/queries/useUserProducts';
 import { COLORS } from '../constants/theme';
+import CircleIconButton from '../components/ui/CircleIconButton';
 import type { UserProduct } from '../types/api';
 
 const TABS = [
@@ -88,19 +89,7 @@ export default function MyShelfScreen() {
           <Text style={{ fontSize: 18, fontWeight: '600', color: COLORS.text }}>
             My Shelf
           </Text>
-          <Pressable
-            onPress={() => router.back()}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              backgroundColor: 'rgba(0,0,0,0.06)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="close" size={18} color={COLORS.text} />
-          </Pressable>
+          <CircleIconButton icon="close" onPress={() => router.back()} />
         </View>
 
         {/* Tabs */}

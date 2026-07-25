@@ -1,30 +1,44 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
+import CircleIconButton from '../components/ui/CircleIconButton';
 import { useCreateCustomRoutine } from '../hooks/queries/useRoutines';
+import RoutineReminderFields, {
+  RoutineReminderValue,
+} from '../components/routine/RoutineReminderFields';
 
 export default function NewRoutineScreen() {
   const router = useRouter();
   const createRoutine = useCreateCustomRoutine();
   const [name, setName] = useState('');
+  const [reminder, setReminder] = useState<RoutineReminderValue>({
+    amReminderTime: null,
+    pmReminderTime: null,
+  });
 
   const canSubmit = name.trim().length > 0;
 
   const handleSubmit = useCallback(() => {
     if (!name.trim()) return;
 
+    const reminderEnabled = !!(reminder.amReminderTime || reminder.pmReminderTime);
     createRoutine.mutate(
-      { name: name.trim() },
+      {
+        name: name.trim(),
+        reminderEnabled,
+        amReminderTime: reminder.amReminderTime,
+        pmReminderTime: reminder.pmReminderTime,
+      },
       {
         onSuccess: (data) => {
           router.replace({ pathname: '/add-steps', params: { routineId: data.id } });
         },
       },
     );
-  }, [name, createRoutine, router]);
+  }, [name, reminder, createRoutine, router]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F2F2F7' }}>
@@ -43,19 +57,7 @@ export default function NewRoutineScreen() {
               height: 52,
             }}
           >
-            <Pressable
-              onPress={() => router.back()}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: 'rgba(0,0,0,0.06)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Ionicons name="close" size={18} color={COLORS.text} />
-            </Pressable>
+            <CircleIconButton icon="close" onPress={() => router.back()} />
             <Text
               style={{
                 fontSize: 17,
@@ -98,6 +100,20 @@ export default function NewRoutineScreen() {
               }}
             />
 
+            <Text
+              style={{
+                fontSize: 13,
+                fontFamily: 'SFProRounded_Semibold',
+                color: COLORS.textSecondary,
+                marginBottom: 6,
+              }}
+            >
+              Reminders
+            </Text>
+            <View style={{ marginBottom: 24 }}>
+              <RoutineReminderFields value={reminder} onChange={setReminder} />
+            </View>
+
             <Pressable
               onPress={handleSubmit}
               disabled={!canSubmit || createRoutine.isPending}
@@ -106,17 +122,25 @@ export default function NewRoutineScreen() {
                 borderRadius: 14,
                 paddingVertical: 14,
                 alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: 50,
+                // Dim the button while the create request is in flight.
+                opacity: createRoutine.isPending ? 0.6 : 1,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontFamily: 'SFProRounded_Semibold',
-                  color: canSubmit ? '#fff' : '#999',
-                }}
-              >
-                {createRoutine.isPending ? 'Creating...' : 'Create'}
-              </Text>
+              {createRoutine.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontFamily: 'SFProRounded_Semibold',
+                    color: canSubmit ? '#fff' : '#999',
+                  }}
+                >
+                  Create
+                </Text>
+              )}
             </Pressable>
           </View>
         </KeyboardAvoidingView>

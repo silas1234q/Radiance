@@ -8,11 +8,8 @@ import Animated, {
   withTiming,
   withDelay,
   withSequence,
-  withSpring,
   Easing,
-  interpolate,
   runOnJS,
-  cancelAnimation,
 } from 'react-native-reanimated';
 import { useAnalyzeSkin } from '../../hooks/queries/useQuiz';
 import { COLORS } from '../../constants/theme';
@@ -29,6 +26,7 @@ const STEPS = [
 export default function AnalyzingScreen() {
   const router = useRouter();
   const analyzeSkin = useAnalyzeSkin();
+  const steps = STEPS;
   const [stepIndex, setStepIndex] = useState(0);
   const hasAnalyzed = useRef(false);
 
@@ -143,16 +141,15 @@ export default function AnalyzingScreen() {
     // Trigger analysis (guard against re-mount / back-nav)
     if (!hasAnalyzed.current) {
       hasAnalyzed.current = true;
-      analyzeSkin.mutate(undefined, {
-        onSuccess: () => {
-          progressWidth.value = withTiming(1, { duration: 400 });
-          setTimeout(() => router.replace('/(onboarding)/results'), 500);
-        },
-        onError: () => {
-          progressWidth.value = withTiming(1, { duration: 400 });
-          setTimeout(() => router.replace('/(onboarding)/results?error=1'), 500);
-        },
-      });
+      const onSuccess = () => {
+        progressWidth.value = withTiming(1, { duration: 400 });
+        setTimeout(() => router.replace('/(onboarding)/results'), 500);
+      };
+      const onError = () => {
+        progressWidth.value = withTiming(1, { duration: 400 });
+        setTimeout(() => router.replace('/(onboarding)/results?error=1'), 500);
+      };
+      analyzeSkin.mutate(undefined, { onSuccess, onError });
     }
   }, []);
 
@@ -160,7 +157,7 @@ export default function AnalyzingScreen() {
   useEffect(() => {
     const interval = setInterval(() => {
       stepOpacity.value = withTiming(0, { duration: 300 }, () => {
-        runOnJS(setStepIndex)((prev: number) => (prev + 1) % STEPS.length);
+        runOnJS(setStepIndex)((prev: number) => (prev + 1) % steps.length);
         stepOpacity.value = withTiming(1, { duration: 400 });
       });
     }, 3500);
@@ -342,7 +339,7 @@ export default function AnalyzingScreen() {
           style={stepTextStyle}
           className="text-[15px] font-poppins text-skin-text-secondary text-center leading-[21px] mb-8"
         >
-          {STEPS[stepIndex]}
+          {steps[stepIndex]}
         </Animated.Text>
 
         {/* Progress bar */}

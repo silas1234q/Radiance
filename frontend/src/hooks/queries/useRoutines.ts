@@ -51,14 +51,39 @@ export function useAddStep() {
   });
 }
 
+export interface RoutineReminderInput {
+  reminderEnabled?: boolean;
+  amReminderTime?: string | null;
+  pmReminderTime?: string | null;
+}
+
 export function useCreateCustomRoutine() {
   const api = useApi();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name }: { name: string }) =>
+    mutationFn: ({ name, ...reminder }: { name: string } & RoutineReminderInput) =>
       api.fetch<Routine>('/routines/custom', {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, ...reminder }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routines'] }),
+  });
+}
+
+export function useUpdateRoutine() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      routineId,
+      data,
+    }: {
+      routineId: string;
+      data: RoutineReminderInput & { name?: string; isActive?: boolean };
+    }) =>
+      api.fetch<Routine>(`/routines/${routineId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routines'] }),
   });

@@ -2,7 +2,7 @@ import React, { useRef, useCallback } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import GlassIconButton from "../components/ui/GlassIconButton";
+import CircleIconButton from "../components/ui/CircleIconButton";
 import { useRoutines } from "../hooks/queries/useRoutines";
 import WeekDayTracker from "../components/routine/WeekDayTracker";
 import SectionDivider from "../components/routine/SectionDivider";
@@ -37,10 +37,9 @@ export default function MyRoutineScreen() {
           </Text>
 
           {/* Back button - left */}
-          <GlassIconButton
+          <CircleIconButton
             icon="chevron-back"
             onPress={() => router.back()}
-            iconSize={22}
             style={{ position: 'absolute', left: 20 }}
           />
 
@@ -48,17 +47,8 @@ export default function MyRoutineScreen() {
           <View
             className="absolute right-[20px] flex-row items-center gap-2"
           >
-            <GlassIconButton
-              icon="ellipsis-horizontal"
-              size={38}
-              iconSize={20}
-            />
-            <GlassIconButton
-              icon="add"
-              onPress={() => openAddSheet()}
-              size={38}
-              iconSize={22}
-            />
+            <CircleIconButton icon="ellipsis-horizontal" />
+            <CircleIconButton icon="add" onPress={() => openAddSheet()} />
           </View>
         </View>
         <ScrollView

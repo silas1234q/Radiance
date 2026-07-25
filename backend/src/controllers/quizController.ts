@@ -6,22 +6,30 @@ export const submitQuiz = catchAsync(async (req, res) => {
   const { answers } = req.body; // Array of { questionId: number, answer: string }
   const userId = req.user!.id;
 
-  const operations = answers.map((a: { questionId: number; answer: string }) => {
-    const question = quizQuestions.find(q => q.id === a.questionId);
-    return prisma.skinQuizAnswer.upsert({
-      where: { userId_questionId: { userId, questionId: a.questionId } },
-      update: { answer: a.answer },
-      create: {
+  const typedAnswers = answers as { questionId: number; answer: string }[];
+
+  // Replace the user's answers in just two round-trips instead of one upsert
+  // per question. The DB is remote (Neon/us-east-1), so collapsing ~28
+  // serialized round-trips into a single bulk delete + a single bulk insert is
+  // dramatically faster and avoids holding a long interactive transaction open.
+  // Not wrapped in a transaction on purpose: the client always sends the full
+  // answer set, so a retry simply re-runs both steps; keeping them independent
+  // lets each use its own pooled connection and retry safely on transient
+  // connection drops.
+  await prisma.skinQuizAnswer.deleteMany({ where: { userId } });
+  await prisma.skinQuizAnswer.createMany({
+    data: typedAnswers.map((a) => {
+      const question = quizQuestions.find((q) => q.id === a.questionId);
+      return {
         userId,
         questionId: a.questionId,
         questionText: question?.text || `Question ${a.questionId}`,
         answer: a.answer,
-      },
-    });
+      };
+    }),
   });
 
-  await prisma.$transaction(operations, { timeout: 15000 });
-  res.json({ success: true, count: answers.length });
+  res.json({ success: true, count: typedAnswers.length });
 });
 
 export const getQuizAnswers = catchAsync(async (req, res) => {

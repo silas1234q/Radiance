@@ -212,7 +212,7 @@ export default function QuizScreen() {
       answer,
     }));
     submitQuiz.mutate(formatted, {
-      onSuccess: () => router.replace('/(onboarding)/analyzing'),
+      onSuccess: () => router.replace('/(onboarding)/face-scan'),
       onError: () => {
         resetExpandAnimation();
       },

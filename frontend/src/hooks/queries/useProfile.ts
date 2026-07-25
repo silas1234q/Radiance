@@ -21,6 +21,13 @@ export function useUpdateProfile() {
   });
 }
 
+export function useDeleteAccount() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: () => api.fetch<null>('/users/me', { method: 'DELETE' }),
+  });
+}
+
 export function useSkinProfile() {
   const api = useApi();
   return useQuery({

@@ -7,6 +7,8 @@ export default function OnboardingLayout() {
       <Stack.Screen name="analyzing"  options={{ animation: "fade" }} />
       <Stack.Screen name="results" options={{ animation: "fade" }} />
       <Stack.Screen name="face-scan" />
+      <Stack.Screen name="scan-processing" options={{ animation: "fade" }} />
+      <Stack.Screen name="notifications" options={{ animation: "fade", gestureEnabled: false }} />
     </Stack>
   );
 }

@@ -35,6 +35,7 @@ export interface SkinProfile {
   scanData: unknown;
   analysisSource: string | null;
   photoUrl: string | null;
+  baselinePhotoUrl: string | null;
   routineLength: string | null;
   productBudget: string | null;
   ingredientsToAvoid: string[];
@@ -99,6 +100,12 @@ export interface Routine {
   type: RoutineType;
   name: string | null;
   isActive: boolean;
+  /** When true, local reminders are scheduled for this routine's time(s). */
+  reminderEnabled: boolean;
+  /** Morning reminder time as "HH:mm" (24h), or null if unset. */
+  amReminderTime: string | null;
+  /** Evening reminder time as "HH:mm" (24h), or null if unset. */
+  pmReminderTime: string | null;
   steps: RoutineStep[];
   createdAt: string;
   updatedAt: string;
@@ -204,6 +211,7 @@ export interface DailyCompletionData {
   dayIndex: number;
   amCompleted: boolean;
   pmCompleted: boolean;
+  customCompleted: boolean;
   moodLogged: boolean;
   isFullDay: boolean;
 }

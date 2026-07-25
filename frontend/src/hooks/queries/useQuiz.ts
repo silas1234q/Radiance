@@ -22,9 +22,19 @@ export function useAnalyzeSkin() {
   const api = useApi();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      api.fetch<SkinProfile>('/skin-profile/analyze', { method: 'POST' }),
-    onSuccess: () => {
+    // analyzing.tsx / results.tsx render their own retry UI for analysis failures.
+    meta: { suppressErrorToast: true },
+    // `buildRoutine: false` runs the free quiz-only analysis without generating
+    // a routine (the "risk it" path); omitted/true builds the routine.
+    mutationFn: (opts?: { buildRoutine?: boolean }) =>
+      api.fetch<SkinProfile>('/skin-profile/analyze', {
+        method: 'POST',
+        body: JSON.stringify({ buildRoutine: opts?.buildRoutine ?? true }),
+      }),
+    onSuccess: (data) => {
+      // Seed the cache so the results screen has real data immediately on reveal
+      // (avoids a flash of empty content before the background refetch lands).
+      queryClient.setQueryData(['skinProfile'], data);
       queryClient.invalidateQueries({ queryKey: ['skinProfile'] });
       queryClient.invalidateQueries({ queryKey: ['routines'] });
       queryClient.invalidateQueries({ queryKey: ['skinScores'] });
@@ -36,12 +46,16 @@ export function useAnalyzeSkinWithScan() {
   const api = useApi();
   const queryClient = useQueryClient();
   return useMutation({
+    // results.tsx renders its own retry UI for analysis failures.
+    meta: { suppressErrorToast: true },
     mutationFn: (photoUrl: string) =>
       api.fetch<SkinProfile>('/skin-profile/analyze-with-scan', {
         method: 'POST',
         body: JSON.stringify({ photoUrl }),
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Seed the cache so the results screen has real data immediately on reveal.
+      queryClient.setQueryData(['skinProfile'], data);
       queryClient.invalidateQueries({ queryKey: ['skinProfile'] });
       queryClient.invalidateQueries({ queryKey: ['routines'] });
       queryClient.invalidateQueries({ queryKey: ['skinScores'] });

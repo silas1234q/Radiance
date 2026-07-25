@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, Alert, ActivityIndicator, Image } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, Image } from "react-native";
 import { useSSO } from "@clerk/clerk-expo";
+import { toast } from "@/src/lib/toast";
+import { getErrorMessage } from "@/src/lib/errors";
 import * as AuthSession from "expo-auth-session";
 import Svg, { Path } from "react-native-svg";
 import GoogleLogo from '@/src/assets/images/googleimage.png'
@@ -26,7 +28,7 @@ export default function AuthScreen() {
     } catch (err: unknown) {
       const clerkErr = err as { errors?: { code?: string; message?: string }[] };
       if (clerkErr?.errors?.[0]?.code !== "session_exists") {
-        Alert.alert("Error", clerkErr.errors?.[0]?.message || "Sign in failed");
+        toast.error(getErrorMessage(err, "Sign in failed"));
       }
       setLoading(null);
     }

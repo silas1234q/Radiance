@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -17,6 +18,7 @@ import { useSkinProfile } from "../hooks/queries/useProfile";
 import { useWeeklyPlan } from "../hooks/queries/useWeeklyPlan";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../constants/theme";
+import CircleIconButton from "../components/ui/CircleIconButton";
 
 interface WeekMilestone {
   week: string;
@@ -131,9 +133,10 @@ function getFallbackWeeklyPlan(concerns: string[]): WeekMilestone[] {
 
 export default function SkinGoalScreen() {
   const router = useRouter();
-  const { data: skinProfile } = useSkinProfile();
-  const { data: weeklyPlanData } = useWeeklyPlan();
+  const { data: skinProfile, isLoading: profileLoading } = useSkinProfile();
+  const { data: weeklyPlanData, isLoading: planLoading } = useWeeklyPlan();
   const { top } = useSafeAreaInsets();
+  const loading = profileLoading || planLoading;
   const concerns = skinProfile?.concerns ?? [];
   const weeklyPlan = weeklyPlanData?.milestones ?? getFallbackWeeklyPlan(concerns);
 
@@ -186,23 +189,33 @@ export default function SkinGoalScreen() {
             >
               Your Skin Goals
             </Text>
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={8}
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 17,
-                backgroundColor: "#FFFFFF",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="close" size={18} color={COLORS.text} />
-            </Pressable>
+            <CircleIconButton icon="close" onPress={() => router.back()} />
           </View>
         </View>
 
+        {loading ? (
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingBottom: 80,
+            }}
+          >
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text
+              style={{
+                marginTop: 14,
+                fontSize: 14,
+                fontWeight: "500",
+                color: COLORS.textSecondary,
+              }}
+            >
+              Preparing your skin goals…
+            </Text>
+          </View>
+        ) : (
+          <>
         <ScrollView
           className="flex-1"
           contentContainerStyle={{
@@ -392,6 +405,8 @@ export default function SkinGoalScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+          </>
+        )}
       </View>
     </View>
   );

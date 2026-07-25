@@ -34,7 +34,7 @@ export default function WeekDayTracker({
           const dayData = weeklyCompletions.find((d) => d.dayIndex === index);
           if (dayData) {
             isFullDay = dayData.isFullDay;
-            isPartial = !isFullDay && (dayData.amCompleted || dayData.pmCompleted || dayData.moodLogged);
+            isPartial = !isFullDay && (dayData.amCompleted || dayData.pmCompleted || dayData.customCompleted || dayData.moodLogged);
           }
         } else {
           isFullDay = completedDays.includes(index);

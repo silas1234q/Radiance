@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import GlassCard from "../components/ui/GlassCard";
-import GlassIconButton from "../components/ui/GlassIconButton";
+import CircleIconButton from "../components/ui/CircleIconButton";
 import { COLORS } from "../constants/theme";
 
 const FAQ_DATA = [
@@ -176,11 +176,7 @@ export default function FAQScreen() {
             gap: 14,
           }}
         >
-          <GlassIconButton
-            icon="chevron-back"
-            onPress={() => router.back()}
-            iconSize={22}
-          />
+          <CircleIconButton icon="chevron-back" onPress={() => router.back()} />
           <Text style={{ fontSize: 18, fontWeight: "600", color: COLORS.text }}>
             FAQ
           </Text>

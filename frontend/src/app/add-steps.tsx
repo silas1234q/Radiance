@@ -15,11 +15,14 @@ import { useRoutines, useAddStep, useUpdateStep, useDeleteStep, useReorderSteps,
 import AddProductSheet, { type AddProductSheetRef } from '../components/routine/AddProductSheet';
 import DraggableStepList from '../components/routine/DraggableStepList';
 import RoutineStepCard from '../components/routine/RoutineStepCard';
-import GlassIconButton from '../components/ui/GlassIconButton';
+import CircleIconButton from '../components/ui/CircleIconButton';
 import TimePickerSheet from '../components/routine/TimePickerSheet';
 import FrequencyPickerSheet from '../components/routine/FrequencyPickerSheet';
 import { COLORS } from '../constants/theme';
 import type { Routine } from '../types/api';
+import SunImage from '@/src/assets/images/sun.png';
+import MoonImage from '@/src/assets/images/crescent-moon.png';
+import { Image } from 'expo-image';
 
 interface StepTemplate {
   name: string;
@@ -200,9 +203,9 @@ export default function AddStepsScreen() {
   useEffect(() => {
     if (!routines || !routineId || initializedRoutineId === routineId) return;
 
-    const seedFromRoutine = (r: Routine, section: 'morning' | 'evening'): AddedStep[] => {
+    const seedFromRoutine = (r: Routine | undefined, section: 'morning' | 'evening'): AddedStep[] => {
       const steps = r?.steps ?? [];
-      if (steps.length === 0) return [];
+      if (!r || steps.length === 0) return [];
       const templates = section === 'morning' ? MORNING_STEPS : EVENING_STEPS;
       const usedTemplateIndices = new Set<number>();
       return steps.map((step) => {
@@ -226,7 +229,7 @@ export default function AddStepsScreen() {
           hasProduct: !!step.product,
           productId: step.product?.id,
           productName: step.product?.name,
-          productImageUrl: step.product?.imageUrl,
+          productImageUrl: step.product?.imageUrl ?? undefined,
           stepName: step.name,
           description: step.description || (step.product ? getProductDescription(step.product.category, step.product.brand) : undefined),
           section,
@@ -265,7 +268,7 @@ export default function AddStepsScreen() {
           hasProduct: !!step.product,
           productId: step.product?.id,
           productName: step.product?.name,
-          productImageUrl: step.product?.imageUrl,
+          productImageUrl: step.product?.imageUrl ?? undefined,
           stepName: step.name,
           description: step.description || (step.product ? getProductDescription(step.product.category, step.product.brand) : undefined),
           section,
@@ -714,11 +717,11 @@ export default function AddStepsScreen() {
               {routine?.name || 'New Routine'}
             </Text>
             <View className="absolute left-0">
-              <GlassIconButton icon="chevron-back" onPress={() => router.back()} size={38} iconSize={20} />
+              <CircleIconButton icon="chevron-back" onPress={() => router.back()} />
             </View>
             <View className="absolute right-0 flex-row items-center gap-2">
-              <GlassIconButton icon="ellipsis-horizontal" onPress={() => {}} size={38} iconSize={20} />
-              <GlassIconButton icon="add" onPress={handleAddButtonPress} size={38} iconSize={22} />
+              <CircleIconButton icon="ellipsis-horizontal" onPress={() => {}} />
+              <CircleIconButton icon="add" onPress={handleAddButtonPress} />
             </View>
           </View>
 
@@ -868,7 +871,7 @@ export default function AddStepsScreen() {
             <Text style={{ fontSize: 18, fontFamily: 'SFProRounded_Semibold', color: COLORS.text }}>
               Morning
             </Text>
-            <Text style={{ fontSize: 16 }}>☀️</Text>
+            <Image source={SunImage} style={{ width: 24, height: 24 }} />
           </View>
           <DraggableStepList
             data={morningOrder}
@@ -882,7 +885,7 @@ export default function AddStepsScreen() {
             <Text style={{ fontSize: 18, fontFamily: 'SFProRounded_Semibold', color: COLORS.text }}>
               Evening
             </Text>
-            <Text style={{ fontSize: 16 }}>🌙</Text>
+            <Image source={MoonImage} style={{ width: 20, height: 20 }} />
           </View>
           <DraggableStepList
             data={eveningOrder}
@@ -907,7 +910,13 @@ export default function AddStepsScreen() {
               }
               queryClient.invalidateQueries({ queryKey: ['routines'] });
               queryClient.invalidateQueries({ queryKey: ['routine-insight-detailed'] });
-              router.back();
+              // For a custom routine (e.g. just created), open its own screen
+              // instead of falling back to the default routine.
+              if (routine?.type === 'CUSTOM') {
+                router.replace({ pathname: '/(tabs)/routine', params: { selectedId: routineId } });
+              } else {
+                router.back();
+              }
             }}
             disabled={addStep.isPending || reorderSteps.isPending}
             style={({ pressed }) => ({

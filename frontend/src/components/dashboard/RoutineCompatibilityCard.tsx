@@ -13,6 +13,9 @@ interface RoutineCompatibilityCardProps {
   totalGoals: number;
   productCount: number;
   onPress?: () => void;
+  /** No routine yet — show a prompt to scan for a personalized routine. */
+  empty?: boolean;
+  onScan?: () => void;
 }
 
 function MiniCircularProgress({
@@ -78,7 +81,45 @@ export default function RoutineCompatibilityCard({
   totalGoals,
   productCount,
   onPress,
+  empty,
+  onScan,
 }: RoutineCompatibilityCardProps) {
+  if (empty) {
+    return (
+      <GlassCard style={{ marginBottom: 16 }}>
+        <Text className="text-lg font-poppins-bold text-skin-text mb-3">
+          My Routine
+        </Text>
+        <View className="items-center py-2">
+          <View
+            className="items-center justify-center rounded-full mb-3"
+            style={{ width: 56, height: 56, backgroundColor: COLORS.primaryLight }}
+          >
+            <Ionicons name="scan-outline" size={26} color={COLORS.primary} />
+          </View>
+          <Text className="text-[14px] font-poppins-medium text-skin-text-secondary text-center max-w-[240px] leading-[20px] mb-4">
+            Scan your face to unlock a personalized routine
+          </Text>
+          <Pressable
+            onPress={onScan}
+            className="flex-row items-center h-[46px] px-6 rounded-full bg-primary"
+            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+          >
+            <Ionicons
+              name="scan-outline"
+              size={18}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
+            <Text className="text-[15px] font-poppins-semibold text-white">
+              Scan My Skin
+            </Text>
+          </Pressable>
+        </View>
+      </GlassCard>
+    );
+  }
+
   return (
     <GlassCard style={{ marginBottom: 16 }}>
       {/* Top row: Title + chevron */}

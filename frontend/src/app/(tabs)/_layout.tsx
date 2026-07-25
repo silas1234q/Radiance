@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { StyleSheet, Text, View, Image } from "react-native";
 import { Tabs, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Octicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { COLORS } from "../../constants/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -66,8 +66,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size , focused }) => (
+            focused ? <Octicons name="home-fill" size={size} color={color} /> : <Octicons name="home" size={size} color={color} />
           ),
         }}
       />
@@ -75,8 +75,8 @@ export default function TabLayout() {
         name="routine"
         options={{
           title: "Routine",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="sparkles-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size , focused }) => (
+            focused ? <Ionicons name="sparkles" size={size} color={color} /> : <Ionicons name="sparkles-outline" size={size} color={color} />
           ),
         }}
       />
@@ -111,15 +111,9 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "You",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size ,focused}) => (
+            focused ? <Ionicons name="person" size={size} color={color} /> : <Ionicons name="person-outline" size={size} color={color} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="products"
-        options={{
-          href: null,
         }}
       />
     </Tabs>

@@ -1,25 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, ScrollView, Pressable, Dimensions, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle } from 'react-native-svg';
-import Animated, {
-  useSharedValue,
-  useAnimatedProps,
-  useAnimatedReaction,
-  withTiming,
-  Easing,
-  FadeIn,
-  FadeInDown,
-  runOnJS,
-} from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import { useAuth } from '@clerk/clerk-expo';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSkinProfile } from '../../hooks/queries/useProfile';
+import { useRoutines } from '../../hooks/queries/useRoutines';
+import { useAnalyzeSkin, useAnalyzeSkinWithScan } from '../../hooks/queries/useQuiz';
+import type { PurchasesPackage } from 'react-native-purchases';
+import { useRevenueCat, PAYWALL_RESULT } from '../../providers/RevenueCatProvider';
+import { uploadSkinPhoto } from '../../api/uploadPhoto';
 import CircularProgress from '../../components/ui/CircularProgress';
 import ScanMetricsCard from '../../components/results/ScanMetricsCard';
+import SkinVitalsCard, { type Vital } from '../../components/results/SkinVitalsCard';
+import SubscribeGate from '../../components/results/SubscribeGate';
+import ScanProcessing from '../../components/face-scan/ScanProcessing';
 import Skeleton from '../../components/ui/Skeleton';
 import { COLORS } from '../../constants/theme';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const { height: SCREEN_H } = Dimensions.get('window');
+const HERO_H = Math.min(Math.round(SCREEN_H * 0.58), 560);
 
 const METRIC_COLORS: Record<string, string> = {
   Hydration: '#4FC3F7',
@@ -29,6 +32,12 @@ const METRIC_COLORS: Record<string, string> = {
   Sensitivity: '#F06680',
 };
 
+// Vitals accent colors — mirror the Overall Metrics grid colors so the two
+// sections read as the same system.
+const VITAL_H = METRIC_COLORS['Hydration'];
+const VITAL_O = METRIC_COLORS['Oil Balance'];
+const VITAL_E = METRIC_COLORS['Even Tone'];
+
 const CARD_SHADOW = {
   shadowColor: '#000',
   shadowOpacity: 0.06,
@@ -37,28 +46,42 @@ const CARD_SHADOW = {
   elevation: 3,
 };
 
+const hydrationLabel = (v: number) =>
+  v >= 70 ? 'Well hydrated' : v >= 45 ? 'Moderately hydrated' : 'Dehydrated';
+const oilBalanceLabel = (v: number) =>
+  v >= 70 ? 'Well balanced' : v >= 45 ? 'Moderate' : 'Needs balancing';
+const evenToneLabel = (v: number) =>
+  v >= 70 ? 'Even & bright' : v >= 45 ? 'Mostly even' : 'Uneven tone';
+
+// Plausible-looking teaser shown (heavily blurred) behind the subscribe gate,
+// before the real analysis runs. Exact numbers are irrelevant — they're blurred.
+const PLACEHOLDER_SCORE = 78;
+const PLACEHOLDER_VITALS: Vital[] = [
+  { key: 'H', label: 'Hydration', value: 64, subtitle: hydrationLabel(64), color: VITAL_H },
+  { key: 'O', label: 'Oil Balance', value: 58, subtitle: oilBalanceLabel(58), color: VITAL_O },
+  { key: 'E', label: 'Even Tone', value: 71, subtitle: evenToneLabel(71), color: VITAL_E },
+];
+const PLACEHOLDER_METRICS = [
+  { label: 'Hydration', value: 64 },
+  { label: 'Oil Balance', value: 58 },
+  { label: 'Texture', value: 69 },
+  { label: 'Even Tone', value: 71 },
+  { label: 'Sensitivity', value: 52 },
+];
+const PLACEHOLDER_CONCERNS = ['Dryness', 'Uneven tone', 'Fine lines'];
+
 function SkeletonLoading() {
   return (
     <View className="flex-1 bg-white items-center pt-10 px-5">
-      {/* Hero ring skeleton */}
       <Skeleton width={180} height={180} borderRadius={90} />
-      {/* Label placeholder */}
       <View className="mt-6">
         <Skeleton width={140} height={14} borderRadius={7} />
       </View>
-      {/* Scan metric rings row */}
       <View className="flex-row justify-center gap-6 mt-8">
         <Skeleton width={68} height={68} borderRadius={34} />
         <Skeleton width={68} height={68} borderRadius={34} />
         <Skeleton width={68} height={68} borderRadius={34} />
       </View>
-      {/* Metric rings row */}
-      <View className="flex-row justify-center gap-6 mt-4">
-        <Skeleton width={80} height={80} borderRadius={40} />
-        <Skeleton width={80} height={80} borderRadius={40} />
-        <Skeleton width={80} height={80} borderRadius={40} />
-      </View>
-      {/* Text blocks */}
       <View className="w-full mt-8 gap-4">
         <Skeleton width={'100%' as unknown as number} height={16} borderRadius={8} />
         <Skeleton width={'80%' as unknown as number} height={16} borderRadius={8} />
@@ -68,70 +91,102 @@ function SkeletonLoading() {
   );
 }
 
-// --- Hero Score Ring (animated) ---
-function HeroScoreRing({ score }: { score: number }) {
-  const size = 200;
-  const strokeWidth = 10;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-
-  const animatedOffset = useSharedValue(circumference);
-  const animatedScore = useSharedValue(0);
-
-  useEffect(() => {
-    const target = circumference - (score / 100) * circumference;
-    animatedOffset.value = withTiming(target, { duration: 1200, easing: Easing.out(Easing.cubic) });
-    animatedScore.value = withTiming(score, { duration: 1200, easing: Easing.out(Easing.cubic) });
-  }, [score]);
-
-  const [displayScore, setDisplayScore] = useState(0);
-
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: animatedOffset.value,
-  }));
-
-  useAnimatedReaction(
-    () => Math.round(animatedScore.value),
-    (val) => { runOnJS(setDisplayScore)(val); },
-  );
-
+// --- Photo-forward hero ---
+function Hero({ photoUrl, score }: { photoUrl: string | null; score: number }) {
+  const insets = useSafeAreaInsets();
   return (
-    <Animated.View entering={FadeIn.duration(600)} className="items-center justify-center" style={{ width: size, height: size }}>
-      <Svg width={size} height={size}>
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="#F2F2F7"
-          strokeWidth={strokeWidth}
-          fill="none"
+    <View style={{ height: HERO_H, backgroundColor: '#111' }}>
+      {photoUrl ? (
+        <Image
+          source={photoUrl}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={300}
         />
-        <AnimatedCircle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={COLORS.primary}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${circumference}`}
-          animatedProps={animatedProps}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
-      <View className="absolute items-center">
-        <Text className="text-[48px] font-poppins-bold text-skin-text tracking-[-2px]">
-          {displayScore}
-        </Text>
-        <Text className="text-[11px] font-poppins-medium text-skin-text-tertiary tracking-[2px] uppercase -mt-1">
-          Your Skin Score
-        </Text>
-      </View>
-    </Animated.View>
+      ) : (
+        <LinearGradient
+          colors={[COLORS.primary, COLORS.primaryDark]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View className="flex-1 items-center justify-center">
+            <Text style={{ color: '#fff', fontSize: 64, fontFamily: 'SFProRounded_Bold' }}>{score}</Text>
+            <Text
+              style={{
+                color: 'rgba(255,255,255,0.85)',
+                fontSize: 11,
+                letterSpacing: 3,
+                fontFamily: 'SFProRounded_Semibold',
+              }}
+            >
+              YOUR SKIN SCORE
+            </Text>
+          </View>
+        </LinearGradient>
+      )}
+
+      {/* Top + bottom scrims for legibility and to blend into the vitals card */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.4)', 'transparent']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 150 }}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.6)']}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: HERO_H * 0.5 }}
+        pointerEvents="none"
+      />
+
+      {/* Top bar */}
+      <Animated.Text
+        entering={FadeIn.duration(400)}
+        style={{
+          position: 'absolute',
+          top: insets.top + 12,
+          left: 20,
+          color: 'rgba(255,255,255,0.9)',
+          fontSize: 11,
+          letterSpacing: 3,
+          textTransform: 'uppercase',
+          fontFamily: 'SFProRounded_Semibold',
+        }}
+      >
+        Analysis Complete
+      </Animated.Text>
+
+      {photoUrl ? (
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          style={{
+            position: 'absolute',
+            top: insets.top + 6,
+            right: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            borderRadius: 20,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 17, fontFamily: 'SFProRounded_Bold' }}>{score}</Text>
+          <Text
+            style={{
+              color: 'rgba(255,255,255,0.8)',
+              fontSize: 11,
+              marginLeft: 6,
+              fontFamily: 'SFProRounded_Medium',
+            }}
+          >
+            Skin Score
+          </Text>
+        </Animated.View>
+      ) : null}
+    </View>
   );
 }
 
-// --- Premium Card ---
 function Card({ children, index = 0 }: { children: React.ReactNode; index?: number }) {
   return (
     <Animated.View
@@ -152,7 +207,6 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-// --- Face Zone Row ---
 function FaceZoneRow({ zone, issues }: { zone: string; issues: string[] }) {
   return (
     <View className="flex-row items-start py-[14px]">
@@ -174,7 +228,6 @@ function SectionDivider() {
   return <View className="h-[1px] bg-skin-border-light" />;
 }
 
-// --- Metrics Grid ---
 function MetricsGrid({ metrics }: { metrics: { label: string; value: number }[] }) {
   const firstRow = metrics.slice(0, 3);
   const secondRow = metrics.slice(3);
@@ -184,12 +237,7 @@ function MetricsGrid({ metrics }: { metrics: { label: string; value: number }[] 
       <View className="flex-row justify-between">
         {firstRow.map((m) => (
           <View key={m.label} className="items-center" style={{ width: 90 }}>
-            <CircularProgress
-              score={m.value}
-              size={80}
-              strokeWidth={5}
-              color={METRIC_COLORS[m.label]}
-            />
+            <CircularProgress score={m.value} size={80} strokeWidth={5} color={METRIC_COLORS[m.label]} />
             <Text className="text-[11px] font-poppins-medium text-skin-text-secondary mt-2 text-center">
               {m.label}
             </Text>
@@ -200,12 +248,7 @@ function MetricsGrid({ metrics }: { metrics: { label: string; value: number }[] 
         <View className="flex-row justify-center gap-6">
           {secondRow.map((m) => (
             <View key={m.label} className="items-center" style={{ width: 90 }}>
-              <CircularProgress
-                score={m.value}
-                size={80}
-                strokeWidth={5}
-                color={METRIC_COLORS[m.label]}
-              />
+              <CircularProgress score={m.value} size={80} strokeWidth={5} color={METRIC_COLORS[m.label]} />
               <Text className="text-[11px] font-poppins-medium text-skin-text-secondary mt-2 text-center">
                 {m.label}
               </Text>
@@ -220,9 +263,139 @@ function MetricsGrid({ metrics }: { metrics: { label: string; value: number }[] 
 // --- Main Screen ---
 export default function ResultsScreen() {
   const router = useRouter();
-  const { error } = useLocalSearchParams<{ error?: string }>();
+  const { error, locked, uri } = useLocalSearchParams<{
+    error?: string;
+    locked?: string;
+    uri?: string;
+  }>();
   const hasError = error === '1';
   const { data: profile, isLoading } = useSkinProfile();
+  // Routines are Pro-only. When the skin was analyzed with the free (OpenAI
+  // quiz-only) path, no routine is generated, so we send the user straight to
+  // the dashboard instead of a routine they don't have.
+  const { data: routines } = useRoutines();
+  const hasRoutine = (routines?.length ?? 0) > 0;
+
+  const { getToken } = useAuth();
+  const { purchasePackage, isPro, isReady } = useRevenueCat();
+  const analyze = useAnalyzeSkin();
+  const analyzeWithScan = useAnalyzeSkinWithScan();
+  const [unlocked, setUnlocked] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+  // Which loader to show while unlocking: the branded scan-processing animation
+  // (photo/YouCam analysis) vs. a simple loader (OpenAI quiz-only).
+  const [scanLoader, setScanLoader] = useState(false);
+  const showLocked = locked === '1' && !unlocked;
+  // Local capture uri (if any) stays the hero photo throughout.
+  const localPhoto = uri ?? null;
+
+  // Runs the real analysis and unlocks: with a captured photo we upload it and
+  // run the YouCam scan analysis; without one (scan skipped) we fall back to the
+  // OpenAI quiz-only analysis. Shared by the purchase flow and the auto-unlock
+  // for already-subscribed customers.
+  const runAnalysisAndUnlock = useCallback(async () => {
+    setUnlockError(null);
+    setScanLoader(!!localPhoto); // scan animation when there's a photo to analyze
+    setUnlocking(true);
+    try {
+      if (localPhoto) {
+        const token = await getToken();
+        if (!token) throw new Error('Not authenticated');
+        const url = await uploadSkinPhoto(localPhoto, token);
+        await analyzeWithScan.mutateAsync(url);
+      } else {
+        await analyze.mutateAsync({ buildRoutine: true });
+      }
+      setUnlocked(true);
+    } catch {
+      setUnlockError(true);
+    } finally {
+      setUnlocking(false);
+    }
+  }, [localPhoto, getToken, analyzeWithScan, analyze]);
+
+  // "Get Radiance Pro": purchase the selected package (unless already Pro), then
+  // run the analysis and unlock.
+  const handleSubscribe = async (pkg: PurchasesPackage) => {
+    if (unlocking) return;
+    setUnlockError(null);
+    if (!isPro) {
+      const outcome = await purchasePackage(pkg);
+      if (!outcome.entitled) {
+        // Stay quiet if the customer simply cancelled the purchase sheet.
+        if (outcome.result !== PAYWALL_RESULT.CANCELLED)
+          setUnlockError(outcome.message ?? 'Something went wrong. Please try again.');
+        return;
+      }
+    }
+    await runAnalysisAndUnlock();
+  };
+
+  // "Risk it": skip the (more accurate) YouCam scan analysis entirely and run
+  // the free OpenAI quiz-only analysis, even when a photo was captured.
+  const handleSkip = async () => {
+    if (unlocking) return;
+    setUnlockError(null);
+    setScanLoader(false); // quiz-only OpenAI analysis → simple loader
+    setUnlocking(true);
+    try {
+      // Free path: quiz-only analysis, no routine (routines are Pro-only).
+      await analyze.mutateAsync({ buildRoutine: false });
+      setUnlocked(true);
+    } catch {
+      setUnlockError(true);
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
+  // An already-subscribed customer should never see the paywall — once we know
+  // their entitlement state, run the analysis and unlock automatically.
+  const autoUnlockRef = useRef(false);
+  useEffect(() => {
+    if (locked === '1' && isReady && isPro && !unlocked && !autoUnlockRef.current) {
+      autoUnlockRef.current = true;
+      runAnalysisAndUnlock();
+    }
+  }, [locked, isReady, isPro, unlocked, runAnalysisAndUnlock]);
+
+  if (showLocked) {
+    // Wait until we know the entitlement state to avoid flashing the paywall.
+    if (!isReady) {
+      return (
+        <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+          <SkeletonLoading />
+        </SafeAreaView>
+      );
+    }
+    // Already subscribed → skip the paywall; the auto-unlock effect runs the
+    // analysis and this shows a loader (or a retry on error) instead.
+    if (isPro) {
+      return (
+        <LockedResults
+          photoUrl={localPhoto}
+          hidePaywall
+          onRetry={runAnalysisAndUnlock}
+          onSubscribe={handleSubscribe}
+          onSkip={handleSkip}
+          loading={!unlockError}
+          errored={unlockError}
+          scanLoader={!!localPhoto}
+        />
+      );
+    }
+    return (
+      <LockedResults
+        photoUrl={localPhoto}
+        onSubscribe={handleSubscribe}
+        onSkip={handleSkip}
+        loading={unlocking}
+        errored={unlockError}
+        scanLoader={scanLoader}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -233,6 +406,7 @@ export default function ResultsScreen() {
   }
 
   const score = profile?.skinScore ?? 0;
+  const photoUrl = localPhoto ?? profile?.photoUrl ?? null;
   const faceMap = (profile?.faceMapIssues as Record<string, string[]>) ?? {};
   const aiRaw = profile?.aiAnalysisRaw as {
     summary?: string;
@@ -264,6 +438,17 @@ export default function ResultsScreen() {
   } | null | undefined;
   const hasScan = !!scanData?.metrics;
 
+  // Vitals mirror three of the canonical profile metrics shown in the Overall
+  // Metrics grid, so the same concept always shows the same number.
+  const hVal = profile?.hydration ?? 0;
+  const oVal = profile?.oilBalance ?? 0;
+  const eVal = profile?.evenTone ?? 0;
+  const vitals: Vital[] = [
+    { key: 'H', label: 'Hydration', value: hVal, subtitle: hydrationLabel(hVal), color: VITAL_H },
+    { key: 'O', label: 'Oil Balance', value: oVal, subtitle: oilBalanceLabel(oVal), color: VITAL_O },
+    { key: 'E', label: 'Even Tone', value: eVal, subtitle: evenToneLabel(eVal), color: VITAL_E },
+  ];
+
   const metrics = [
     { label: 'Hydration', value: profile?.hydration ?? 0 },
     { label: 'Oil Balance', value: profile?.oilBalance ?? 0 },
@@ -277,10 +462,10 @@ export default function ResultsScreen() {
     profile?.sensitivityLevel,
     profile?.skinTone ? `${profile.skinTone} tone` : null,
     profile?.skinAge ? `Skin age ${profile.skinAge}` : null,
-    ...(hasScan && scanData.skinType
+    ...(hasScan && scanData!.skinType
       ? [
-          scanData.skinType.tZone ? `T-Zone: ${scanData.skinType.tZone}` : null,
-          scanData.skinType.uZone ? `U-Zone: ${scanData.skinType.uZone}` : null,
+          scanData!.skinType!.tZone ? `T-Zone: ${scanData!.skinType!.tZone}` : null,
+          scanData!.skinType!.uZone ? `U-Zone: ${scanData!.skinType!.uZone}` : null,
         ]
       : []),
   ].filter(Boolean) as string[];
@@ -288,22 +473,18 @@ export default function ResultsScreen() {
   let cardIndex = 0;
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <View className="flex-1 bg-white">
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 50 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Label */}
-        <Animated.View entering={FadeIn.duration(400)} className="items-center pt-6 pb-2">
-          <Text className="text-[11px] font-poppins-semibold text-skin-text-tertiary tracking-[3px] uppercase">
-            Analysis Complete
-          </Text>
-        </Animated.View>
+        {/* Photo hero */}
+        <Hero photoUrl={photoUrl} score={score} />
 
-        {/* Hero Score Ring */}
-        <View className="items-center pt-4 pb-8">
-          <HeroScoreRing score={score} />
+        {/* Skin Analysis vitals card — overlaps the hero */}
+        <View style={{ marginTop: -104, marginBottom: 18 }}>
+          <SkinVitalsCard vitals={vitals} />
         </View>
 
         {/* Summary Card */}
@@ -334,7 +515,7 @@ export default function ResultsScreen() {
         {hasScan && (
           <Card index={cardIndex++}>
             <SectionHeader title="Scan Analysis" />
-            <ScanMetricsCard metrics={scanData.metrics} explanations={scanMetricExplanations} />
+            <ScanMetricsCard metrics={scanData!.metrics} explanations={scanMetricExplanations} />
           </Card>
         )}
 
@@ -385,50 +566,148 @@ export default function ResultsScreen() {
           </Card>
         )}
 
-        {/* Upgrade Card */}
-        {(!profile?.analysisSource || profile.analysisSource === 'quiz_only' || profile.analysisSource === 'rule_based') && (
-          <Card index={cardIndex++}>
-            <SectionHeader title="Upgrade Your Analysis" />
-            <Text className="text-[14px] font-poppins-regular text-skin-text-secondary leading-[22px] mb-5">
-              Your results are based on quiz answers alone. A face scan can measure your skin directly for more accurate scores.
-            </Text>
-            <View className="gap-3 mb-5">
-              {[
-                'Precise hydration & oiliness readings',
-                'Real pore size and texture measurement',
-                'Better-matched product recommendations',
-              ].map((item) => (
-                <View key={item} className="flex-row items-start">
-                  <View className="w-[5px] h-[5px] rounded-full bg-primary mt-[7px] mr-3" />
-                  <Text className="flex-1 text-[14px] font-poppins-medium text-skin-text leading-[20px]">{item}</Text>
-                </View>
-              ))}
-            </View>
-            <Pressable
-              onPress={() => router.push('/(onboarding)/face-scan')}
-              className="h-[48px] rounded-2xl bg-primary items-center justify-center"
-              style={({ pressed }) => [pressed && { opacity: 0.85 }]}
-            >
-              <Text className="text-[14px] font-poppins-semibold text-white tracking-[0.3px]">
-                Scan My Face
-              </Text>
-            </Pressable>
-          </Card>
-        )}
-
         {/* CTA */}
         <Animated.View entering={FadeInDown.delay(cardIndex * 120 + 200).duration(500)} className="px-5 pt-6">
           <Pressable
-            onPress={() => router.replace(hasError ? '/(onboarding)/quiz' : '/(tabs)')}
+            onPress={() =>
+              router.replace(hasError ? '/(onboarding)/quiz' : '/(onboarding)/notifications')
+            }
             className="h-[56px] rounded-2xl bg-primary items-center justify-center"
             style={({ pressed }) => [pressed && { opacity: 0.85 }]}
           >
             <Text className="text-[16px] font-poppins-semibold text-white tracking-[0.5px]">
-              {hasError ? 'Try Again' : 'View My Routine'}
+              {hasError ? 'Try Again' : hasRoutine ? 'View My Routine' : 'Continue to Dashboard'}
             </Text>
           </Pressable>
         </Animated.View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
+  );
+}
+
+// --- Locked (pre-subscription) results ---
+// Hero photo stays crisp up top; a plausible teaser is blurred beneath it, and
+// a premium subscribe sheet is anchored to the bottom. A full-screen loader
+// covers the real analysis that runs on unlock (YouCam scan, or OpenAI if the
+// scan was skipped).
+function LockedResults({
+  photoUrl,
+  onSubscribe,
+  onSkip,
+  loading,
+  errored,
+  hidePaywall = false,
+  onRetry,
+  scanLoader = false,
+}: {
+  photoUrl: string | null;
+  onSubscribe: (pkg: PurchasesPackage) => void;
+  onSkip: () => void;
+  loading: boolean;
+  errored: boolean;
+  hidePaywall?: boolean;
+  onRetry?: () => void;
+  scanLoader?: boolean;
+}) {
+  return (
+    <View className="flex-1" style={{ backgroundColor: COLORS.dark }}>
+      <Hero photoUrl={photoUrl} score={PLACEHOLDER_SCORE} />
+
+      {/* Blurred teaser fills the space below the hero */}
+      <View style={{ flex: 1 }}>
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <View style={{ marginTop: 18, marginBottom: 18 }}>
+            <SkinVitalsCard vitals={PLACEHOLDER_VITALS} />
+          </View>
+          <Card index={0}>
+            <SectionHeader title="Overall Metrics" />
+            <MetricsGrid metrics={PLACEHOLDER_METRICS} />
+          </Card>
+          <Card index={1}>
+            <SectionHeader title="Priority Concerns" />
+            <View className="flex-row flex-wrap gap-2">
+              {PLACEHOLDER_CONCERNS.map((concern) => (
+                <View key={concern} className="px-4 py-[9px] rounded-xl bg-primary-light">
+                  <Text className="text-[13px] font-poppins-semibold text-primary">{concern}</Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+        </View>
+
+        <BlurView intensity={44} tint="light" style={StyleSheet.absoluteFill} />
+        {/* Dark gradient so the bottom sheet reads clearly over the teaser */}
+        <LinearGradient
+          colors={['rgba(13,13,18,0)', 'rgba(13,13,18,0.28)', 'rgba(13,13,18,0.72)']}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      </View>
+
+      {/* Bottom subscribe sheet — hidden for already-subscribed customers, who
+          only see the loader (or a retry if the analysis failed). */}
+      {hidePaywall ? (
+        errored ? (
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              paddingHorizontal: 24,
+              paddingBottom: 44,
+              alignItems: 'center',
+            }}
+          >
+            <Text className="text-[14px] font-poppins-medium text-white text-center mb-4">
+              Something went wrong preparing your results.
+            </Text>
+            <Pressable
+              onPress={onRetry}
+              className="h-[52px] px-10 rounded-2xl bg-primary items-center justify-center"
+            >
+              <Text className="text-[15px] font-poppins-semibold text-white">Try Again</Text>
+            </Pressable>
+          </View>
+        ) : null
+      ) : (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
+          {errored && (
+            <View
+              className="self-center mb-3 px-4 py-2.5 rounded-2xl"
+              style={{ backgroundColor: 'rgba(255,255,255,0.95)' }}
+            >
+              <Text className="text-[13px] font-poppins-medium text-primary text-center">
+                Something went wrong. Please try again.
+              </Text>
+            </View>
+          )}
+          <SubscribeGate onSubscribe={onSubscribe} onSkip={onSkip} loading={loading} />
+        </View>
+      )}
+
+      {/* Full-screen loader while the real analysis runs. A scan analysis keeps
+          the branded scan-processing animation going (seamless from the scan);
+          the quick OpenAI quiz-only path shows a simple loader. */}
+      {loading &&
+        (scanLoader && photoUrl ? (
+          <Animated.View entering={FadeIn.duration(200)} style={StyleSheet.absoluteFill}>
+            <ScanProcessing uri={photoUrl} />
+          </Animated.View>
+        ) : (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center' },
+            ]}
+          >
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text className="mt-4 text-[15px] font-poppins-medium text-skin-text">
+              Analyzing your skin…
+            </Text>
+          </Animated.View>
+        ))}
+    </View>
   );
 }

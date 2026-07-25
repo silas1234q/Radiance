@@ -34,6 +34,8 @@ export function useProductAnalysis(productId: string) {
 export function useBarcodeLookup() {
   const api = useApi();
   return useMutation({
+    // scan.tsx renders its own 404 "not found" + error UI for this.
+    meta: { suppressErrorToast: true },
     mutationFn: (barcode: string) =>
       api.fetch<Product>(`/products/barcode/${encodeURIComponent(barcode)}`),
   });
@@ -43,6 +45,8 @@ export function useCreateProduct() {
   const api = useApi();
   const queryClient = useQueryClient();
   return useMutation({
+    // ManualProductModal renders inline `createProduct.isError` text.
+    meta: { suppressErrorToast: true },
     mutationFn: (data: {
       name: string;
       brand: string;
@@ -64,6 +68,8 @@ export function useCreateProduct() {
 export function useExtractIngredients() {
   const api = useApi();
   return useMutation({
+    // ManualProductModal.processLabelImage toasts from its own catch block.
+    meta: { suppressErrorToast: true },
     mutationFn: (imageUrl: string) =>
       api.fetch<{ ingredients: string[] }>('/products/extract-ingredients', {
         method: 'POST',

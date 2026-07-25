@@ -3,6 +3,7 @@ import prisma from '../config/db.config';
 const XP_TABLE: Record<string, number> = {
   COMPLETE_AM: 50,
   COMPLETE_PM: 50,
+  COMPLETE_CUSTOM: 50,
   LOG_MOOD: 15,
   DAILY_BONUS: 30,
   STREAK_MILESTONE: 100,
@@ -79,7 +80,7 @@ export async function awardXp(userId: string, action: string, xpAmount: number, 
 
 export async function updateDailyCompletion(
   userId: string,
-  field: 'amCompleted' | 'pmCompleted' | 'moodLogged',
+  field: 'amCompleted' | 'pmCompleted' | 'customCompleted' | 'moodLogged',
 ) {
   const today = getTodayMidnight();
 
@@ -89,12 +90,18 @@ export async function updateDailyCompletion(
     update: { [field]: true },
   });
 
-  // Check if all three are now done
+  // Check if the day now counts as a full day. A user's routine obligation is
+  // met either by completing both AM and PM routines, or — for users who only
+  // keep a custom routine — by completing a custom routine. Either way a mood
+  // (skin) log is still required.
   const updated = await prisma.dailyCompletion.findUnique({
     where: { userId_date: { userId, date: today } },
   });
 
-  if (updated && updated.amCompleted && updated.pmCompleted && updated.moodLogged && !updated.isFullDay) {
+  const routineDone =
+    !!updated && ((updated.amCompleted && updated.pmCompleted) || updated.customCompleted);
+
+  if (updated && routineDone && updated.moodLogged && !updated.isFullDay) {
     await prisma.dailyCompletion.update({
       where: { userId_date: { userId, date: today } },
       data: { isFullDay: true },
@@ -303,6 +310,7 @@ export async function getWeeklyCompletions(userId: string) {
       dayIndex: i,
       amCompleted: completion?.amCompleted ?? false,
       pmCompleted: completion?.pmCompleted ?? false,
+      customCompleted: completion?.customCompleted ?? false,
       moodLogged: completion?.moodLogged ?? false,
       isFullDay: completion?.isFullDay ?? false,
     };

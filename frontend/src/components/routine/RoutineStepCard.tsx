@@ -44,11 +44,8 @@ export default function RoutineStepCard({
       }}
     >
       {/* Product Image / Placeholder */}
-      <Pressable
-        onPress={(e) => {
-          e.stopPropagation();
-          onImagePress?.();
-        }}
+      <View
+       
         style={{ position: 'relative' }}
       >
         {productImageUrl ? (
@@ -93,7 +90,7 @@ export default function RoutineStepCard({
             <Ionicons name="checkmark" size={11} color="#fff" />
           </View>
         )}
-      </Pressable>
+      </View>
 
       {/* Text */}
       <View style={{ flex: 1 }}>

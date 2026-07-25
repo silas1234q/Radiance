@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo, useState } from "react";
+import React, { useRef, useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,16 +8,14 @@ import {
   Share,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import {
   useRoutines,
   useUpdateStep,
+  useToggleStep,
   useDeleteRoutine,
   useDetailedInsight,
   useCompleteRoutine,
@@ -36,7 +34,7 @@ import RoutineSkeleton, {
 import AddProductSheet, {
   type AddProductSheetRef,
 } from "../../components/routine/AddProductSheet";
-import GlassIconButton from "../../components/ui/GlassIconButton";
+import CircleIconButton from "../../components/ui/CircleIconButton";
 import ActionMenu, {
   type ActionMenuGroup,
 } from "../../components/ui/ActionMenu";
@@ -54,13 +52,21 @@ export default function RoutineScreen() {
   const { data: weeklyCompletions } = useWeeklyCompletions();
   const [xpToastVisible, setXpToastVisible] = useState(false);
 
-  const { top } = useSafeAreaInsets();
 
   const updateStep = useUpdateStep();
+  const toggleStep = useToggleStep();
   const deleteRoutine = useDeleteRoutine();
   const completeRoutine = useCompleteRoutine();
 
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>("default");
+
+  // When navigated here with a `selectedId` (e.g. right after creating a custom
+  // routine), open that routine instead of the default one.
+  const { selectedId } = useLocalSearchParams<{ selectedId?: string }>();
+  useEffect(() => {
+    if (selectedId) setSelectedRoutineId(selectedId);
+  }, [selectedId]);
+
   const [selectedStepTarget, setSelectedStepTarget] = useState<{
     routineId: string;
     stepId: string;
@@ -96,6 +102,26 @@ export default function RoutineScreen() {
       });
     },
     [completeRoutine],
+  );
+
+  // A custom routine keeps its morning/evening steps in a single routine (tagged
+  // [AM]/[PM]), so "complete this section" means toggling that section's
+  // still-incomplete steps rather than completing the whole routine.
+  const handleCompleteSteps = useCallback(
+    async (routineId: string, steps: RoutineStep[]) => {
+      const pending = steps.filter((s) => !s.isCompleted);
+      if (pending.length === 0) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      try {
+        for (const step of pending) {
+          await toggleStep.mutateAsync({ routineId, stepId: step.id });
+        }
+        setXpToastVisible(true);
+      } catch {
+        // Optimistic changes are rolled back inside the mutation on error.
+      }
+    },
+    [toggleStep],
   );
 
   const selectedCustomRoutine =
@@ -288,6 +314,35 @@ export default function RoutineScreen() {
     </View>
   );
 
+  const renderDoneButton = (onPress: () => void) => (
+    <Pressable
+      onPress={onPress}
+      disabled={completeRoutine.isPending || toggleStep.isPending}
+      style={{
+        backgroundColor: COLORS.primary,
+        borderRadius: 999,
+        paddingVertical: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        marginTop: 12,
+      }}
+    >
+      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+      <Text
+        style={{
+          fontSize: 15,
+          fontWeight: "700",
+          color: "#fff",
+          fontFamily: "SFProRounded_Bold",
+        }}
+      >
+        Done
+      </Text>
+    </Pressable>
+  );
+
   if (isLoading) {
     return (
       <View className="flex-1 bg-gray-200">
@@ -299,10 +354,10 @@ export default function RoutineScreen() {
   }
 
   return (
-    <View className="flex-1">
+    <SafeAreaView className="flex-1" edges={["top"]}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100,paddingTop: top }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
@@ -317,18 +372,8 @@ export default function RoutineScreen() {
             {headerTitle}
           </Text>
           <View className="absolute right-0 flex-row items-center gap-2">
-            <GlassIconButton
-              icon="ellipsis-horizontal"
-              onPress={openActionSheet}
-              size={38}
-              iconSize={20}
-            />
-            <GlassIconButton
-              icon="add"
-              onPress={() => openAddSheet()}
-              size={38}
-              iconSize={22}
-            />
+            <CircleIconButton icon="ellipsis-horizontal" onPress={openActionSheet} />
+            <CircleIconButton icon="add" onPress={() => openAddSheet()} />
           </View>
         </View>
 
@@ -360,7 +405,7 @@ export default function RoutineScreen() {
         )}
 
         {/* Routine Insight Card */}
-        {insightLoading && <InsightSkeleton />}
+        {insightLoading && hasStepsWithProducts && <InsightSkeleton />}
         {!insightLoading &&
           insightData &&
           insightData.compatibilityScore > 0 && (
@@ -455,7 +500,7 @@ export default function RoutineScreen() {
         {selectedRoutineId === "default" ? (
           <>
             {/* Morning Routine */}
-            <SectionDivider label="Morning Routine" />
+            {amSteps.length > 0 && <SectionDivider label="Morning Routine" />}
             <View className="gap-3">
               {amSteps.map((step, index: number) =>
                 renderStepCard(step, index, amRoutine!),
@@ -491,7 +536,7 @@ export default function RoutineScreen() {
             )}
 
             {/* Evening Routine */}
-            <SectionDivider label="Evening Routine" />
+            {pmSteps.length > 0 && <SectionDivider label="Evening Routine" />}
             <View className="gap-3">
               {pmSteps.map((step, index: number) =>
                 renderStepCard(step, index, pmRoutine!),
@@ -600,6 +645,13 @@ export default function RoutineScreen() {
                         renderStepCard(step, index, selectedCustomRoutine),
                       )}
                     </View>
+                    {!morningSteps.every((s) => s.isCompleted) &&
+                      renderDoneButton(() =>
+                        handleCompleteSteps(
+                          selectedCustomRoutine.id,
+                          morningSteps,
+                        ),
+                      )}
                   </>
                 )}
                 {eveningSteps.length > 0 && (
@@ -610,6 +662,13 @@ export default function RoutineScreen() {
                         renderStepCard(step, index, selectedCustomRoutine),
                       )}
                     </View>
+                    {!eveningSteps.every((s) => s.isCompleted) &&
+                      renderDoneButton(() =>
+                        handleCompleteSteps(
+                          selectedCustomRoutine.id,
+                          eveningSteps,
+                        ),
+                      )}
                   </>
                 )}
                 {untaggedSteps.length > 0 && (
@@ -622,43 +681,15 @@ export default function RoutineScreen() {
                         renderStepCard(step, index, selectedCustomRoutine),
                       )}
                     </View>
+                    {!untaggedSteps.every((s) => s.isCompleted) &&
+                      renderDoneButton(() =>
+                        handleCompleteSteps(
+                          selectedCustomRoutine.id,
+                          untaggedSteps,
+                        ),
+                      )}
                   </>
                 )}
-                {allSteps.length > 0 &&
-                  !allSteps.every((s) => s.isCompleted) && (
-                    <Pressable
-                      onPress={() =>
-                        handleCompleteRoutine(selectedCustomRoutine.id)
-                      }
-                      disabled={completeRoutine.isPending}
-                      style={{
-                        backgroundColor: COLORS.primary,
-                        borderRadius: 999,
-                        paddingVertical: 14,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                        marginTop: 12,
-                      }}
-                    >
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color="#fff"
-                      />
-                      <Text
-                        style={{
-                          fontSize: 15,
-                          fontWeight: "700",
-                          color: "#fff",
-                          fontFamily: "SFProRounded_Bold",
-                        }}
-                      >
-                        Done
-                      </Text>
-                    </Pressable>
-                  )}
               </>
             );
           })()
@@ -667,13 +698,27 @@ export default function RoutineScreen() {
         {selectedRoutineId === "default" &&
           amSteps.length === 0 &&
           pmSteps.length === 0 &&
-          customRoutines.length === 0 &&
           !isLoading && (
             <View className="items-center py-[60px]">
               <Text className="text-[48px] mb-4">✨</Text>
-              <Text className="text-base text-skin-text-secondary text-center max-w-[240px] leading-[22px]">
-                Complete the skin quiz to get your personalized routine
+              <Text className="text-base text-skin-text-secondary text-center max-w-[260px] leading-[22px] mb-5">
+                Scan your skin to unlock a personalized routine
               </Text>
+              <Pressable
+                onPress={() => router.push("/(onboarding)/face-scan")}
+                className="flex-row items-center h-[48px] px-6 rounded-full bg-primary"
+                style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+              >
+                <Ionicons
+                  name="scan-outline"
+                  size={18}
+                  color="#fff"
+                  style={{ marginRight: 8 }}
+                />
+                <Text className="text-[15px] font-poppins-semibold text-white">
+                  Scan My Skin
+                </Text>
+              </Pressable>
             </View>
           )}
 
@@ -739,6 +784,6 @@ export default function RoutineScreen() {
           </View>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }

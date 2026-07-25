@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Image } from 'react-native';
+import Fire from '@/src/assets/images/fire.png';
 
 interface ConsistencyCalendarProps {
   activeDays: number[];
@@ -13,8 +14,9 @@ export default function ConsistencyCalendar({ activeDays, streak }: ConsistencyC
     <View className="bg-white rounded-xl p-5 shadow-sm mb-4">
       <View className="flex-row justify-between items-center mb-4">
         <Text className="text-lg font-poppins-bold text-skin-text">Consistency</Text>
-        <View className="px-3 py-1.5 rounded-full bg-primary-light">
-          <Text className="text-[13px] font-poppins-semibold text-primary">🔥 {streak} day streak</Text>
+        <View className="flex-row items-center px-3 py-1.5 rounded-full bg-primary-light">
+          <Image source={Fire} style={{ width: 14, height: 14, marginRight: 4 }} />
+          <Text className="text-[13px] font-poppins-semibold text-primary">{streak} day streak</Text>
         </View>
       </View>
       <View className="flex-row flex-wrap gap-2 justify-start">

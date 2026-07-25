@@ -6,9 +6,25 @@ import AppError from '../errors/AppError';
 import { analyzeSkin, analyzeSkinWithScan } from '../services/skinAnalysisService';
 import { generateRoutines } from '../services/routineService';
 import { generateWeeklyPlan, getOrGenerateWeeklyPlan } from '../services/weeklyPlanService';
+import * as revenueCatService from '../services/revenueCatService';
+import type { Request } from 'express';
 
 function getWeekNumber(): number {
   return Math.ceil((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000)) || 1;
+}
+
+/**
+ * Routines are a paid ("Radiance Pro") feature. Decide whether to generate them
+ * for this request. When RevenueCat is configured we verify the entitlement
+ * server-side (authoritative, tamper-proof) and ignore the client. Otherwise we
+ * fall back to the client's `buildRoutine` hint so local/dev setups still work.
+ */
+async function shouldBuildRoutine(req: Request): Promise<boolean> {
+  if (revenueCatService.isConfigured()) {
+    const auth = getAuth(req);
+    return auth?.userId ? revenueCatService.hasProEntitlement(auth.userId) : false;
+  }
+  return req.body?.buildRoutine !== false;
 }
 
 function todayStart(): Date {
@@ -96,6 +112,8 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
       sensitivityLevel: existingProfile?.sensitivityLevel ?? sensitivityLevel,
       skinTone: existingProfile?.skinTone ?? skinTone,
       photoUrl,
+      // Keep the first scan as the immutable baseline ("before" photo).
+      baselinePhotoUrl: existingProfile?.baselinePhotoUrl ?? photoUrl,
       aiAnalysisRaw: _raw ? JSON.parse(JSON.stringify(_raw)) : undefined,
       analysisSource: _source ?? undefined,
       scanData: _scanData ? JSON.parse(JSON.stringify(_scanData)) : undefined,
@@ -104,6 +122,7 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
       userId,
       ...profileData,
       photoUrl,
+      baselinePhotoUrl: photoUrl,
       aiAnalysisRaw: _raw ? JSON.parse(JSON.stringify(_raw)) : undefined,
       analysisSource: _source ?? undefined,
       scanData: _scanData ? JSON.parse(JSON.stringify(_scanData)) : undefined,
@@ -112,13 +131,15 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
 
   await upsertSkinScore(userId, analysis);
 
-  // Generate routines
-  await generateRoutines(userId);
+  // Generate routines (Radiance Pro only — verified server-side)
+  if (await shouldBuildRoutine(req)) {
+    await generateRoutines(userId);
 
-  // Generate weekly plan in background (don't block response)
-  generateWeeklyPlan(userId).catch((err) =>
-    console.error("Background weekly plan generation failed:", err),
-  );
+    // Generate weekly plan in background (don't block response)
+    generateWeeklyPlan(userId).catch((err) =>
+      console.error("Background weekly plan generation failed:", err),
+    );
+  }
 
   // Mark user as onboarded in Clerk
   const auth = getAuth(req);
@@ -133,6 +154,8 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
 
 export const analyzeProfile = catchAsync(async (req, res) => {
   const userId = req.user!.id;
+  // Routines are a paid ("Radiance Pro") feature — verified server-side.
+  const buildRoutine = await shouldBuildRoutine(req);
   const analysis = await analyzeSkin(userId);
 
   const { _raw, _source, _scanData, ...profileData } = analysis;
@@ -154,13 +177,15 @@ export const analyzeProfile = catchAsync(async (req, res) => {
 
   await upsertSkinScore(userId, analysis);
 
-  // Generate routines
-  await generateRoutines(userId);
+  // Generate routines (subscribers only)
+  if (buildRoutine) {
+    await generateRoutines(userId);
 
-  // Generate weekly plan in background (don't block response)
-  generateWeeklyPlan(userId).catch((err) =>
-    console.error("Background weekly plan generation failed:", err),
-  );
+    // Generate weekly plan in background (don't block response)
+    generateWeeklyPlan(userId).catch((err) =>
+      console.error("Background weekly plan generation failed:", err),
+    );
+  }
 
   // Mark user as onboarded in Clerk
   const auth = getAuth(req);

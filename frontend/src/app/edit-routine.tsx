@@ -1,14 +1,14 @@
-import React, { useRef, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { BottomSheetModal } from '@gorhom/bottom-sheet';
-import { useRoutines, useAddStep, useDeleteStep, useUpdateStep } from '../hooks/queries/useRoutines';
+import { useRoutines, useDeleteStep, useUpdateStep, useUpdateRoutine } from '../hooks/queries/useRoutines';
 import AddProductSheet, { type AddProductSheetRef } from '../components/routine/AddProductSheet';
 import AddStepSheet, { type AddStepSheetRef } from '../components/routine/AddStepSheet';
 import RoutineStepCard from '../components/routine/RoutineStepCard';
-import GlassIconButton from '../components/ui/GlassIconButton';
+import RoutineReminderFields, { type RoutineReminderValue } from '../components/routine/RoutineReminderFields';
+import CircleIconButton from '../components/ui/CircleIconButton';
 import { COLORS } from '../constants/theme';
 
 export default function EditRoutineScreen() {
@@ -17,6 +17,7 @@ export default function EditRoutineScreen() {
   const { data: routines } = useRoutines();
   const deleteStep = useDeleteStep();
   const updateStep = useUpdateStep();
+  const updateRoutine = useUpdateRoutine();
 
   const addStepSheetRef = useRef<AddStepSheetRef>(null);
   const addProductSheetRef = useRef<AddProductSheetRef>(null);
@@ -24,6 +25,36 @@ export default function EditRoutineScreen() {
 
   const routine = routines?.find((r) => r.id === routineId);
   const steps = (routine?.steps ?? []).slice().sort((a, b) => a.order - b.order);
+
+  // Reminder state, seeded from the routine and persisted on change.
+  const [reminder, setReminder] = useState<RoutineReminderValue>({
+    amReminderTime: null,
+    pmReminderTime: null,
+  });
+  useEffect(() => {
+    if (routine) {
+      setReminder({
+        amReminderTime: routine.amReminderTime ?? null,
+        pmReminderTime: routine.pmReminderTime ?? null,
+      });
+    }
+  }, [routine?.id, routine?.amReminderTime, routine?.pmReminderTime]);
+
+  const handleReminderChange = useCallback(
+    (next: RoutineReminderValue) => {
+      setReminder(next);
+      if (!routineId) return;
+      updateRoutine.mutate({
+        routineId,
+        data: {
+          reminderEnabled: !!(next.amReminderTime || next.pmReminderTime),
+          amReminderTime: next.amReminderTime,
+          pmReminderTime: next.pmReminderTime,
+        },
+      });
+    },
+    [routineId, updateRoutine],
+  );
 
   const handleDeleteStep = useCallback((stepId: string, stepName: string) => {
     Alert.alert(
@@ -70,11 +101,11 @@ export default function EditRoutineScreen() {
       <SafeAreaView className="flex-1" edges={['top']}>
         {/* Header */}
         <View className="flex-row items-center justify-between px-5 mt-2 mb-5" style={{ height: 44 }}>
-          <GlassIconButton icon="arrow-back" onPress={() => router.back()} size={38} iconSize={20} />
+          <CircleIconButton icon="arrow-back" onPress={() => router.back()} />
           <Text className="text-[18px] tracking-[-0.4px] text-skin-text" style={{ fontWeight: '600' }}>
             {routine.name || 'Custom Routine'}
           </Text>
-          <GlassIconButton icon="add" onPress={() => addStepSheetRef.current?.present()} size={38} iconSize={22} />
+          <CircleIconButton icon="add" onPress={() => addStepSheetRef.current?.present()} />
         </View>
 
         {/* Steps list */}
@@ -82,6 +113,21 @@ export default function EditRoutineScreen() {
           data={steps}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+          ListHeaderComponent={
+            <View style={{ marginBottom: 20 }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: 'SFProRounded_Semibold',
+                  color: COLORS.textSecondary,
+                  marginBottom: 6,
+                }}
+              >
+                Reminders
+              </Text>
+              <RoutineReminderFields value={reminder} onChange={handleReminderChange} />
+            </View>
+          }
           renderItem={({ item }) => (
             <View style={{ position: 'relative', marginBottom: 12 }}>
               <RoutineStepCard

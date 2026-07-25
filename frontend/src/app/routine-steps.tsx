@@ -8,7 +8,7 @@ import StepDetailPage from '../components/routine/StepDetailPage';
 import { useRoutines } from '../hooks/queries/useRoutines';
 import { useSkinProfile } from '../hooks/queries/useProfile';
 import { COLORS } from '../constants/theme';
-import GlassIconButton from '../components/ui/GlassIconButton';
+import CircleIconButton from '../components/ui/CircleIconButton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -70,7 +70,7 @@ export default function RoutineStepsScreen() {
             zIndex: 10,
           }}
         >
-          <GlassIconButton icon="close" onPress={() => router.back()} />
+          <CircleIconButton icon="close" onPress={() => router.back()} />
         </Animated.View>
 
         {/* Pager */}

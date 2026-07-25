@@ -26,6 +26,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { COLORS, FONTS } from '../../constants/theme';
 import { useCreateProduct, useExtractIngredients } from '../../hooks/queries/useProducts';
 import { uploadProductPhoto } from '../../api/uploadPhoto';
+import { toast } from '../../lib/toast';
 
 const CATEGORIES = [
   'Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Sunscreen',
@@ -101,7 +102,7 @@ export default function ManualProductModal({
       const url = await uploadProductPhoto(uri, token);
       setImageUrl(url);
     } catch {
-      Alert.alert('Upload Failed', 'Could not upload the photo. Please try again.');
+      toast.error('Could not upload the photo. Please try again.', { title: 'Upload failed' });
     } finally {
       setImageUploading(false);
     }
@@ -137,10 +138,10 @@ export default function ManualProductModal({
       if (result.ingredients.length > 0) {
         setIngredients(result.ingredients.join(', '));
       } else {
-        Alert.alert('No Ingredients Found', 'Could not read ingredients from the image. Please enter them manually.');
+        toast.info('Could not read ingredients from the image. Please enter them manually.', { title: 'No ingredients found' });
       }
     } catch {
-      Alert.alert('Scan Failed', 'Could not extract ingredients. Please try again or enter them manually.');
+      toast.error('Could not extract ingredients. Please try again or enter them manually.', { title: 'Scan failed' });
     } finally {
       setScanningLabel(false);
     }

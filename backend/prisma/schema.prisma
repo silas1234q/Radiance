@@ -22,6 +22,15 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Push notifications (Phase 2 — server-driven)
+  expoPushToken         String?   // Expo push token for this user's device
+  timezone              String?   // IANA tz (e.g. "Africa/Accra") for local-time scheduling
+  pushEnabled           Boolean   @default(true) // master server-push switch (mirrors client)
+  weeklyProgressEnabled Boolean   @default(true) // weekly summary push
+  winbackEnabled        Boolean   @default(true) // inactivity win-back push
+  lastWeeklySummaryAt   DateTime? // dedupe marker for the weekly summary job
+  lastWinbackAt         DateTime? // dedupe marker for the win-back job
+
   skinProfile      SkinProfile?
   quizAnswers      SkinQuizAnswer[]
   routines         Routine[]
@@ -57,7 +66,8 @@ model SkinProfile {
   analysisSource   String?
   weeklyPlan         Json?
   weeklyPlanSource   String?
-  photoUrl           String?
+  photoUrl           String?   // latest face-scan photo
+  baselinePhotoUrl   String?   // first (onboarding) face-scan photo — never overwritten; used as the "before" in progress comparisons
   routineLength      String?   // "minimal" | "standard" | "extensive"
   productBudget      String?   // "drugstore" | "midrange" | "luxury" | "none"
   ingredientsToAvoid String[]
@@ -85,6 +95,9 @@ model Routine {
   type     String        // "AM", "PM", or "CUSTOM"
   name     String?       // null for AM/PM, user-provided for CUSTOM
   isActive Boolean       @default(true)
+  reminderEnabled Boolean @default(false) // schedule local reminders for this routine
+  amReminderTime  String? // "HH:mm" 24h morning reminder, null if unset
+  pmReminderTime  String? // "HH:mm" 24h evening reminder, null if unset
   steps    RoutineStep[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
@@ -214,10 +227,11 @@ model DailyCompletion {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   date        DateTime
-  amCompleted Boolean  @default(false)
-  pmCompleted Boolean  @default(false)
-  moodLogged  Boolean  @default(false)
-  isFullDay   Boolean  @default(false)
+  amCompleted     Boolean @default(false)
+  pmCompleted     Boolean @default(false)
+  customCompleted Boolean @default(false)
+  moodLogged      Boolean @default(false)
+  isFullDay       Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

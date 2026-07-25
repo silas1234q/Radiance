@@ -31,7 +31,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@clerk/clerk-expo";
 import { uploadSkinPhoto } from "../api/uploadPhoto";
 import { COLORS } from "../constants/theme";
-import GlassIconButton from "../components/ui/GlassIconButton";
+import CircleIconButton from "../components/ui/CircleIconButton";
 import Chip from "../components/ui/Chip";
 import FaceIcon from "../components/dashboard/FaceIcon";
 import { useLogMood } from "../hooks/queries/useMoods";
@@ -911,7 +911,7 @@ export default function SkinLogModal() {
                 <Text className="text-xl text-gray-900" style={{ flex: 1, textAlign: "center", fontWeight: "600" }}>
                   Skin Diary
                 </Text>
-                <GlassIconButton icon="close" onPress={handleClose} size={40} />
+                <CircleIconButton icon="close" onPress={handleClose} />
               </View>
             </View>
           </SafeAreaView>

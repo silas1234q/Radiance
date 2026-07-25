@@ -14,19 +14,20 @@ export const authService = async (clerkId: string) => {
   const primaryEmail = clerkUser.primaryEmailAddress?.emailAddress;
   if (!primaryEmail) throw new AuthError('user email not found');
 
-  const avatarUrl = clerkUser.imageUrl ?? null;
-  const userData = {
+  const baseData = {
     clerkId,
     email: primaryEmail,
     firstName: clerkUser.firstName || null,
     lastName: clerkUser.lastName || null,
-    avatarUrl,
   };
 
   const user = await prisma.user.upsert({
     where: { clerkId },
-    update: userData,
-    create: userData,
+    // Don't overwrite the user's avatar on every sync — the avatar is managed
+    // in-app (PATCH /users/me). Only seed it from Clerk when first creating the
+    // account.
+    update: baseData,
+    create: { ...baseData, avatarUrl: clerkUser.imageUrl ?? null },
   });
 
   invalidateUserCache(clerkId);

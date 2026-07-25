@@ -93,12 +93,19 @@ export async function generateRoutines(userId: string): Promise<void> {
       }
     }
 
-    // Track recommended products in user's shelf
-    for (const productId of [...new Set(recommendedProductIds)]) {
-      await prisma.userProduct.upsert({
-        where: { userId_productId: { userId, productId } },
-        update: {},
-        create: { userId, productId, source: 'recommended' },
+    // Track recommended products in user's shelf. `createMany` + `skipDuplicates`
+    // is a single atomic `INSERT ... ON CONFLICT DO NOTHING`, so concurrent
+    // invocations for the same user can't race into a P2002 the way per-row
+    // upserts do (upsert is check-then-insert and not atomic).
+    const uniqueProductIds = [...new Set(recommendedProductIds)];
+    if (uniqueProductIds.length > 0) {
+      await prisma.userProduct.createMany({
+        data: uniqueProductIds.map((productId) => ({
+          userId,
+          productId,
+          source: 'recommended',
+        })),
+        skipDuplicates: true,
       });
     }
   } catch (err) {
@@ -178,12 +185,17 @@ async function fallbackGenerateRoutines(userId: string, skinType: string, concer
     }
   }
 
-  // Track recommended products in user's shelf
-  for (const productId of [...new Set(recommendedProductIds)]) {
-    await prisma.userProduct.upsert({
-      where: { userId_productId: { userId, productId } },
-      update: {},
-      create: { userId, productId, source: 'recommended' },
+  // Track recommended products in user's shelf. Atomic, race-safe insert
+  // (see the note on the same pattern in generateRoutines).
+  const uniqueProductIds = [...new Set(recommendedProductIds)];
+  if (uniqueProductIds.length > 0) {
+    await prisma.userProduct.createMany({
+      data: uniqueProductIds.map((productId) => ({
+        userId,
+        productId,
+        source: 'recommended',
+      })),
+      skipDuplicates: true,
     });
   }
 }

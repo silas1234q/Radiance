@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import GlassCard from "../components/ui/GlassCard";
-import GlassIconButton from "../components/ui/GlassIconButton";
+import CircleIconButton from "../components/ui/CircleIconButton";
 import { COLORS } from "../constants/theme";
 
 const SUPPORT_EMAIL = "support@radianceapp.com";
@@ -52,11 +52,7 @@ export default function ContactUsScreen() {
             gap: 14,
           }}
         >
-          <GlassIconButton
-            icon="chevron-back"
-            onPress={() => router.back()}
-            iconSize={22}
-          />
+          <CircleIconButton icon="chevron-back" onPress={() => router.back()} />
           <Text style={{ fontSize: 18, fontWeight: "600", color: COLORS.text }}>
             Contact Us
           </Text>

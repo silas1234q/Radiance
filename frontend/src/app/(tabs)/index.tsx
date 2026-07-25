@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable ,Image} from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -16,6 +16,7 @@ import RoutineCompatibilityCard from "../../components/dashboard/RoutineCompatib
 import HomeSkeleton from "../../components/dashboard/HomeSkeleton";
 import GlassCard from "../../components/ui/GlassCard";
 import { COLORS } from "../../constants/theme";
+import Fire from '@/src/assets/images/fire.png';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -130,7 +131,7 @@ export default function HomeScreen() {
             <GlassCard style={{ marginBottom: 16, flexDirection: "row", alignItems: "center", gap: 14 }}>
               {/* Streak */}
               <View style={{ alignItems: "center", paddingHorizontal: 4 }}>
-                <Text style={{ fontSize: 22 }}>🔥</Text>
+               <Image source={Fire} style={{ width: 30, height: 30 }} />
                 <Text
                   style={{
                     fontSize: 28,
@@ -259,15 +260,15 @@ export default function HomeScreen() {
           )}
 
           {/* Routine Compatibility */}
-          {hasRoutine && (
-            <RoutineCompatibilityCard
-              compatibilityScore={compatibilityScore}
-              goalsMetCount={goalsMetCount}
-              totalGoals={totalGoals}
-              productCount={totalProducts}
-              onPress={() => router.push("/(tabs)/routine")}
-            />
-          )}
+          <RoutineCompatibilityCard
+            empty={!hasRoutine}
+            compatibilityScore={compatibilityScore}
+            goalsMetCount={goalsMetCount}
+            totalGoals={totalGoals}
+            productCount={totalProducts}
+            onPress={() => router.push("/(tabs)/routine")}
+            onScan={() => router.push("/(onboarding)/face-scan")}
+          />
 
           {/* Skin Diary */}
           <SectionDivider label="Skin Diary" />

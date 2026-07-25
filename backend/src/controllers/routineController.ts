@@ -8,6 +8,28 @@ async function invalidateInsightCache(userId: string) {
   await prisma.routineInsightCache.deleteMany({ where: { userId } });
 }
 
+// Which DailyCompletion field a routine type credits when completed. Returns
+// null for types that don't participate in the streak system.
+function completionFieldFor(
+  type: string,
+): 'amCompleted' | 'pmCompleted' | 'customCompleted' | null {
+  if (type === 'AM') return 'amCompleted';
+  if (type === 'PM') return 'pmCompleted';
+  if (type === 'CUSTOM') return 'customCompleted';
+  return null;
+}
+
+// Accepts "HH:mm" (24h) or null/empty; returns a normalized string or null.
+// Throws on a malformed non-empty value.
+function sanitizeReminderTime(value: unknown, field: string): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string' || !/^([01]?\d|2[0-3]):[0-5]\d$/.test(value)) {
+    throw new ValidationErrors([{ field, message: 'Time must be in HH:mm 24-hour format' }]);
+  }
+  const [h, m] = value.split(':');
+  return `${h.padStart(2, '0')}:${m}`;
+}
+
 export const getRoutines = catchAsync(async (req, res) => {
   const routines = await prisma.routine.findMany({
     where: { userId: req.user!.id },
@@ -32,6 +54,15 @@ export const getRoutines = catchAsync(async (req, res) => {
 export const createRoutine = catchAsync(async (req, res) => {
   const { type, steps } = req.body;
   const userId = req.user!.id;
+
+  // Optional per-routine reminder config (falls back to app defaults client-side).
+  const amReminderTime = sanitizeReminderTime(req.body.amReminderTime, 'amReminderTime');
+  const pmReminderTime = sanitizeReminderTime(req.body.pmReminderTime, 'pmReminderTime');
+  const reminderEnabled =
+    req.body.reminderEnabled !== undefined
+      ? !!req.body.reminderEnabled
+      : !!(amReminderTime || pmReminderTime);
+
   const existing = await prisma.routine.findFirst({
     where: { userId, type, name: null },
   });
@@ -39,12 +70,17 @@ export const createRoutine = catchAsync(async (req, res) => {
   if (existing) {
     routine = await prisma.routine.update({
       where: { id: existing.id },
-      data: { steps: { deleteMany: {}, create: steps } },
+      data: {
+        steps: { deleteMany: {}, create: steps },
+        reminderEnabled,
+        amReminderTime,
+        pmReminderTime,
+      },
       include: { steps: { orderBy: { order: 'asc' } } },
     });
   } else {
     routine = await prisma.routine.create({
-      data: { userId, type, steps: { create: steps } },
+      data: { userId, type, steps: { create: steps }, reminderEnabled, amReminderTime, pmReminderTime },
       include: { steps: { orderBy: { order: 'asc' } } },
     });
   }
@@ -106,16 +142,20 @@ export const toggleStep = catchAsync(async (req, res) => {
     },
   });
 
-  // If toggling ON, check if all steps in the routine are now complete
-  if (togglingOn && (step.routine.type === 'AM' || step.routine.type === 'PM')) {
+  // If toggling ON and every step in the routine is now complete, credit the
+  // day. Custom routines count toward the streak too (see updateDailyCompletion).
+  if (togglingOn) {
     const allSteps = step.routine.steps;
-    const allComplete = allSteps.every((s) => s.id === stepId ? true : s.isCompleted);
+    const allComplete = allSteps.every((s) => (s.id === stepId ? true : s.isCompleted));
     if (allComplete) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const userId = req.user!.id;
-      await gamificationService.awardXp(userId, `COMPLETE_${step.routine.type}`, 50, today);
-      await gamificationService.updateDailyCompletion(userId, step.routine.type === 'AM' ? 'amCompleted' : 'pmCompleted');
+      const field = completionFieldFor(step.routine.type);
+      if (field) {
+        await gamificationService.awardXp(userId, `COMPLETE_${step.routine.type}`, 50, today);
+        await gamificationService.updateDailyCompletion(userId, field);
+      }
     }
   }
 
@@ -140,13 +180,14 @@ export const completeRoutine = catchAsync(async (req, res) => {
     include: { steps: { orderBy: { order: 'asc' }, include: { product: { select: { id: true, name: true, brand: true, imageUrl: true, category: true } } } } },
   });
 
-  // Gamification: award XP for completing AM/PM routines
-  if (routine.type === 'AM' || routine.type === 'PM') {
+  // Gamification: award XP for completing AM/PM/custom routines
+  const field = completionFieldFor(routine.type);
+  if (field) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const userId = req.user!.id;
     await gamificationService.awardXp(userId, `COMPLETE_${routine.type}`, 50, today);
-    await gamificationService.updateDailyCompletion(userId, routine.type === 'AM' ? 'amCompleted' : 'pmCompleted');
+    await gamificationService.updateDailyCompletion(userId, field);
   }
 
   res.json(updated);
@@ -170,15 +211,60 @@ export const createCustomRoutine = catchAsync(async (req, res) => {
     throw new ValidationErrors([{ field: 'name', message: 'Routine name is required' }]);
   }
 
+  const amReminderTime = sanitizeReminderTime(req.body.amReminderTime, 'amReminderTime');
+  const pmReminderTime = sanitizeReminderTime(req.body.pmReminderTime, 'pmReminderTime');
+  const reminderEnabled =
+    req.body.reminderEnabled !== undefined
+      ? !!req.body.reminderEnabled
+      : !!(amReminderTime || pmReminderTime);
+
   const routine = await prisma.routine.create({
     data: {
       userId: req.user!.id,
       type: 'CUSTOM',
       name: name.trim(),
+      reminderEnabled,
+      amReminderTime,
+      pmReminderTime,
     },
     include: { steps: { orderBy: { order: 'asc' }, include: { product: true } } },
   });
   res.status(201).json(routine);
+});
+
+// PATCH /routines/:id — update reminder settings (and name/isActive) for a routine.
+export const updateRoutine = catchAsync(async (req, res) => {
+  const routineId = req.params.id as string;
+  const routine = await prisma.routine.findFirst({
+    where: { id: routineId, userId: req.user!.id },
+  });
+  if (!routine) throw new NotFoundError('Routine not found');
+
+  const data: {
+    name?: string;
+    isActive?: boolean;
+    reminderEnabled?: boolean;
+    amReminderTime?: string | null;
+    pmReminderTime?: string | null;
+  } = {};
+
+  if (req.body.name !== undefined) data.name = String(req.body.name).trim();
+  if (req.body.isActive !== undefined) data.isActive = !!req.body.isActive;
+  if (req.body.reminderEnabled !== undefined) data.reminderEnabled = !!req.body.reminderEnabled;
+  if (req.body.amReminderTime !== undefined) {
+    data.amReminderTime = sanitizeReminderTime(req.body.amReminderTime, 'amReminderTime');
+  }
+  if (req.body.pmReminderTime !== undefined) {
+    data.pmReminderTime = sanitizeReminderTime(req.body.pmReminderTime, 'pmReminderTime');
+  }
+
+  const updated = await prisma.routine.update({
+    where: { id: routineId },
+    data,
+    include: { steps: { orderBy: { order: 'asc' }, include: { product: { select: { id: true, name: true, brand: true, imageUrl: true, category: true } } } } },
+  });
+  await invalidateInsightCache(req.user!.id);
+  res.json(updated);
 });
 
 export const updateStep = catchAsync(async (req, res) => {

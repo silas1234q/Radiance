@@ -6,6 +6,7 @@ import {
   Image,
   Pressable,
   Linking,
+  Share,
   Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,7 +15,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useProductAnalysis } from '../hooks/queries/useProducts';
 import { COLORS } from '../constants/theme';
-import GlassIconButton from '../components/ui/GlassIconButton';
+import CircleIconButton from '../components/ui/CircleIconButton';
 import Skeleton from '../components/ui/Skeleton';
 
 function FitScoreRing({ score }: { score: number }) {
@@ -431,6 +432,18 @@ export default function ProductDetailScreen() {
     );
   }
 
+  const handleShare = async () => {
+    const title = product.brand ? `${product.name} (${product.brand})` : product.name;
+    const message = [title, product.sourceUrl, 'Shared via Radiance']
+      .filter(Boolean)
+      .join('\n\n');
+    try {
+      await Share.share({ message });
+    } catch {
+      // User dismissed the share sheet — nothing to do.
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "#F2F2F7"}}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -444,8 +457,8 @@ export default function ProductDetailScreen() {
             paddingVertical: 12,
           }}
         >
-          <GlassIconButton icon="chevron-back" onPress={() => router.back()} iconSize={22} />
-          <GlassIconButton icon="share-outline" />
+          <CircleIconButton icon="chevron-back" onPress={() => router.back()} />
+          <CircleIconButton icon="share-outline" onPress={handleShare} />
         </View>
 
         <ScrollView

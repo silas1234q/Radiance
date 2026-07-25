@@ -12,9 +12,16 @@ if (!connectionString) {
 const pool = new pg.Pool({
   connectionString,
   max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-  allowExitOnIdle: true,
+  // Keep connections warm longer so bursty requests reuse an open connection
+  // instead of paying Neon's (slow) connection-establishment cost each time.
+  idleTimeoutMillis: 60000,
+  // Neon cold-starts from auto-suspend take ~4s; 12s gives headroom without
+  // letting a genuinely-unreachable DB hang requests for a long time.
+  connectionTimeoutMillis: 12000,
+  // TCP keepalive keeps idle sockets healthy through NAT/proxies.
+  keepAlive: true,
+  // Recycle connections periodically (Neon pooler recommendation).
+  maxUses: 7500,
 });
 
 // Discard broken connections instead of crashing
@@ -26,13 +33,17 @@ const adapter = new PrismaPg(pool);
 
 const basePrisma = new PrismaClient({ adapter });
 
+// Only genuinely transient *mid-flight* drops are retried — a fresh connection
+// usually succeeds immediately. Connection-acquisition timeouts are deliberately
+// NOT retried: the pool already waited `connectionTimeoutMillis`, so retrying
+// just stacks multi-second waits and can turn an unreachable DB into a
+// minutes-long hang instead of failing fast.
 const TRANSIENT_ERRORS = [
   'Connection terminated unexpectedly',
   'Connection terminated',
   'connection is insecure',
   'Client has encountered a connection error',
   'ECONNRESET',
-  'ETIMEDOUT',
   'ECONNREFUSED',
 ];
 

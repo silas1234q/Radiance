@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { useDetailedInsight } from '../hooks/queries/useRoutines';
-import GlassIconButton from '../components/ui/GlassIconButton';
+import CircleIconButton from '../components/ui/CircleIconButton';
 import { COLORS } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -167,7 +167,7 @@ export default function RoutineInsightScreen() {
               Routine Insight
             </Text>
             <View className="absolute left-0">
-              <GlassIconButton icon="chevron-back" onPress={() => router.back()} size={38} iconSize={20} />
+              <CircleIconButton icon="chevron-back" onPress={() => router.back()} />
             </View>
           </View>
 

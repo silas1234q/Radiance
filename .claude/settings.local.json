@@ -154,7 +154,32 @@
       "Bash(cd \"C:/Users/Silas/Documents/radiance/backend\" && timeout 8 npx ts-node-dev --transpile-only src/server.ts 2>&1 | tail -5)",
       "Bash(cd \"C:/Users/Silas/Documents/radiance/backend\" && timeout 8 npx ts-node-dev --transpile-only src/server.ts 2>&1 | tail -3)",
       "Bash(cd \"C:/Users/Silas/Documents/radiance/backend\" && timeout 8 npx ts-node-dev --transpile-only src/server.ts 2>&1 | tail -2)",
-      "Bash(head -100 /c/Users/Silas/Documents/radiance/frontend/src/app/\\\\\\(tabs\\\\\\)/index.tsx)"
+      "Bash(head -100 /c/Users/Silas/Documents/radiance/frontend/src/app/\\\\\\(tabs\\\\\\)/index.tsx)",
+      "Bash(xcode-select -p)",
+      "Bash(xcodebuild -version)",
+      "Bash(sudo -n xcodebuild -license check)",
+      "Bash(mdfind \"kMDItemKind == 'Application'\")",
+      "Bash(xcrun simctl *)",
+      "Bash(xcodebuild *)",
+      "Bash(curl -sS -m 3 http://localhost:5000/api/health)",
+      "Bash(lsof -nP -iTCP:5000 -sTCP:LISTEN)",
+      "Bash(curl -sS -m 3 -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5000/api/health)",
+      "Bash(npm -v)",
+      "Bash(npx expo *)",
+      "Bash(git status *)",
+      "Bash(git -C /Users/amponsahstephen/Documents/Radiance/frontend status --short)",
+      "Bash(xcrun xctrace *)",
+      "Bash(xcrun devicectl *)",
+      "Bash(npm uninstall *)",
+      "Bash(npx tsc *)",
+      "Bash(node *)",
+      "Bash(curl -s -o /dev/null -w \"connect=%{time_connect}s  speed=%{speed_download} B/s\\\\n\" --max-time 3 https://repo1.maven.org/maven2/)",
+      "Bash(pkill -f \"expo prebuild\")",
+      "Bash(pkill -f \"cocoapods/1.17.0\")",
+      "Bash(pkill -f \"hermes-ios.download\")",
+      "Bash(export HERMES_ENGINE_TARBALL_PATH=$HOME/hermes-ios-0.81.5-debug.tar.gz)",
+      "Bash(echo \"=== prebuild exit: $? ===\")",
+      "WebFetch(domain:docs.infinite.red)"
     ]
   }
 }

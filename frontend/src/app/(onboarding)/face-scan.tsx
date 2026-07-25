@@ -1,260 +1,343 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, Pressable, Linking, StyleSheet, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, ActivityIndicator, Dimensions, InteractionManager, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '@clerk/clerk-expo';
-import { useAnalyzeSkinWithScan } from '../../hooks/queries/useQuiz';
-import { uploadSkinPhoto } from '../../api/uploadPhoto';
-import { useSimulatedFaceChecks } from '../../hooks/useSimulatedFaceChecks';
-import { StatusPillBar } from '../../components/face-scan/StatusPillBar';
-import { InstructionBubble } from '../../components/face-scan/InstructionBubble';
-import { FaceGuideOverlay, FRAME_H } from '../../components/face-scan/FaceGuideOverlay';
-import { CaptureFlash } from '../../components/face-scan/CaptureFlash';
-import { PhotoPreview } from '../../components/face-scan/PhotoPreview';
-import { ScanAnalyzing } from '../../components/face-scan/ScanAnalyzing';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import * as Brightness from 'expo-brightness';
+import Animated, {
+  FadeIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import {
+  FaceDetectionProvider,
+  useFaceDetection,
+  type RNMLKitFaceDetectorOptions,
+} from '@infinitered/react-native-mlkit-face-detection';
+import { validateFaceScan } from '../../lib/faceValidation';
 import { COLORS } from '../../constants/theme';
 
-const { height: SCREEN_H } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GUIDE_SIZE = SCREEN_WIDTH * 0.72;
+const GUIDE_HEIGHT = GUIDE_SIZE * 1.25;
 
-type ScreenState = 'camera' | 'preview' | 'analyzing';
+const G_BRACKET = 34;
+const G_BW = 2.5;
+const G_WHITE = 'rgba(255,255,255,0.92)';
+const G_EDGE_INSET = 34;
+const guide = StyleSheet.create({
+  edge: {
+    position: 'absolute',
+    left: G_EDGE_INSET,
+    right: G_EDGE_INSET,
+    height: G_BW,
+    backgroundColor: G_WHITE,
+    borderRadius: G_BW,
+  },
+  topEdge: { top: 0 },
+  bottomEdge: { bottom: 0 },
+  edgeError: { backgroundColor: COLORS.primary },
+  bracket: { position: 'absolute', width: G_BRACKET, height: G_BRACKET, borderColor: G_WHITE },
+  bracketError: { borderColor: COLORS.primary },
+  tl: { top: 0, left: 0, borderLeftWidth: G_BW, borderTopWidth: G_BW, borderTopLeftRadius: 24 },
+  tr: { top: 0, right: 0, borderRightWidth: G_BW, borderTopWidth: G_BW, borderTopRightRadius: 24 },
+  bl: { bottom: 0, left: 0, borderLeftWidth: G_BW, borderBottomWidth: G_BW, borderBottomLeftRadius: 24 },
+  br: { bottom: 0, right: 0, borderRightWidth: G_BW, borderBottomWidth: G_BW, borderBottomRightRadius: 24 },
+});
+
+// Landmarks + classification (eyes open) power the validation checks; contours
+// are unnecessary and slower. "accurate" mode maximizes detection reliability
+// for a single deliberate capture.
+const DETECTOR_OPTIONS: RNMLKitFaceDetectorOptions = {
+  performanceMode: 'accurate',
+  landmarkMode: true,
+  classificationMode: true,
+  contourMode: false,
+};
+
+type Phase = 'preview' | 'capturing' | 'validating';
+
+/**
+ * From the camera's supported still sizes, pick the highest-resolution option.
+ * On iOS the "photo" preset yields the full sensor resolution; on Android the
+ * sizes come back as "WIDTHxHEIGHT" strings, so we pick the largest by area.
+ */
+function pickBestPictureSize(sizes: string[]): string | undefined {
+  let best: string | undefined;
+  let bestArea = 0;
+  for (const s of sizes) {
+    const m = /(\d+)x(\d+)/.exec(s);
+    if (m) {
+      const area = Number(m[1]) * Number(m[2]);
+      if (area > bestArea) {
+        bestArea = area;
+        best = s;
+      }
+    }
+  }
+  if (sizes.includes('photo')) return 'photo';
+  return best;
+}
 
 export default function FaceScanScreen() {
+  return (
+    <FaceDetectionProvider options={DETECTOR_OPTIONS}>
+      <FaceScanInner />
+    </FaceDetectionProvider>
+  );
+}
+
+function FaceScanInner() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { getToken } = useAuth();
-  const analyzeScan = useAnalyzeSkinWithScan();
-  const cameraRef = useRef<CameraView>(null);
-
-  const [state, setState] = useState<ScreenState>('camera');
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [flashTrigger, setFlashTrigger] = useState(false);
-
+  const detector = useFaceDetection();
   const [permission, requestPermission] = useCameraPermissions();
 
-  // Simulated face checks
-  const { checks, checkStatuses, allPassed, reset: resetChecks } =
-    useSimulatedFaceChecks(state === 'camera' && !!permission?.granted);
+  const cameraRef = useRef<CameraView>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
+  const [phase, setPhase] = useState<Phase>('preview');
+  const [error, setError] = useState<string | null>(null);
+  // Front camera has no hardware flash; when on, we light the face with a
+  // bright white screen right before capture (like the iOS Retina Flash).
+  const [flashOn, setFlashOn] = useState(false);
+  // Touching the camera immediately can race the screen's push transition on
+  // iOS; wait until the transition settles before mounting the preview.
+  const [interactionsDone, setInteractionsDone] = useState(false);
 
-  const passedCount = checkStatuses.filter((s) => s.passed).length;
+  // Capture flash
+  const flash = useSharedValue(0);
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }));
 
-  const handleTakePhoto = async () => {
-    if (!cameraRef.current) return;
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => setInteractionsDone(true));
+    return () => task.cancel();
+  }, []);
+
+  useEffect(() => {
+    if (permission && !permission.granted && permission.canAskAgain) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
+
+  const onCameraReady = useCallback(async () => {
+    setCameraReady(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
-      if (photo) {
-        setPhotoUri(photo.uri);
-        setFlashTrigger(true);
-        setTimeout(() => setFlashTrigger(false), 500);
-        setState('preview');
-        setError(null);
+      const sizes = await cameraRef.current?.getAvailablePictureSizesAsync();
+      if (sizes && sizes.length) {
+        const best = pickBestPictureSize(sizes);
+        if (best) setPictureSize(best);
       }
     } catch {
-      setError('Failed to take photo. Please try again.');
+      // Fall back to the camera default resolution.
     }
-  };
+  }, []);
 
-  const handleRetake = () => {
-    setPhotoUri(null);
+  const capture = useCallback(async () => {
+    if (phase !== 'preview' || !cameraRef.current || !cameraReady) return;
     setError(null);
-    setState('camera');
-    resetChecks();
-  };
 
-  const getTokenWithRetry = async (retries = 3, delay = 500): Promise<string> => {
-    for (let i = 0; i < retries; i++) {
-      const token = await getToken();
-      if (token) return token;
-      if (i < retries - 1) {
-        await new Promise((r) => setTimeout(r, delay));
-      }
-    }
-    throw new Error('Not authenticated');
-  };
-
-  const handleAnalyze = async () => {
-    setState('analyzing');
-    setError(null);
+    let prevBrightness: number | null = null;
+    const fail = (reason: string) => {
+      setError(reason);
+      setPhase('preview');
+    };
 
     try {
-      const token = await getTokenWithRetry();
+      setPhase('capturing');
 
-      const cloudinaryUrl = await uploadSkinPhoto(photoUri ?? '', token);
+      if (flashOn) {
+        // Screen flash: crank the display to full white/brightness and hold it
+        // long enough to light the face before the shutter fires.
+        try {
+          prevBrightness = await Brightness.getBrightnessAsync();
+          await Brightness.setBrightnessAsync(1);
+        } catch {
+          // Brightness control unavailable — the white overlay still helps.
+        }
+        flash.value = withTiming(1, { duration: 120 });
+        await new Promise((resolve) => setTimeout(resolve, 260));
+      } else {
+        // Shutter blink for feedback.
+        flash.value = withSequence(
+          withTiming(0.85, { duration: 60 }),
+          withTiming(0, { duration: 260 }),
+        );
+      }
 
-      analyzeScan.mutate(cloudinaryUrl, {
-        onSuccess: () => router.replace('/(onboarding)/results'),
-        onError: (err) => {
-          setState('preview');
-          setError(err instanceof Error ? err.message : 'Analysis failed. Please try again.');
-        },
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 1,
+        skipProcessing: false,
+        exif: false,
       });
-    } catch (err) {
-      setState('preview');
-      setError(err instanceof Error ? err.message : 'Failed to upload photo. Please try again.');
-    }
-  };
 
-  // --- Permission loading ---
+      if (flashOn) {
+        flash.value = withTiming(0, { duration: 200 });
+        if (prevBrightness != null) {
+          Brightness.setBrightnessAsync(prevBrightness).catch(() => {});
+        }
+      }
+
+      if (!photo?.uri) {
+        fail('Something went wrong. Please try again.');
+        return;
+      }
+
+      setPhase('validating');
+      const result = await detector.detectFaces(photo.uri);
+      const validation = validateFaceScan(result, photo.width, photo.height);
+      if (!validation.ok) {
+        fail(validation.reason);
+        return;
+      }
+
+      // Hand the captured photo off to the processing screen, which uploads it,
+      // runs the scan analysis, and routes to results.
+      router.replace(`/(onboarding)/scan-processing?uri=${encodeURIComponent(photo.uri)}`);
+    } catch (e) {
+      flash.value = withTiming(0, { duration: 150 });
+      if (prevBrightness != null) {
+        Brightness.setBrightnessAsync(prevBrightness).catch(() => {});
+      }
+      fail('Something went wrong. Please try again.');
+    }
+  }, [phase, cameraReady, detector, router, flash, flashOn]);
+
+  // --- Permission states ---
   if (!permission) {
-    return <View className="flex-1 bg-black" />;
+    return (
+      <View className="flex-1 bg-black items-center justify-center">
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
   }
 
-  // --- Permission denied ---
   if (!permission.granted) {
     return (
-      <View className="flex-1 bg-white justify-center items-center px-8">
-        <Text className="text-[22px] font-poppins-bold text-skin-text text-center mb-3">
-          Camera Access Needed
+      <SafeAreaView className="flex-1 bg-white items-center justify-center px-8">
+        <Text className="text-[18px] font-poppins-semibold text-skin-text text-center mb-2">
+          Camera access needed
         </Text>
-        <Text className="text-[15px] font-poppins-regular text-skin-text-secondary text-center leading-[22px] mb-8">
-          We need camera access to scan your skin and provide a personalized analysis. Your photos
-          are only used for analysis and are never shared.
+        <Text className="text-[14px] font-poppins-regular text-skin-text-secondary text-center mb-6">
+          We use your front camera to scan your skin. Your photo is only used for your analysis.
         </Text>
-
-        {permission.canAskAgain ? (
-          <Pressable
-            onPress={requestPermission}
-            className="h-[56px] w-full rounded-2xl bg-primary items-center justify-center mb-3"
-            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
-          >
-            <Text className="text-[16px] font-poppins-semibold text-white">
-              Allow Camera Access
-            </Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            onPress={() => Linking.openSettings()}
-            className="h-[56px] w-full rounded-2xl bg-primary items-center justify-center mb-3"
-            style={({ pressed }) => [pressed && { opacity: 0.85 }]}
-          >
-            <Text className="text-[16px] font-poppins-semibold text-white">Open Settings</Text>
-          </Pressable>
-        )}
-
-        <Pressable onPress={() => router.back()} className="h-[48px] items-center justify-center">
-          <Text className="text-[14px] font-poppins-medium text-skin-text-secondary">
-            Maybe later
-          </Text>
+        <Pressable
+          onPress={requestPermission}
+          className="h-[48px] px-8 rounded-2xl bg-primary items-center justify-center"
+        >
+          <Text className="text-[14px] font-poppins-semibold text-white">Enable Camera</Text>
         </Pressable>
-      </View>
+        <Pressable
+          onPress={() => router.replace('/(onboarding)/results?locked=1')}
+          className="mt-4 py-2"
+        >
+          <Text className="text-[14px] font-poppins-medium text-skin-text-tertiary">Not now</Text>
+        </Pressable>
+      </SafeAreaView>
     );
   }
 
-  // --- Analyzing state ---
-  if (state === 'analyzing') {
-    return <ScanAnalyzing photoUri={photoUri} />;
-  }
+  const busy = phase !== 'preview';
 
-  // --- Preview state ---
-  if (state === 'preview' && photoUri) {
-    return (
-      <PhotoPreview
-        photoUri={photoUri}
-        error={error}
-        onAnalyze={handleAnalyze}
-        onRetake={handleRetake}
-      />
-    );
-  }
-
-  // --- Camera viewfinder ---
   return (
     <View className="flex-1 bg-black">
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="front" />
-
-      {/* Face guide overlay with dimming */}
-      <FaceGuideOverlay passedCount={passedCount} />
-
-      {/* Back button */}
-      <Pressable
-        onPress={() => router.back()}
-        style={{ top: insets.top + 8, left: 16 }}
-        className="absolute z-10 w-10 h-10 rounded-full bg-black/30 items-center justify-center"
-      >
-        <Text className="text-white text-[22px] mt-[-2px]">{'\u2039'}</Text>
-      </Pressable>
-
-      {/* Status pills */}
-      <View
-        className="absolute left-0 right-0"
-        style={{ top: insets.top + 14 }}
-      >
-        <StatusPillBar statuses={checkStatuses} />
-      </View>
-
-      {/* Error banner */}
-      {error && (
-        <View
-          className="absolute left-0 right-0 items-center"
-          style={{ top: insets.top + 56 }}
-        >
-          <View className="bg-red-500/90 px-5 py-3 rounded-xl mx-6">
-            <Text className="text-white text-[14px] font-poppins-medium text-center">
-              {error}
-            </Text>
-          </View>
-        </View>
+      {interactionsDone && (
+        <CameraView
+          ref={cameraRef}
+          style={{ flex: 1 }}
+          facing="front"
+          pictureSize={pictureSize}
+          onCameraReady={onCameraReady}
+        />
       )}
 
-      {/* Instruction bubble below frame */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: SCREEN_H / 2 + FRAME_H / 2 - 10,
-          alignItems: 'center',
-        }}
-      >
-        <InstructionBubble
-          checks={checks}
-          captureState="scanning"
-          countdownNumber={3}
-        />
-      </View>
+      {/* --- Idle preview UI --- */}
+      {!busy && (
+        <>
+          {/* Face guide frame (matches the scanning overlay) */}
+          <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+            <View style={{ width: GUIDE_SIZE, height: GUIDE_HEIGHT }}>
+              <View style={[guide.edge, guide.topEdge, error && guide.edgeError]} />
+              <View style={[guide.edge, guide.bottomEdge, error && guide.edgeError]} />
+              <View style={[guide.bracket, guide.tl, error && guide.bracketError]} />
+              <View style={[guide.bracket, guide.tr, error && guide.bracketError]} />
+              <View style={[guide.bracket, guide.bl, error && guide.bracketError]} />
+              <View style={[guide.bracket, guide.br, error && guide.bracketError]} />
+            </View>
+          </View>
 
-      {/* Shutter button */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          alignItems: 'center',
-          paddingBottom: insets.bottom + 28,
-          zIndex: 20,
-          elevation: 20,
-        }}
-      >
-        <Pressable
-          onPress={handleTakePhoto}
-          disabled={!allPassed}
-          style={({ pressed }) => ({
-            width: 72,
-            height: 72,
-            borderRadius: 36,
-            borderWidth: 4,
-            borderColor: allPassed ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed && allPassed ? 0.7 : 1,
-          })}
-        >
-          <View
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: allPassed ? COLORS.primary : 'rgba(255,255,255,0.25)',
-            }}
-          />
-        </Pressable>
-      </View>
+          <SafeAreaView className="absolute inset-0" pointerEvents="box-none">
+            {/* Flash toggle (screen flash for the front camera) */}
+            <Pressable
+              onPress={() => setFlashOn((v) => !v)}
+              hitSlop={12}
+              style={{
+                position: 'absolute',
+                top: 50,
+                left: 20,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: flashOn ? COLORS.primary : 'rgba(0,0,0,0.45)',
+              }}
+            >
+              <Ionicons name={flashOn ? 'flash' : 'flash-off'} size={22} color="#fff" />
+            </Pressable>
+
+            {/* Top instruction / error */}
+            <View className="px-6 pt-4 items-center" pointerEvents="none">
+              {error ? (
+                <Animated.View
+                  entering={FadeIn.duration(250)}
+                  className="px-4 py-2.5 rounded-2xl"
+                  style={{ backgroundColor: 'rgba(240,102,128,0.92)' }}
+                >
+                  <Text className="text-[14px] font-poppins-semibold text-white text-center">{error}</Text>
+                </Animated.View>
+              ) : (
+                <View className="px-4 py-2.5 rounded-2xl" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+                  <Text className="text-[14px] font-poppins-medium text-white text-center">
+                    Position your face in the circle
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Bottom controls */}
+            <View className="mt-auto items-center pb-8" pointerEvents="box-none">
+              <Pressable
+                onPress={capture}
+                disabled={!cameraReady}
+                hitSlop={12}
+                style={({ pressed }) => ({
+                  width: 76,
+                  height: 76,
+                  borderRadius: 38,
+                  borderWidth: 5,
+                  borderColor: 'rgba(255,255,255,0.9)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: cameraReady ? (pressed ? 0.7 : 1) : 0.4,
+                })}
+              >
+                <View
+                  style={{ width: 58, height: 58, borderRadius: 29, backgroundColor: COLORS.primary }}
+                />
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </>
+      )}
 
       {/* Capture flash */}
-      <CaptureFlash trigger={flashTrigger} />
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: '#fff' }, flashStyle]}
+      />
     </View>
   );
 }

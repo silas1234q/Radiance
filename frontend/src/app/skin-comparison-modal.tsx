@@ -28,7 +28,7 @@ import { useSkinProfile } from '../hooks/queries/useProfile';
 import { useSkinScores } from '../hooks/queries/useSkinScores';
 import { useSkinLogs } from '../hooks/queries/useSkinLogs';
 import { COLORS } from '../constants/theme';
-import GlassIconButton from '../components/ui/GlassIconButton';
+import CircleIconButton from '../components/ui/CircleIconButton';
 import type { SkinScore } from '../types/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -361,13 +361,21 @@ export default function SkinComparisonModal() {
     return sorted.last.score - sorted.first.score;
   }, [sorted]);
 
+  // "Before" is the immutable first (onboarding) scan; "Now" prefers the latest
+  // re-scan and falls back to the most recent logged progress photo.
+  const firstScanPhoto = profile?.baselinePhotoUrl ?? profile?.photoUrl ?? null;
+  const latestScanPhoto = profile?.photoUrl ?? null;
+  const latestLogPhoto = skinLogs?.filter((l) => l.photoUrl)?.[0]?.photoUrl ?? null;
+  const nowPhoto =
+    latestScanPhoto && latestScanPhoto !== firstScanPhoto ? latestScanPhoto : latestLogPhoto;
+
   const mosaicPhotos = useMemo(() => {
     const photos: MosaicPhoto[] = [];
 
-    if (profile?.photoUrl) {
+    if (firstScanPhoto) {
       photos.push({
         id: 'before',
-        uri: profile.photoUrl,
+        uri: firstScanPhoto,
         date: sorted?.first.date ?? new Date().toISOString(),
         label: 'Day 1',
       });
@@ -386,8 +394,19 @@ export default function SkinComparisonModal() {
       });
     }
 
+    // Include the latest re-scan (not stored as a skin log) when it differs
+    // from the baseline, so re-scans appear in the timeline.
+    if (latestScanPhoto && latestScanPhoto !== firstScanPhoto) {
+      photos.push({
+        id: 'latest-scan',
+        uri: latestScanPhoto,
+        date: new Date().toISOString(),
+        label: 'Latest',
+      });
+    }
+
     return photos;
-  }, [profile, skinLogs, sorted]);
+  }, [firstScanPhoto, latestScanPhoto, skinLogs, sorted]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F2F2F7' }}>
@@ -429,7 +448,7 @@ export default function SkinComparisonModal() {
             <Text style={{ fontSize: 16, fontFamily: 'SFProRounded_Semibold', color: COLORS.text }}>
               Your Progress
             </Text>
-            <GlassIconButton icon="close" onPress={() => router.back()} iconSize={18} />
+            <CircleIconButton icon="close" onPress={() => router.back()} />
           </View>
         </View>
 
@@ -483,9 +502,9 @@ export default function SkinComparisonModal() {
             >
               {/* Before */}
               <View style={{ flex: 1 }}>
-                {profile?.photoUrl ? (
+                {firstScanPhoto ? (
                   <Image
-                    source={{ uri: profile.photoUrl }}
+                    source={{ uri: firstScanPhoto }}
                     style={{ width: '100%', height: 190, borderRadius: 16, backgroundColor: '#f0f0f0' }}
                     resizeMode="cover"
                   />
@@ -511,23 +530,20 @@ export default function SkinComparisonModal() {
 
               {/* Now */}
               <View style={{ flex: 1 }}>
-                {(() => {
-                  const nowPhoto = skinLogs?.filter((l) => l.photoUrl)?.[0]?.photoUrl;
-                  return nowPhoto ? (
-                    <Image
-                      source={{ uri: nowPhoto }}
-                      style={{ width: '100%', height: 190, borderRadius: 16, backgroundColor: '#f0f0f0' }}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={{ width: '100%', height: 190, borderRadius: 16, backgroundColor: '#EEF5EE', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="camera-outline" size={32} color="#A8CCB0" />
-                      <Text style={{ fontSize: 11, fontFamily: 'SFProRounded_Medium', color: '#8AB894', marginTop: 6 }}>
-                        No photo yet
-                      </Text>
-                    </View>
-                  );
-                })()}
+                {nowPhoto ? (
+                  <Image
+                    source={{ uri: nowPhoto }}
+                    style={{ width: '100%', height: 190, borderRadius: 16, backgroundColor: '#f0f0f0' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={{ width: '100%', height: 190, borderRadius: 16, backgroundColor: '#EEF5EE', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="camera-outline" size={32} color="#A8CCB0" />
+                    <Text style={{ fontSize: 11, fontFamily: 'SFProRounded_Medium', color: '#8AB894', marginTop: 6 }}>
+                      No photo yet
+                    </Text>
+                  </View>
+                )}
                 <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 4 }}>
                   <View style={{ backgroundColor: '#DCFCE7', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 }}>
                     <Text style={{ fontSize: 11, fontFamily: 'SFProRounded_Semibold', color: '#16A34A' }}>

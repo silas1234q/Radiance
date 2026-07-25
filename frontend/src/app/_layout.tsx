@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import {
   ClerkProvider,
@@ -6,15 +6,41 @@ import {
   useAuth,
   useUser,
 } from "@clerk/clerk-expo";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  MutationCache,
+} from "@tanstack/react-query";
 import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import Toast from "react-native-toast-message";
 import { tokenCache } from "../lib/clerk";
 import { apiCall, authHeaders } from "../api/apiClient";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { RevenueCatProvider } from "../providers/RevenueCatProvider";
+import { NotificationsProvider } from "../providers/NotificationsProvider";
+import ErrorBoundary from "../components/ErrorBoundary";
+import AnimatedSplash from "../components/splash/AnimatedSplash";
+import { setNavReady } from "../lib/splash/ready";
+import { toastConfig } from "../components/ui/toastConfig";
+import { toast } from "../lib/toast";
 import "../../global.css";
 
-const queryClient = new QueryClient();
+// Hold the native splash until our JS overlay has painted, then cross-fade.
+SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ duration: 300, fade: true });
+
+const queryClient = new QueryClient({
+  // Failed mutations toast by default. Opt out per-mutation with
+  // `meta: { suppressErrorToast: true }` when a screen renders its own error UI.
+  mutationCache: new MutationCache({
+    onError: (err, _vars, _ctx, mutation) => {
+      if (mutation.meta?.suppressErrorToast) return;
+      toast.fromError(err);
+    },
+  }),
+});
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -60,6 +86,8 @@ function AuthRouter() {
 
         const isOnboarded = backendOnboarded ?? !!user.publicMetadata?.onboarded;
         router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+        // Destination is mounted — let the animated splash fade out.
+        setNavReady();
       })();
     } else {
       navigatedForSignIn.current = false;
@@ -68,6 +96,8 @@ function AuthRouter() {
       if (segments[0] !== "auth") {
         router.replace("/auth");
       }
+      // Signed-out destination resolved (already on or navigating to /auth).
+      setNavReady();
     }
   }, [isSignedIn, isLoaded, user]);
 
@@ -177,31 +207,59 @@ function AuthRouter() {
           animation: "slide_from_right",
         }}
       />
+      <Stack.Screen
+        name="skin-summary"
+        options={{
+          headerShown: false,
+          presentation: "modal",
+          animation: "slide_from_bottom",
+        }}
+      />
+      <Stack.Screen
+        name="critical-error"
+        options={{
+          headerShown: false,
+          presentation: "transparentModal",
+          animation: "fade",
+        }}
+      />
     </Stack>
   );
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     SFProRounded_Regular: require('../../src/assets/fonts/SF-Pro-Rounded-Regular.otf'),
     SFProRounded_Medium: require('../../src/assets/fonts/SF-Pro-Rounded-Medium.otf'),
     SFProRounded_Semibold: require('../../src/assets/fonts/SF-Pro-Rounded-Semibold.otf'),
     SFProRounded_Bold: require('../../src/assets/fonts/SF-Pro-Rounded-Bold.otf'),
   });
+  const [splashDone, setSplashDone] = useState(false);
 
-  if (!fontsLoaded) return null;
+  // Native splash stays up (preventAutoHideAsync) until fonts resolve and the
+  // animated overlay mounts, so this early return shows no blank frame. Proceed
+  // on a font error too, otherwise the held native splash would never hide.
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-          <ClerkLoaded>
-            <QueryClientProvider client={queryClient}>
-              <AuthRouter />
-            </QueryClientProvider>
-          </ClerkLoaded>
-        </ClerkProvider>
-      </BottomSheetModalProvider>
+      <ErrorBoundary>
+        <BottomSheetModalProvider>
+          <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+            <ClerkLoaded>
+              <QueryClientProvider client={queryClient}>
+                <RevenueCatProvider>
+                  <NotificationsProvider>
+                    <AuthRouter />
+                  </NotificationsProvider>
+                </RevenueCatProvider>
+              </QueryClientProvider>
+            </ClerkLoaded>
+          </ClerkProvider>
+        </BottomSheetModalProvider>
+      </ErrorBoundary>
+      <Toast config={toastConfig} topOffset={60} />
+      {!splashDone && <AnimatedSplash onFinish={() => setSplashDone(true)} />}
     </GestureHandlerRootView>
   );
 }

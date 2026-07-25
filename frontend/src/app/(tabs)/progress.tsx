@@ -5,6 +5,7 @@ import {
   Text,
   ScrollView,
   Pressable,
+  TouchableOpacity,
   Image,
   Dimensions,
   Modal,
@@ -32,7 +33,11 @@ import type { SkinScore } from "../../types/api";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { COLORS, GLASS } from "@/src/constants/theme";
 import defaultProfile from "@/src/assets/images/defaultProfile.jpg";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Fire from "@/src/assets/images/fire.png";
+import { buildAiInsight } from "../../lib/skinSummary";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_GAP = 12;
@@ -187,7 +192,7 @@ function ShieldBadge() {
 
 // ── Radar Chart ──
 
-const RADAR_LABELS = ["Hydration", "Oil Balance", "Acne", "Pigmentation", "Barrier\nStrength"];
+const RADAR_LABELS = ["Hydration", "Oil\nBalance", "Acne", "Pigmentation", "Barrier\nStrength"];
 
 function getRadarPoints(
   values: number[],
@@ -398,7 +403,6 @@ export default function ProgressScreen() {
   const { data: weeklyCompletions } = useWeeklyCompletions();
 
   const queryClient = useQueryClient();
-  const {top} = useSafeAreaInsets();
   const [scanRange, setScanRange] = useState<"5" | "10" | "all">("all");
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -464,39 +468,23 @@ export default function ProgressScreen() {
   const completedDays = weekConsistency.filter((d) => d.completed).length;
   const topImprovements = useMemo(() => getTopImprovements(scores ?? []), [scores]);
 
-  // Before vs Now photos
-  const firstScanPhoto = profile?.photoUrl ?? null;
+  // Before vs Now photos. "Before" is the immutable first (onboarding) scan;
+  // "Now" is the latest scan when the user has re-scanned, otherwise the most
+  // recent logged progress photo.
+  const firstScanPhoto = profile?.baselinePhotoUrl ?? profile?.photoUrl ?? null;
   const latestLogPhoto = useMemo(() => {
     if (!skinLogs || skinLogs.length === 0) return null;
     const withPhoto = skinLogs.filter((l) => l.photoUrl);
     return withPhoto.length > 0 ? withPhoto[0].photoUrl : null;
   }, [skinLogs]);
+  const latestScanPhoto = profile?.photoUrl ?? null;
+  const nowPhoto =
+    latestScanPhoto && latestScanPhoto !== firstScanPhoto
+      ? latestScanPhoto
+      : latestLogPhoto;
 
-  // AI Insight message derived from real data
-  const aiInsight = useMemo(() => {
-    const parts: string[] = [];
-    if (gamification) {
-      if (gamification.currentStreak >= 7) {
-        parts.push(`Amazing ${gamification.currentStreak}-day streak! Your consistency is paying off.`);
-      } else if (gamification.currentStreak >= 3) {
-        parts.push(`Nice ${gamification.currentStreak}-day streak! Keep the momentum going.`);
-      }
-    }
-    if (scores && scores.length >= 2) {
-      const sorted = [...scores].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const latest = sorted[sorted.length - 1];
-      const prev = sorted[sorted.length - 2];
-      if (latest.score > prev.score) {
-        parts.push("Your skin barrier is getting stronger! Keep focusing on hydration.");
-      } else if (latest.score < prev.score) {
-        parts.push("Your score dipped slightly. Focus on consistency and sun protection.");
-      }
-    }
-    if (parts.length === 0) {
-      return "Complete routines and log your mood daily to unlock personalized insights.";
-    }
-    return parts.join(" ");
-  }, [scores, gamification]);
+  // AI Insight message derived from real data (shared with the summary screen).
+  const aiInsight = useMemo(() => buildAiInsight(scores, gamification), [scores, gamification]);
 
   // Build chart data from skin scan scores
   const chartData = useMemo(() => {
@@ -517,24 +505,6 @@ export default function ProgressScreen() {
     return { actual };
   }, [scores, scanRange]);
 
-  // Earned badges based on real data
-  const earnedBadges = useMemo(() => {
-    const badges: { label: string; icon: string; color: string }[] = [];
-    if (profile?.hydration && profile.hydration >= 70) {
-      badges.push({ label: "Hydration Master", icon: "💧", color: "#4FC3F7" });
-    }
-    if (profile?.texture && profile.texture >= 70) {
-      badges.push({ label: "Barrier Builder", icon: "🛡️", color: "#81C784" });
-    }
-    if (gamification && gamification.currentStreak >= 7) {
-      badges.push({ label: "Consistency Queen", icon: "👑", color: "#FFB74D" });
-    }
-    if (gamification && gamification.totalXp >= 500) {
-      badges.push({ label: "XP Earner", icon: "⭐", color: "#AB47BC" });
-    }
-    return badges;
-  }, [profile, gamification]);
-
   // Goal estimation from real XP growth rate
   const targetScore = 90;
   const weeksToGoal = useMemo(() => {
@@ -554,11 +524,11 @@ export default function ProgressScreen() {
   }, [scores, latestScore]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F2F2F7" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F2F2F7" }} edges={["top"]}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: CARD_PADDING,
-          paddingTop: top + 10,
+          paddingTop: 10,
           paddingBottom: 120,
         }}
         showsVerticalScrollIndicator={false}
@@ -682,7 +652,7 @@ export default function ProgressScreen() {
 
           {/* Right: Day Streak */}
           <View style={{ alignItems: "center", paddingHorizontal: 4 }}>
-            <Text style={{ fontSize: 20 }}>🔥</Text>
+            <Image source={Fire} style={{ width: 22, height: 22 }} />
             <Text
               style={{
                 fontSize: 26,
@@ -1023,7 +993,7 @@ export default function ProgressScreen() {
                   profile.texture ?? 0,
                 ]}
                 labels={RADAR_LABELS}
-                size={HALF_WIDTH - 20}
+                size={HALF_WIDTH - 40}
               />
 
               {/* Legend */}
@@ -1306,9 +1276,9 @@ export default function ProgressScreen() {
 
             {/* Now photo */}
             <View style={{ flex: 1 }}>
-              {latestLogPhoto ? (
+              {nowPhoto ? (
                 <Image
-                  source={{ uri: latestLogPhoto }}
+                  source={{ uri: nowPhoto }}
                   style={{ width: "100%", height: 120, borderRadius: 14, backgroundColor: "#f0f0f0" }}
                   resizeMode="cover"
                 />
@@ -1339,82 +1309,81 @@ export default function ProgressScreen() {
           </Pressable>
         </Animated.View>
 
-        {/* ── Row: AI Insight ── */}
-        <Animated.View
+        {/* ── Row: AI Insight (opens full skin summary) ── */}
+        <AnimatedTouchable
           entering={FadeInDown.delay(800).duration(500)}
+          onPress={() => router.push("/skin-summary")}
+          activeOpacity={0.85}
           style={{
-            backgroundColor: GLASS.background,
-            borderRadius: GLASS.borderRadius,
-            borderWidth: GLASS.borderWidth,
-            borderColor: GLASS.borderColor,
-            padding: 18,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 13,
+            backgroundColor: "#FFFFFF",
+            borderRadius: 20,
+            paddingVertical: 15,
+            paddingHorizontal: 16,
             marginBottom: CARD_GAP,
+            shadowColor: "#1C1C1E",
+            shadowOpacity: 0.06,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 2,
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 }}>
-            <Text style={{ fontSize: 16 }}>✨</Text>
-            <Text style={{ fontSize: 15, fontFamily: "SFProRounded_Semibold", color: "#1C1C1E" }}>
-              AI Insight
-            </Text>
-            <Text style={{ fontSize: 12, fontFamily: "SFProRounded_Medium", color: "#AEAEB2" }}>
-              Based on your data
-            </Text>
+          <View
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              backgroundColor: COLORS.primaryLight,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="sparkles" size={20} color={COLORS.primary} />
           </View>
 
-          <View style={{ flexDirection: "row", gap: 14 }}>
-            {/* Insight text */}
-            <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ fontSize: 15, fontFamily: "SFProRounded_Bold", color: "#1C1C1E" }}>
+                AI Insight
+              </Text>
               <View
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: "#F0F7FF",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  paddingHorizontal: 7,
+                  paddingVertical: 2,
+                  borderRadius: 6,
+                  backgroundColor: COLORS.primaryLight,
                 }}
               >
-                <Text style={{ fontSize: 18 }}>💡</Text>
+                <Text
+                  style={{
+                    fontSize: 9,
+                    fontFamily: "SFProRounded_Bold",
+                    color: COLORS.primaryDark,
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  SUMMARY
+                </Text>
               </View>
-              <Text
-                style={{
-                  flex: 1,
-                  fontSize: 13,
-                  fontFamily: "SFProRounded_Medium",
-                  color: "#444",
-                  lineHeight: 19,
-                }}
-              >
-                {aiInsight}
-              </Text>
             </View>
-
-            {/* Achievement badges */}
-            {earnedBadges.length > 0 && (
-              <View style={{ gap: 8 }}>
-                {earnedBadges.map((badge, i) => (
-                  <View
-                    key={i}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                      backgroundColor: `${badge.color}15`,
-                      paddingHorizontal: 10,
-                      paddingVertical: 5,
-                      borderRadius: 12,
-                    }}
-                  >
-                    <Text style={{ fontSize: 14 }}>{badge.icon}</Text>
-                    <Text style={{ fontSize: 10, fontFamily: "SFProRounded_Semibold", color: badge.color }}>
-                      {badge.label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
+            <Text
+              numberOfLines={2}
+              style={{
+                fontSize: 12.5,
+                fontFamily: "SFProRounded_Medium",
+                color: "#8E8E93",
+                marginTop: 3,
+                lineHeight: 17,
+              }}
+            >
+              {aiInsight}
+            </Text>
           </View>
-        </Animated.View>
+
+          <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
+        </AnimatedTouchable>
       </ScrollView>
 
       {/* Info Detail Modal */}
@@ -1457,6 +1426,6 @@ export default function ProgressScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }

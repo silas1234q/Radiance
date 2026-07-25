@@ -25,12 +25,18 @@ import Animated, {
 import * as ImagePicker from "expo-image-picker";
 import { useAuth, useClerk } from "@clerk/clerk-expo";
 import { useQueryClient } from "@tanstack/react-query";
-import { useProfile, useSkinProfile, useUpdateProfile } from "../../hooks/queries/useProfile";
+import {
+  useProfile,
+  useSkinProfile,
+  useUpdateProfile,
+  useDeleteAccount,
+} from "../../hooks/queries/useProfile";
 import { uploadSkinPhoto } from "../../api/uploadPhoto";
 import { useSkinLogs } from "../../hooks/queries/useSkinLogs";
 import { useSkinScores } from "../../hooks/queries/useSkinScores";
 import GlassCard from "../../components/ui/GlassCard";
 import { COLORS } from "../../constants/theme";
+import { toast } from "../../lib/toast";
 
 function AnimatedDot({ active }: { active: boolean }) {
   const width = useSharedValue(active ? 16 : 6);
@@ -59,6 +65,7 @@ export default function ProfileScreen() {
   const { data: user } = useProfile();
   const updateProfile = useUpdateProfile();
   const { data: skinProfile } = useSkinProfile();
+  const deleteAccount = useDeleteAccount();
   const { data: skinLogs } = useSkinLogs();
   const { data: skinScores } = useSkinScores();
   const [monthOffset, setMonthOffset] = useState(0);
@@ -83,7 +90,7 @@ export default function ProfileScreen() {
   const handlePickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow access to your photo library.");
+      toast.info("Please allow access to your photo library.", { title: "Permission needed" });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -99,7 +106,7 @@ export default function ProfileScreen() {
       const url = await uploadSkinPhoto(result.assets[0].uri, token!);
       updateProfile.mutate({ avatarUrl: url });
     } catch {
-      Alert.alert("Upload failed", "Could not update your avatar. Please try again.");
+      toast.error("Could not update your avatar. Please try again.", { title: "Upload failed" });
     } finally {
       setAvatarUploading(false);
     }
@@ -118,6 +125,34 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    if (deleteAccount.isPending) return;
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account and all of your data. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteAccount.mutateAsync();
+              queryClient.cancelQueries();
+              queryClient.clear();
+              await signOut();
+            } catch {
+              Alert.alert(
+                "Delete failed",
+                "We couldn't delete your account. Please try again.",
+              );
+            }
+          },
+        },
+      ],
+    );
   };
 
   // Calendar swipe setup — 3 months centered on current offset
@@ -683,22 +718,25 @@ export default function ProfileScreen() {
         </Pressable>
 
         <Pressable
-          onPress={() => {
-            Alert.alert("Delete Account", "Are you sure? This action cannot be undone.", [
-              { text: "Cancel", style: "cancel" },
-              { text: "Delete", style: "destructive", onPress: () => {} },
-            ]);
-          }}
+          onPress={handleDeleteAccount}
+          disabled={deleteAccount.isPending}
           style={{
             alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+            gap: 8,
             paddingVertical: 14,
             backgroundColor: "rgba(0,0,0,0.03)",
             borderRadius: 16,
             marginBottom: 16,
+            opacity: deleteAccount.isPending ? 0.6 : 1,
           }}
         >
+          {deleteAccount.isPending && (
+            <ActivityIndicator size="small" color={COLORS.textTertiary} />
+          )}
           <Text style={{ fontSize: 16, fontWeight: "500", color: COLORS.textTertiary }}>
-            Delete Account
+            {deleteAccount.isPending ? "Deleting…" : "Delete Account"}
           </Text>
         </Pressable>
         </Animated.View>
