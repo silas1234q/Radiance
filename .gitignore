@@ -11,6 +11,8 @@ node_modules/
 # Prisma generated client
 backend/generated/prisma/
 
+.claude/
+
 # Backend
 backend/uploads/
 
