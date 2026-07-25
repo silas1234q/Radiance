@@ -164,13 +164,13 @@ export async function getOrCreateAnalysis(
         fitScore: analysis.fitScore,
         pros: analysis.pros,
         cons: analysis.cons,
-        ingredientFlags: analysis.ingredientFlags as unknown as Record<string, unknown>[],
+        ingredientFlags: JSON.parse(JSON.stringify(analysis.ingredientFlags)),
       },
       update: {
         fitScore: analysis.fitScore,
         pros: analysis.pros,
         cons: analysis.cons,
-        ingredientFlags: analysis.ingredientFlags as unknown as Record<string, unknown>[],
+        ingredientFlags: JSON.parse(JSON.stringify(analysis.ingredientFlags)),
         createdAt: new Date(),
       },
     });

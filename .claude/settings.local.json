@@ -179,7 +179,9 @@
       "Bash(pkill -f \"hermes-ios.download\")",
       "Bash(export HERMES_ENGINE_TARBALL_PATH=$HOME/hermes-ios-0.81.5-debug.tar.gz)",
       "Bash(echo \"=== prebuild exit: $? ===\")",
-      "WebFetch(domain:docs.infinite.red)"
+      "WebFetch(domain:docs.infinite.red)",
+      "Bash(ls C:/Users/Silas/Documents/radiance/backend/node_modules/expo-server-sdk/build/*.d.ts 2>&1 | head -5)",
+      "Bash(cd C:/Users/Silas/Documents/radiance/backend && npm run build 2>&1)"
     ]
   }
 }

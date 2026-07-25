@@ -93,8 +93,8 @@ export async function getQuickInsight(
   // Store in cache
   await prisma.routineInsightCache.upsert({
     where: { userId_type: { userId, type: 'quick' } },
-    update: { routineHash: hash, result: result as unknown as Record<string, unknown> },
-    create: { userId, type: 'quick', routineHash: hash, result: result as unknown as Record<string, unknown> },
+    update: { routineHash: hash, result: JSON.parse(JSON.stringify(result)) },
+    create: { userId, type: 'quick', routineHash: hash, result: JSON.parse(JSON.stringify(result)) },
   });
 
   return result;
@@ -342,8 +342,8 @@ export async function getDetailedRoutineInsight(userId: string, routineId?: stri
   // Store in cache
   await prisma.routineInsightCache.upsert({
     where: { userId_type: { userId, type: cacheType } },
-    update: { routineHash: hash, result: result as unknown as Record<string, unknown> },
-    create: { userId, type: cacheType, routineHash: hash, result: result as unknown as Record<string, unknown> },
+    update: { routineHash: hash, result: JSON.parse(JSON.stringify(result)) },
+    create: { userId, type: cacheType, routineHash: hash, result: JSON.parse(JSON.stringify(result)) },
   });
 
   return result;

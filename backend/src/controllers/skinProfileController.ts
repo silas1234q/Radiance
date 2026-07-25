@@ -86,7 +86,7 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
   const { photoUrl } = req.body;
 
   if (!photoUrl || typeof photoUrl !== 'string') {
-    throw new AppError('photoUrl is required', 400, 'VALIDATION_ERROR');
+    throw new AppError({ message: 'photoUrl is required', statusCode: 400, type: 'VALIDATION_ERROR' });
   }
 
   // Validate DB access before calling expensive external APIs

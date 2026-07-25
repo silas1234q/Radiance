@@ -1,12 +1,12 @@
 import AppError from "./AppError";
 
 class ValidationErrors extends AppError {
-  constructor(errors: Array<{ field: string; message: string }>) {
+  constructor(errors: string | Array<{ field: string; message: string }>) {
     super({
-      message: "Validation failed",
+      message: typeof errors === 'string' ? errors : 'Validation failed',
       statusCode: 400,
       type: "VALIDATION_ERROR",
-      details: errors,
+      details: typeof errors === 'string' ? undefined : errors,
     });
   }
 }
