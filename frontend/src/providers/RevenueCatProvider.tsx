@@ -66,6 +66,14 @@ function hasPro(info: CustomerInfo | null): boolean {
   return !!info?.entitlements.active[PRO_ENTITLEMENT];
 }
 
+/**
+ * Loading state of the current offering's packages. `error` covers both a failed
+ * fetch and a fetch that succeeded but returned no purchasable packages (an
+ * unconfigured/unavailable offering) — either way the UI should offer a retry
+ * rather than hang on "Loading plans…".
+ */
+export type OfferingsStatus = 'loading' | 'loaded' | 'error';
+
 interface RevenueCatContextValue {
   /** SDK configured and initial customer info loaded. */
   isReady: boolean;
@@ -73,6 +81,10 @@ interface RevenueCatContextValue {
   isPro: boolean;
   customerInfo: CustomerInfo | null;
   offerings: PurchasesOfferings | null;
+  /** Loading state of the current offering's purchasable packages. */
+  offeringsStatus: OfferingsStatus;
+  /** Re-fetch the current offering's packages (used to retry after a failure). */
+  refreshOfferings: () => Promise<void>;
   /** Re-fetch the latest customer info from RevenueCat. */
   refresh: () => Promise<void>;
   /**
@@ -104,6 +116,51 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
   const [isReady, setIsReady] = useState(false);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
+  const [offeringsStatus, setOfferingsStatus] = useState<OfferingsStatus>('loading');
+
+  // Fetch the current offering with a bounded retry — StoreKit product loads can
+  // be slow or transient right after install. Treats "no packages" as an error
+  // so the paywall can show a retry instead of hanging on "Loading plans…".
+  const refreshOfferings = useCallback(async () => {
+    if (!Purchases || typeof Purchases.getOfferings !== 'function') {
+      setOfferingsStatus('error');
+      return;
+    }
+    setOfferingsStatus('loading');
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const offs = await Purchases.getOfferings();
+        setOfferings(offs);
+        const hasPackages = (offs.current?.availablePackages?.length ?? 0) > 0;
+        // TEMP DIAGNOSTIC: when the offering has no packages, probe the raw
+        // products directly so the logs show whether StoreKit can see them at
+        // all (vs. an offering/package wiring problem). Remove once resolved.
+        if (!hasPackages) {
+          try {
+            const probe = await Purchases.getProducts(['YearlySub', 'Monthly']);
+            console.log(
+              '[RevenueCat] product probe →',
+              'current offering:', offs.current?.identifier ?? '(none set as Current)',
+              '| all offerings:', Object.keys(offs.all ?? {}),
+              '| StoreKit returned products:', probe.map((p) => p.identifier),
+            );
+          } catch (probeErr) {
+            console.log('[RevenueCat] product probe failed', probeErr);
+          }
+        }
+        setOfferingsStatus(hasPackages ? 'loaded' : 'error');
+        return;
+      } catch (err) {
+        if (attempt === maxAttempts) {
+          console.warn('[RevenueCat] getOfferings failed', err);
+          setOfferingsStatus('error');
+          return;
+        }
+        await new Promise((r) => setTimeout(r, attempt * 600));
+      }
+    }
+  }, []);
 
   // --- Configure the SDK once, and subscribe to customer-info updates ---
   useEffect(() => {
@@ -112,6 +169,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
       console.warn(
         '[RevenueCat] EXPO_PUBLIC_REVENUECAT_API_KEY is not set — subscriptions disabled.',
       );
+      setOfferingsStatus('error');
       setIsReady(true);
       return;
     }
@@ -124,15 +182,16 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
         '[RevenueCat] native module unavailable — subscriptions disabled. ' +
           'Cold-restart the app (fully quit & relaunch), or rebuild the dev client.',
       );
+      setOfferingsStatus('error');
       setIsReady(true);
       return;
     }
 
     let listener: ((info: CustomerInfo) => void) | null = null;
     try {
-      // WARN keeps the console quiet while still surfacing real problems. Bump
-      // to LOG_LEVEL.DEBUG temporarily if you need to trace purchases/offerings.
-      Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.WARN : LOG_LEVEL.ERROR);
+      // TEMP DIAGNOSTIC: VERBOSE to see the exact product identifiers StoreKit
+      // requests and which come back "invalid". Revert to WARN once resolved.
+      Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.ERROR);
       Purchases.configure({ apiKey: API_KEY });
       setConfigured(true);
 
@@ -142,21 +201,16 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
 
       (async () => {
         try {
-          const [info, offs] = await Promise.all([
-            Purchases.getCustomerInfo(),
-            Purchases.getOfferings().catch((e) => {
-              console.warn('[RevenueCat] getOfferings failed', e);
-              return null;
-            }),
-          ]);
-          setCustomerInfo(info);
-          setOfferings(offs);
+          setCustomerInfo(await Purchases.getCustomerInfo());
         } catch (err) {
           console.warn('[RevenueCat] initialization error', err);
         } finally {
           setIsReady(true);
         }
       })();
+      // Load offerings independently (own retry + status) so a slow/empty
+      // product fetch never blocks entitlement readiness.
+      void refreshOfferings();
     } catch (err) {
       // The native module isn't available (e.g. Expo Go, or the dev client
       // wasn't rebuilt after installing react-native-purchases). Don't crash
@@ -166,6 +220,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
           'Rebuild your development client to enable them.',
         err,
       );
+      setOfferingsStatus('error');
       setIsReady(true);
     }
 
@@ -178,7 +233,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
         }
       }
     };
-  }, [configured]);
+  }, [configured, refreshOfferings]);
 
   // --- Identify the customer with their Clerk id so entitlements follow the
   // account across devices/reinstalls (not the anonymous per-device id). ---
@@ -189,7 +244,12 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
       try {
         if (userId) {
           const { customerInfo: info } = await Purchases.logIn(userId);
-          if (!cancelled) setCustomerInfo(info);
+          if (!cancelled) {
+            setCustomerInfo(info);
+            // Offerings can be scoped to the identified user (targeting/
+            // experiments), so re-fetch now that we've logged in.
+            void refreshOfferings();
+          }
         } else {
           // Only log out a previously-identified user. Calling logOut while the
           // SDK is still on its anonymous id throws / logs a native error.
@@ -206,7 +266,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     return () => {
       cancelled = true;
     };
-  }, [configured, isLoaded, userId]);
+  }, [configured, isLoaded, userId, refreshOfferings]);
 
   const refresh = useCallback(async () => {
     if (!API_KEY) return;
@@ -332,6 +392,8 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     isPro: hasPro(customerInfo),
     customerInfo,
     offerings,
+    offeringsStatus,
+    refreshOfferings,
     refresh,
     presentPaywall,
     presentPaywallIfNeeded,

@@ -47,12 +47,16 @@ function formatMoney(amount: number, currencyCode: string): string {
  * prices shown always match what the customer is actually charged.
  */
 function buildPlans(pkgs: PurchasesPackage[]): DisplayPlan[] {
-  const annual =
-    pkgs.find((p) => p.packageType === PACKAGE_TYPE.ANNUAL) ??
-    pkgs.find((p) => p.product.identifier === 'yearly');
-  const monthly =
-    pkgs.find((p) => p.packageType === PACKAGE_TYPE.MONTHLY) ??
-    pkgs.find((p) => p.product.identifier === 'monthly');
+  // Prefer RevenueCat's standard package types; fall back to matching the
+  // product identifier by keyword so any naming works (e.g. "YearlySub",
+  // "Monthly") without relying on the exact Annual/Monthly package slots.
+  const matches = (p: PurchasesPackage, type: PACKAGE_TYPE, ...needles: string[]) => {
+    if (p.packageType === type) return true;
+    const id = p.product.identifier.toLowerCase();
+    return needles.some((n) => id.includes(n));
+  };
+  const annual = pkgs.find((p) => matches(p, PACKAGE_TYPE.ANNUAL, 'year', 'annual'));
+  const monthly = pkgs.find((p) => matches(p, PACKAGE_TYPE.MONTHLY, 'month'));
 
   const plans: DisplayPlan[] = [];
 
@@ -101,7 +105,7 @@ export default function SubscribeGate({
   loading: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  const { offerings, restore } = useRevenueCat();
+  const { offerings, offeringsStatus, refreshOfferings, restore } = useRevenueCat();
   const plans = useMemo(
     () => buildPlans(offerings?.current?.availablePackages ?? []),
     [offerings],
@@ -109,6 +113,7 @@ export default function SubscribeGate({
   const [selected, setSelected] = useState<PlanId>('yearly');
   const plan = plans.find((p) => p.id === selected) ?? plans[0];
   const [restoring, setRestoring] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   const handleRestore = async () => {
     if (restoring || loading) return;
@@ -119,6 +124,24 @@ export default function SubscribeGate({
       setRestoring(false);
     }
   };
+
+  const handleRetry = async () => {
+    if (retrying || loading) return;
+    setRetrying(true);
+    try {
+      await refreshOfferings();
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  // Three-way CTA: buy the selected plan, wait while plans load, or retry when
+  // the offering came back empty/failed (so it never hangs on "Loading plans…").
+  const ctaMode: 'ready' | 'loading' | 'error' = plan
+    ? 'ready'
+    : offeringsStatus === 'loading' || retrying
+      ? 'loading'
+      : 'error';
 
   return (
     <Animated.View
@@ -192,12 +215,16 @@ export default function SubscribeGate({
 
       {/* CTA */}
       <Pressable
-        onPress={() => plan && onSubscribe(plan.pkg)}
-        disabled={loading || !plan}
+        onPress={() => {
+          if (loading) return;
+          if (ctaMode === 'ready' && plan) onSubscribe(plan.pkg);
+          else if (ctaMode === 'error') handleRetry();
+        }}
+        disabled={loading || ctaMode === 'loading'}
         style={({ pressed }) => [
           styles.ctaWrap,
-          pressed && !loading && plan && { transform: [{ scale: 0.985 }] },
-          !plan && { opacity: 0.6 },
+          pressed && !loading && ctaMode !== 'loading' && { transform: [{ scale: 0.985 }] },
+          ctaMode === 'loading' && { opacity: 0.6 },
         ]}
       >
         <LinearGradient
@@ -206,10 +233,13 @@ export default function SubscribeGate({
           end={{ x: 1, y: 1 }}
           style={styles.cta}
         >
-          {loading ? (
+          {loading || ctaMode === 'loading' ? (
             <ActivityIndicator size="small" color="#fff" />
-          ) : !plan ? (
-            <Text style={styles.ctaText}>Loading plans…</Text>
+          ) : ctaMode === 'error' ? (
+            <>
+              <Ionicons name="refresh" size={17} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.ctaText}>Couldn&apos;t load plans — Retry</Text>
+            </>
           ) : (
             <>
               <Text style={styles.ctaText}>Get Radiance Pro</Text>
