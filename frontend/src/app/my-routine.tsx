@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from "react";
 import { View, Text, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CircleIconButton from "../components/ui/CircleIconButton";
@@ -101,7 +102,7 @@ export default function MyRoutineScreen() {
 
           {amSteps.length === 0 && pmSteps.length === 0 && !isLoading && (
             <View className="items-center py-[60px]">
-              <Text className="text-[48px] mb-4">✨</Text>
+              <Ionicons name="sparkles" size={48} color="#F06680" style={{ marginBottom: 16 }} />
               <Text className="text-base text-skin-text-secondary text-center max-w-[240px] leading-[22px]">
                 Complete the skin quiz to get your personalized routine
               </Text>

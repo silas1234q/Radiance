@@ -73,7 +73,7 @@ Route prefixes: `/auth`, `/users`, `/quiz`, `/skin-profile`, `/routines`, `/skin
 
 ### Auth Pattern
 - **Backend:** `clerkMiddleware()` runs globally. Protected routes chain `requireAuth()` → `syncUser`. `syncUser` upserts the Clerk user into the DB and sets `req.user` (the DB User, not the Clerk user).
-- **Frontend:** `ClerkProvider` wraps the app in `src/app/_layout.tsx`. An `AuthRouter` component there does all auth-based navigation: signed out → `/auth` (single screen, no route group); signed in → checks whether a skin profile exists and routes to `(tabs)` or `(onboarding)/quiz`. It also guards `(tabs)` access by re-verifying the profile.
+- **Frontend:** Provider nesting in `_layout.tsx`: `ClerkProvider` → `RevenueCatProvider` → `QueryClientProvider` → `NotificationsProvider` → `Slot`. An `AuthRouter` component there does all auth-based navigation: signed out → `/auth` (single screen, no route group); signed in → checks whether a skin profile exists and routes to `(tabs)` or `(onboarding)/quiz`. It also guards `(tabs)` access by re-verifying the profile.
 - `useApi()` hook provides `fetch()` that auto-attaches Bearer tokens (with retry). All API calls go through `src/api/apiClient.ts` which prepends `EXPO_PUBLIC_API_BASE_URL/api`.
 - **Account deletion:** `DELETE /api/users/me` (`deleteMe`, hook `useDeleteAccount`) deletes the DB user inside a transaction — most relations cascade from `User`, but `RoutineInsightCache` is keyed by `userId` without an FK so it's deleted explicitly — then best-effort deletes the Clerk account (`clerkClient.users.deleteUser`).
 
@@ -93,6 +93,16 @@ Route prefixes: `/auth`, `/users`, `/quiz`, `/skin-profile`, `/routines`, `/skin
 
 ### Photo Upload Flow
 `POST /api/upload/skin-photo`: multer writes to `backend/uploads/` → `uploadService.ts` uploads to Cloudinary (`radiance/skin-scans` folder) and deletes the temp file → returns `{ url }`. Cloudinary client configured in `src/config/cloudinary.config.ts`.
+
+### Subscriptions (RevenueCat)
+`RevenueCatProvider` wraps the app (inside `ClerkProvider`, outside `QueryClientProvider`). It configures `react-native-purchases` with the Clerk user ID as the app user ID, exposes `presentPaywall()` (via `react-native-purchases-ui`), and tracks entitlement status. The `SubscribeGate` component on the results screen calls `presentPaywall()` to gate the full skin analysis behind a subscription. Error codes from the SDK are mapped to user-friendly messages — never surface raw SDK errors.
+
+### Push Notifications
+- **Frontend (local):** `NotificationsProvider` installs the notification handler, hydrates persisted settings, and reconciles locally-scheduled reminders (routine reminders, streak nudges) whenever routines/gamification data or app foreground state change. Settings persistence and scheduling logic live in `src/lib/notifications.ts`. Phase 2 registers the Expo push token with the backend via `useRegisterPushToken`.
+- **Backend (server push):** `src/jobs/index.ts` runs `node-cron` scheduled tasks — weekly summary (hourly cron, fires at 18:00 local Sunday) and win-back (daily, for users inactive ≥ 3 days). Uses each user's stored IANA `timezone` and `luxon` for local-time checks. Push delivery via `expo-server-sdk` in `src/services/notificationService.ts`.
+
+### Query Persistence
+React Query is configured with `@tanstack/query-async-storage-persister` + `@tanstack/react-query-persist-client` to persist the query cache to AsyncStorage for offline support.
 
 ### Onboarding Flow (frontend)
 `quiz → analyzing → results`. `analyzing.tsx` runs the real quiz-only analysis (`useAnalyzeSkin`) once, then routes to `results` (or `results?error=1` on failure). From results the user can optionally launch face-scan.

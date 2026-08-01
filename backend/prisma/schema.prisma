@@ -30,6 +30,7 @@ model User {
   winbackEnabled        Boolean   @default(true) // inactivity win-back push
   lastWeeklySummaryAt   DateTime? // dedupe marker for the weekly summary job
   lastWinbackAt         DateTime? // dedupe marker for the win-back job
+  lastScanReminderAt    DateTime? // dedupe marker for the weekly scan reminder job
 
   skinProfile      SkinProfile?
   quizAnswers      SkinQuizAnswer[]
@@ -42,6 +43,7 @@ model User {
   dailyCompletions DailyCompletion[]
   xpEvents         XpEvent[]
   userProducts     UserProduct[]
+  scanCredits      ScanCredit[]
 }
 
 model SkinProfile {
@@ -71,6 +73,9 @@ model SkinProfile {
   routineLength      String?   // "minimal" | "standard" | "extensive"
   productBudget      String?   // "drugstore" | "midrange" | "luxury" | "none"
   ingredientsToAvoid String[]
+  lastFaceScanAt          DateTime?   // set when analyze-with-scan completes
+  faceScanWeekStart       DateTime?   // start of the current 7-day scan window
+  faceScanCountThisWeek   Int         @default(0) // scans used in the current window
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -265,6 +270,17 @@ model ProductAnalysis {
 
   @@unique([productId, userId])
   @@index([productId])
+  @@index([userId])
+}
+
+model ScanCredit {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionId String    @unique // RevenueCat transaction ID (idempotency)
+  purchasedAt   DateTime  @default(now())
+  usedAt        DateTime? // null = still available
+
   @@index([userId])
 }
 

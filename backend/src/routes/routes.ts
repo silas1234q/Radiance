@@ -11,6 +11,7 @@ import productRoutes from './productRoutes';
 import uploadRoutes from './uploadRoutes';
 import gamificationRoutes from './gamificationRoutes';
 import userProductRoutes from './userProductRoutes';
+import scanCreditRoutes from './scanCreditRoutes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/products', productRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/gamification', gamificationRoutes);
 router.use('/user-products', userProductRoutes);
+router.use('/scan-credits', scanCreditRoutes);
 
 export default router;

@@ -8,9 +8,11 @@ import React, {
 import Purchases, {
   LOG_LEVEL,
   PURCHASES_ERROR_CODE,
+  STOREKIT_VERSION,
   type CustomerInfo,
   type PurchasesOfferings,
   type PurchasesPackage,
+  type PurchasesStoreProduct,
 } from 'react-native-purchases';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 import { useAuth } from '@clerk/clerk-expo';
@@ -74,6 +76,16 @@ function hasPro(info: CustomerInfo | null): boolean {
  */
 export type OfferingsStatus = 'loading' | 'loaded' | 'error';
 
+/** Outcome of a consumable scan-credit purchase. */
+export type ScanCreditPurchaseOutcome = {
+  /** Whether the purchase succeeded. */
+  purchased: boolean;
+  /** RevenueCat transaction ID (needed to verify on backend). */
+  transactionId?: string;
+  /** Friendly message on failure (absent on success/cancel). */
+  message?: string;
+};
+
 interface RevenueCatContextValue {
   /** SDK configured and initial customer info loaded. */
   isReady: boolean;
@@ -81,9 +93,13 @@ interface RevenueCatContextValue {
   isPro: boolean;
   customerInfo: CustomerInfo | null;
   offerings: PurchasesOfferings | null;
+  /** Products fetched directly via getProducts (workaround for getOfferings). */
+  products: PurchasesStoreProduct[];
   /** Loading state of the current offering's purchasable packages. */
   offeringsStatus: OfferingsStatus;
-  /** Re-fetch the current offering's packages (used to retry after a failure). */
+  /** The scan credit package from the extra_scans offering, if available. */
+  scanCreditPackage: PurchasesPackage | null;
+  /** Re-fetch products (used to retry after a failure). */
   refreshOfferings: () => Promise<void>;
   /** Re-fetch the latest customer info from RevenueCat. */
   refresh: () => Promise<void>;
@@ -102,6 +118,8 @@ interface RevenueCatContextValue {
    * outcome so callers can tell a successful purchase from a cancel/failure.
    */
   purchasePackage: (pkg: PurchasesPackage) => Promise<PaywallOutcome>;
+  /** Purchase a single scan credit (consumable). */
+  purchaseScanCredit: () => Promise<ScanCreditPurchaseOutcome>;
   /** Restore previous purchases. Resolves `true` if Pro is now active. */
   restore: () => Promise<boolean>;
   /** Present the RevenueCat Customer Center (manage/cancel/refund/support). */
@@ -116,11 +134,10 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
   const [isReady, setIsReady] = useState(false);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
+  const [products, setProducts] = useState<PurchasesStoreProduct[]>([]);
   const [offeringsStatus, setOfferingsStatus] = useState<OfferingsStatus>('loading');
+  const [scanCreditPackage, setScanCreditPackage] = useState<PurchasesPackage | null>(null);
 
-  // Fetch the current offering with a bounded retry — StoreKit product loads can
-  // be slow or transient right after install. Treats "no packages" as an error
-  // so the paywall can show a retry instead of hanging on "Loading plans…".
   const refreshOfferings = useCallback(async () => {
     if (!Purchases || typeof Purchases.getOfferings !== 'function') {
       setOfferingsStatus('error');
@@ -131,25 +148,25 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const offs = await Purchases.getOfferings();
+        console.log(
+          '[RevenueCat] getOfferings result:',
+          '\n  current offering:', offs.current?.identifier ?? '(none)',
+          '\n  packages:', offs.current?.availablePackages?.map((p) => ({
+            id: p.identifier,
+            productId: p.product.identifier,
+            price: p.product.price,
+            title: p.product.title,
+          })),
+        );
         setOfferings(offs);
-        const hasPackages = (offs.current?.availablePackages?.length ?? 0) > 0;
-        // TEMP DIAGNOSTIC: when the offering has no packages, probe the raw
-        // products directly so the logs show whether StoreKit can see them at
-        // all (vs. an offering/package wiring problem). Remove once resolved.
-        if (!hasPackages) {
-          try {
-            const probe = await Purchases.getProducts(['YearlySub', 'Monthly']);
-            console.log(
-              '[RevenueCat] product probe →',
-              'current offering:', offs.current?.identifier ?? '(none set as Current)',
-              '| all offerings:', Object.keys(offs.all ?? {}),
-              '| StoreKit returned products:', probe.map((p) => p.identifier),
-            );
-          } catch (probeErr) {
-            console.log('[RevenueCat] product probe failed', probeErr);
-          }
-        }
-        setOfferingsStatus(hasPackages ? 'loaded' : 'error');
+        const pkgs = offs.current?.availablePackages ?? [];
+        setProducts(pkgs.map((p) => p.product));
+        setOfferingsStatus(pkgs.length > 0 ? 'loaded' : 'error');
+
+        // Fetch the scan credit package from the extra_scans offering
+        const scanPkg = offs.all['extra_scans']?.availablePackages?.[0] ?? null;
+        setScanCreditPackage(scanPkg);
+
         return;
       } catch (err) {
         if (attempt === maxAttempts) {
@@ -192,7 +209,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
       // TEMP DIAGNOSTIC: VERBOSE to see the exact product identifiers StoreKit
       // requests and which come back "invalid". Revert to WARN once resolved.
       Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.ERROR);
-      Purchases.configure({ apiKey: API_KEY });
+      Purchases.configure({ apiKey: API_KEY, storeKitVersion: STOREKIT_VERSION.STOREKIT_1 });
       setConfigured(true);
 
       // Keep entitlement state live (renewals, purchases on other devices, etc.).
@@ -367,6 +384,45 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     [configured],
   );
 
+  const purchaseScanCredit = useCallback(
+    async (): Promise<ScanCreditPurchaseOutcome> => {
+      if (!configured || !scanCreditPackage) {
+        return {
+          purchased: false,
+          message: 'Extra scans are not available right now. Please try again later.',
+        };
+      }
+      try {
+        const result = await Purchases.purchasePackage(scanCreditPackage);
+        setCustomerInfo(result.customerInfo);
+        // For consumables, find the transaction in nonSubscriptionTransactions.
+        // Match by the package's product identifier (more reliable than the
+        // return value which may be absent in some SDK versions).
+        const pid = scanCreditPackage.product.identifier;
+        const txns = result.customerInfo.nonSubscriptionTransactions ?? [];
+        const latestTxn = txns
+          .filter((t) => t.productIdentifier === pid)
+          .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())[0];
+        // Fall back to the most recent transaction of any type if the filter missed
+        const fallbackTxn = !latestTxn && txns.length > 0
+          ? [...txns].sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())[0]
+          : undefined;
+        const txnId = latestTxn?.transactionIdentifier ?? fallbackTxn?.transactionIdentifier;
+        return {
+          purchased: true,
+          transactionId: txnId,
+        };
+      } catch (err) {
+        if ((err as { userCancelled?: boolean })?.userCancelled) {
+          return { purchased: false };
+        }
+        console.warn('[RevenueCat] purchaseScanCredit error', err);
+        return { purchased: false, message: friendlyPurchaseError(err) };
+      }
+    },
+    [configured, scanCreditPackage],
+  );
+
   const restore = useCallback(async () => {
     try {
       const info = await Purchases.restorePurchases();
@@ -392,12 +448,15 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     isPro: hasPro(customerInfo),
     customerInfo,
     offerings,
+    products,
     offeringsStatus,
+    scanCreditPackage,
     refreshOfferings,
     refresh,
     presentPaywall,
     presentPaywallIfNeeded,
     purchasePackage,
+    purchaseScanCredit,
     restore,
     presentCustomerCenter,
   };

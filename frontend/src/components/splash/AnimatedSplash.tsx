@@ -109,7 +109,7 @@ export default function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
     >
       <Animated.View style={iconStyle}>
         <Image
-          source={require('../../assets/images/icon.png')}
+          source={require('../../assets/images/logo.png')}
           style={{ width: ICON_SIZE, height: ICON_SIZE }}
           contentFit="contain"
         />

@@ -25,6 +25,7 @@ import Animated, {
 import { COLORS } from "../../constants/theme";
 import GlassCard from "../../components/ui/GlassCard";
 import { useBarcodeLookup } from "../../hooks/queries/useProducts";
+import { useRevenueCat } from "../../providers/RevenueCatProvider";
 import ManualProductModal from "../../components/scan/ManualProductModal";
 
 const { width: SCREEN_W } = Dimensions.get("window");
@@ -33,7 +34,7 @@ const CUTOUT_H = 160;
 const CORNER_SIZE = 24;
 const CORNER_THICKNESS = 3;
 
-type ScanState = "scanning" | "loading" | "not-found" | "error";
+type ScanState = "scanning" | "loading" | "not-found" | "error" | "paywall";
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function ScanScreen() {
   const isFocused = useIsFocused();
   const barcodeLookup = useBarcodeLookup();
 
+  const { presentPaywallIfNeeded } = useRevenueCat();
   const [state, setState] = useState<ScanState>("scanning");
   const [lastBarcode, setLastBarcode] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -99,6 +101,12 @@ export default function ScanScreen() {
         setTimeout(() => setState("scanning"), 1000);
       } catch (err: any) {
         if (
+          err?.status === 403 ||
+          err?.type === "PRODUCT_SCAN_LIMIT" ||
+          err?.message?.includes("free product scans")
+        ) {
+          setState("paywall");
+        } else if (
           err?.status === 404 ||
           err?.message?.includes("404") ||
           err?.message?.includes("not found")
@@ -321,6 +329,46 @@ export default function ScanScreen() {
           </GlassCard>
         </View>
       )}
+
+      {/* Paywall overlay — free product scan limit reached */}
+      {state === "paywall" && (
+        <View style={styles.cardOverlay}>
+          <GlassCard style={styles.paywallCard}>
+            <View style={styles.paywallIconCircle}>
+              <Ionicons name="lock-closed" size={28} color={COLORS.primary} />
+            </View>
+            <Text style={styles.paywallTitle}>Free scans used up</Text>
+            <Text style={styles.paywallBody}>
+              You've used all 10 free product scans. Upgrade to Radiance Pro for
+              unlimited scans and full skin analysis.
+            </Text>
+            <Pressable
+              onPress={async () => {
+                const outcome = await presentPaywallIfNeeded();
+                if (outcome.entitled) {
+                  setState("scanning");
+                }
+              }}
+              style={({ pressed }) => [
+                styles.actionButton,
+                { width: "100%", alignItems: "center" },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Text style={styles.actionButtonText}>Upgrade to Pro</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.back()}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Text style={styles.secondaryButtonText}>Not Now</Text>
+            </Pressable>
+          </GlassCard>
+        </View>
+      )}
     </View>
   );
 }
@@ -532,5 +580,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Poppins_600SemiBold",
     color: "#fff",
+  },
+  paywallCard: {
+    alignItems: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 28,
+    width: 300,
+  },
+  paywallIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(240,102,128,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  paywallTitle: {
+    fontSize: 20,
+    fontFamily: "Poppins_700Bold",
+    color: "#1a1a2e",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  paywallBody: {
+    fontSize: 14,
+    fontFamily: "Poppins_400Regular",
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 20,
   },
 });

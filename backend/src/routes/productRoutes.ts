@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/clerkAuth';
 import { syncUser } from '../middleware/syncUser';
-import { getProducts, getProductById, getProductByBarcodeHandler, getProductAnalysis, searchProductsHandler, createProduct, extractIngredients } from '../controllers/productController';
+import { getProducts, getProductById, getProductByBarcodeHandler, getProductAnalysis, searchProductsHandler, createProduct, extractIngredients, getProductScanLimit } from '../controllers/productController';
 
 const router = Router();
 router.use(requireAuth(), syncUser);
 router.post('/', createProduct);
 router.post('/extract-ingredients', extractIngredients);
+router.get('/scan-limit', getProductScanLimit);
 router.get('/search', searchProductsHandler);
 router.get('/barcode/:code', getProductByBarcodeHandler);
 router.get('/', getProducts);

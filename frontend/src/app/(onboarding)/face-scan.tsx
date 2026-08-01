@@ -18,6 +18,8 @@ import {
   type RNMLKitFaceDetectorOptions,
 } from '@infinitered/react-native-mlkit-face-detection';
 import { validateFaceScan } from '../../lib/faceValidation';
+import { useScanCredits, useVerifyScanPurchase } from '../../hooks/queries/useScanCredits';
+import { useRevenueCat } from '../../providers/RevenueCatProvider';
 import { COLORS } from '../../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -100,6 +102,13 @@ function FaceScanInner() {
   const detector = useFaceDetection();
   const [permission, requestPermission] = useCameraPermissions();
 
+  const { data: scanCreditsData, refetch: refetchScanCredits } = useScanCredits();
+  const { purchaseScanCredit, scanCreditPackage } = useRevenueCat();
+  const verifyScanPurchase = useVerifyScanPurchase();
+  const [showCreditPrompt, setShowCreditPrompt] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+
   const cameraRef = useRef<CameraView>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
@@ -140,9 +149,47 @@ function FaceScanInner() {
     }
   }, []);
 
+  const handleBuyCredit = useCallback(async () => {
+    if (purchasing) return; // prevent double-tap
+    setPurchaseError(null);
+    setPurchasing(true);
+    try {
+      const outcome = await purchaseScanCredit();
+      if (!outcome.purchased) {
+        if (outcome.message) setPurchaseError(outcome.message);
+        return;
+      }
+      // Apple payment succeeded — verify on backend to credit the user
+      if (outcome.transactionId) {
+        try {
+          await verifyScanPurchase.mutateAsync(outcome.transactionId);
+        } catch (verifyErr) {
+          console.warn('[ScanCredit] Backend verify failed, will retry on scan', verifyErr);
+        }
+      }
+      // Refetch credit balance and close prompt regardless of verify outcome —
+      // the backend will also accept the credit via RevenueCat check at scan time.
+      await refetchScanCredits();
+      setShowCreditPrompt(false);
+    } catch {
+      setPurchaseError('Something went wrong. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  }, [purchasing, purchaseScanCredit, verifyScanPurchase, refetchScanCredits]);
+
   const capture = useCallback(async () => {
     if (phase !== 'preview' || !cameraRef.current || !cameraReady) return;
     setError(null);
+
+    // Check if the user has free scans or credits available
+    if (scanCreditsData) {
+      const { freeScansRemaining, availableCredits } = scanCreditsData;
+      if (freeScansRemaining <= 0 && availableCredits <= 0) {
+        setShowCreditPrompt(true);
+        return;
+      }
+    }
 
     let prevBrightness: number | null = null;
     const fail = (reason: string) => {
@@ -208,7 +255,7 @@ function FaceScanInner() {
       }
       fail('Something went wrong. Please try again.');
     }
-  }, [phase, cameraReady, detector, router, flash, flashOn]);
+  }, [phase, cameraReady, detector, router, flash, flashOn, scanCreditsData]);
 
   // --- Permission states ---
   if (!permission) {
@@ -378,6 +425,104 @@ function FaceScanInner() {
             </View>
           </SafeAreaView>
         </>
+      )}
+
+      {/* Scan credit purchase prompt — full screen */}
+      {showCreditPrompt && (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#fff' }]}
+        >
+          <SafeAreaView className="flex-1">
+            {/* Close button */}
+            <Pressable
+              onPress={() => {
+                setShowCreditPrompt(false);
+                setPurchaseError(null);
+              }}
+              hitSlop={12}
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 16,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.06)',
+                zIndex: 1,
+              }}
+            >
+              <Ionicons name="close" size={24} color={COLORS.text} />
+            </Pressable>
+
+            {/* Content */}
+            <View className="flex-1 items-center justify-center px-8">
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: 'rgba(240,102,128,0.1)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 24,
+                }}
+              >
+                <Ionicons name="scan-outline" size={40} color={COLORS.primary} />
+              </View>
+              <Text className="text-[24px] font-poppins-semibold text-skin-text text-center mb-3">
+                No scans remaining
+              </Text>
+              <Text className="text-[15px] font-poppins-regular text-skin-text-secondary text-center leading-[22px]">
+                You&apos;ve used your 2 free scans this week.
+                {scanCreditPackage
+                  ? ' Unlock an extra scan to keep tracking your skin progress.'
+                  : ' Try again next week.'}
+              </Text>
+            </View>
+
+            {/* Bottom actions */}
+            <View className="px-6 pb-4">
+              {purchaseError && (
+                <View
+                  className="mb-3 px-4 py-2.5 rounded-2xl"
+                  style={{ backgroundColor: 'rgba(240,102,128,0.08)' }}
+                >
+                  <Text className="text-[13px] font-poppins-medium text-primary text-center">
+                    {purchaseError}
+                  </Text>
+                </View>
+              )}
+              {scanCreditPackage && (
+                <Pressable
+                  onPress={handleBuyCredit}
+                  disabled={purchasing}
+                  className="h-[56px] rounded-2xl bg-primary items-center justify-center mb-3"
+                  style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+                >
+                  {purchasing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text className="text-[16px] font-poppins-semibold text-white">
+                      Buy Extra Scan — {scanCreditPackage.product.priceString}
+                    </Text>
+                  )}
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => {
+                  setShowCreditPrompt(false);
+                  setPurchaseError(null);
+                }}
+                className="h-[48px] items-center justify-center"
+              >
+                <Text className="text-[15px] font-poppins-medium text-skin-text-tertiary">Not now</Text>
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </Animated.View>
       )}
 
       {/* Capture flash */}

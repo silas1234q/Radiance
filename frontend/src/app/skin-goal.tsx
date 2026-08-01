@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Pressable,
-  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -19,6 +18,7 @@ import { useWeeklyPlan } from "../hooks/queries/useWeeklyPlan";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../constants/theme";
 import CircleIconButton from "../components/ui/CircleIconButton";
+import Skeleton from "../components/ui/Skeleton";
 
 interface WeekMilestone {
   week: string;
@@ -194,26 +194,64 @@ export default function SkinGoalScreen() {
         </View>
 
         {loading ? (
-          <View
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-              paddingBottom: 80,
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{
+              paddingHorizontal: 24,
+              paddingBottom: 40,
+              paddingTop: 50,
             }}
+            showsVerticalScrollIndicator={false}
           >
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text
+            {/* Goal pill skeleton */}
+            <View style={{ alignItems: "center", marginTop: 20, marginBottom: 16 }}>
+              <Skeleton width={220} height={50} borderRadius={999} />
+            </View>
+
+            {/* Subtitle skeleton */}
+            <View style={{ alignItems: "center", marginBottom: 20, gap: 6 }}>
+              <Skeleton width="90%" height={14} borderRadius={6} />
+              <Skeleton width="70%" height={14} borderRadius={6} />
+            </View>
+
+            {/* Divider */}
+            <View
               style={{
-                marginTop: 14,
-                fontSize: 14,
-                fontWeight: "500",
-                color: COLORS.textSecondary,
+                height: 1,
+                backgroundColor: "rgba(0,0,0,0.06)",
+                marginBottom: 24,
               }}
-            >
-              Preparing your skin goals…
-            </Text>
-          </View>
+            />
+
+            {/* Timeline heading skeleton */}
+            <View style={{ marginBottom: 20 }}>
+              <Skeleton width={260} height={22} borderRadius={6} />
+            </View>
+
+            {/* Week timeline skeletons */}
+            {[0, 1, 2, 3, 4].map((i) => (
+              <View key={i} style={{ flexDirection: "row", marginBottom: 2 }}>
+                <View style={{ width: 110, alignItems: "center" }}>
+                  <Skeleton width={80} height={36} borderRadius={999} />
+                  {i < 4 && (
+                    <View
+                      style={{
+                        width: 2,
+                        height: 60,
+                        backgroundColor: "rgba(0,0,0,0.06)",
+                        marginVertical: 4,
+                      }}
+                    />
+                  )}
+                </View>
+                <View style={{ flex: 1, paddingLeft: 12, paddingBottom: 24, gap: 6 }}>
+                  <Skeleton width="80%" height={15} borderRadius={6} />
+                  <Skeleton width="100%" height={14} borderRadius={6} />
+                  <Skeleton width="60%" height={14} borderRadius={6} />
+                </View>
+              </View>
+            ))}
+          </ScrollView>
         ) : (
           <>
         <ScrollView

@@ -32,6 +32,11 @@ interface ScanModalProps {
   onClose: () => void;
   onFaceScan: () => void;
   onCosmeticsScan: () => void;
+  faceScansLeft: number;
+  /** Purchased scan credits available. */
+  faceCredits: number;
+  /** Remaining free product scans. null = unlimited (Pro user). */
+  productScansLeft: number | null;
 }
 
 export default function ScanModal({
@@ -39,7 +44,11 @@ export default function ScanModal({
   onClose,
   onFaceScan,
   onCosmeticsScan,
+  faceScansLeft,
+  faceCredits,
+  productScansLeft,
 }: ScanModalProps) {
+  const totalFaceScans = faceScansLeft + faceCredits;
   const insets = useSafeAreaInsets();
 
   return (
@@ -73,9 +82,11 @@ export default function ScanModal({
               activeOpacity={0.9}
               style={styles.card}
             >
-              <View style={[styles.badge, styles.badgeDisabled]}>
-                <Text style={[styles.badgeText, styles.badgeTextDisabled]}>
-                  No free scans
+              <View style={[styles.badge, totalFaceScans > 0 ? styles.badgeActive : styles.badgePurchase]}>
+                <Text style={[styles.badgeText, totalFaceScans > 0 ? styles.badgeTextActive : styles.badgeTextPurchase]}>
+                  {totalFaceScans > 0
+                    ? `${totalFaceScans} ${totalFaceScans === 1 ? 'scan' : 'scans'} left`
+                    : 'Buy a scan'}
                 </Text>
               </View>
               <View style={styles.iconCircle}>
@@ -91,11 +102,16 @@ export default function ScanModal({
             <TouchableOpacity
               onPress={onCosmeticsScan}
               activeOpacity={0.9}
-              style={styles.card}
+              style={[styles.card, productScansLeft === 0 && { opacity: 0.5 }]}
+              disabled={productScansLeft === 0}
             >
-              <View style={[styles.badge, styles.badgeActive]}>
-                <Text style={[styles.badgeText, styles.badgeTextActive]}>
-                  2 scans left
+              <View style={[styles.badge, productScansLeft === null || productScansLeft > 0 ? styles.badgeActive : styles.badgeDisabled]}>
+                <Text style={[styles.badgeText, productScansLeft === null || productScansLeft > 0 ? styles.badgeTextActive : styles.badgeTextDisabled]}>
+                  {productScansLeft === null
+                    ? 'Unlimited'
+                    : productScansLeft === 0
+                      ? 'No scans left'
+                      : `${productScansLeft} ${productScansLeft === 1 ? 'scan' : 'scans'} left`}
                 </Text>
               </View>
               <View style={styles.iconCircle}>
@@ -168,6 +184,9 @@ const styles = StyleSheet.create({
   badgeActive: {
     backgroundColor: '#E8E4F8',
   },
+  badgePurchase: {
+    backgroundColor: '#FFE0E6',
+  },
   badgeText: {
     fontSize: 12,
     ...FONTS.semibold,
@@ -177,6 +196,9 @@ const styles = StyleSheet.create({
   },
   badgeTextActive: {
     color: '#7C6FE0',
+  },
+  badgeTextPurchase: {
+    color: COLORS.primary,
   },
   iconCircle: {
     width: 80,

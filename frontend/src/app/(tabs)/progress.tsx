@@ -363,18 +363,18 @@ function GemIcon({ size = 48 }: { size?: number }) {
 const DAYS_OF_WEEK = ["M", "T", "W", "T", "F", "S", "S"];
 
 
-function getTopImprovements(scores: SkinScore[]): { label: string; change: number; icon: string }[] {
+function getTopImprovements(scores: SkinScore[]): { label: string; change: number; icon: keyof typeof Ionicons.glyphMap }[] {
   if (scores.length < 2) return [];
   const sorted = [...scores].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const oldest = sorted[0];
   const latest = sorted[sorted.length - 1];
 
-  const metrics: { label: string; key: keyof SkinScore; icon: string }[] = [
-    { label: "Barrier Strength", key: "texture", icon: "🛡️" },
-    { label: "Hydration", key: "hydration", icon: "💧" },
-    { label: "Texture Clarity", key: "evenTone", icon: "✨" },
-    { label: "Oil Balance", key: "oilBalance", icon: "⚖️" },
-    { label: "Sensitivity", key: "sensitivity", icon: "🌸" },
+  const metrics: { label: string; key: keyof SkinScore; icon: keyof typeof Ionicons.glyphMap }[] = [
+    { label: "Barrier Strength", key: "texture", icon: "shield-outline" },
+    { label: "Hydration", key: "hydration", icon: "water-outline" },
+    { label: "Texture Clarity", key: "evenTone", icon: "sparkles-outline" },
+    { label: "Oil Balance", key: "oilBalance", icon: "scale-outline" },
+    { label: "Sensitivity", key: "sensitivity", icon: "flower-outline" },
   ];
 
   return metrics
@@ -713,7 +713,7 @@ export default function ProgressScreen() {
                 color: ACCENT.primary,
               }}
             >
-              {scoreMessage} 🎉
+              {scoreMessage} <Ionicons name="trophy-outline" size={14} color={ACCENT.primary} />
             </Text>
           </View>
         </Animated.View>
@@ -1210,7 +1210,7 @@ export default function ProgressScreen() {
             {topImprovements.length > 0 ? (
               topImprovements.map((item, i) => (
                 <View key={i} style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
-                  <Text style={{ fontSize: 18, marginRight: 8 }}>{item.icon}</Text>
+                  <Ionicons name={item.icon} size={18} color={ACCENT.primary} style={{ marginRight: 8 }} />
                   <Text style={{ flex: 1, fontSize: 12, fontFamily: "SFProRounded_Medium", color: "#1C1C1E" }}>
                     {item.label}
                   </Text>

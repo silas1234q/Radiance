@@ -14,7 +14,7 @@ app.use(morgan("dev"));
 // Webhook route must be before express.json() - needs raw body
 app.use("/api/webhooks", webhookRoutes);
 
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.use(clerkAuth);
 
 app.use("/api", routes);

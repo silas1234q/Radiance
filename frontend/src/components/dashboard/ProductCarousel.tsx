@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, FlatList } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Product {
   id: string;
@@ -38,7 +39,7 @@ export default function ProductCarousel({ products }: ProductCarouselProps) {
               className="w-full h-[100px] rounded-lg items-center justify-center mb-2.5"
               style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
             >
-              <Text className="text-[32px]">✨</Text>
+              <Ionicons name="sparkles" size={32} color="#F06680" />
             </View>
             <Text className="text-[11px] font-poppins-semibold text-skin-text-tertiary uppercase tracking-wide">{item.brand}</Text>
             <Text className="text-sm font-poppins-bold text-skin-text mt-0.5 leading-[18px]" numberOfLines={2}>{item.name}</Text>

@@ -700,7 +700,7 @@ export default function RoutineScreen() {
           pmSteps.length === 0 &&
           !isLoading && (
             <View className="items-center py-[60px]">
-              <Text className="text-[48px] mb-4">✨</Text>
+              <Ionicons name="sparkles" size={48} color="#F06680" style={{ marginBottom: 16 }} />
               <Text className="text-base text-skin-text-secondary text-center max-w-[260px] leading-[22px] mb-5">
                 Scan your skin to unlock a personalized routine
               </Text>

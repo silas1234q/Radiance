@@ -89,10 +89,37 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
     throw new AppError({ message: 'photoUrl is required', statusCode: 400, type: 'VALIDATION_ERROR' });
   }
 
-  // Validate DB access before calling expensive external APIs
-  await prisma.skinQuizAnswer.findFirst({ where: { userId } });
-
   const existingProfile = await prisma.skinProfile.findUnique({ where: { userId } });
+
+  // Enforce 2 face scans per rolling 7-day window; purchased credits extend the limit
+  let usedCredit = false;
+  if (existingProfile?.faceScanWeekStart && existingProfile.faceScanCountThisWeek >= 2) {
+    const windowEnd = new Date(existingProfile.faceScanWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+    if (new Date() < windowEnd) {
+      // Check for available purchased credits
+      const availableCredit = await prisma.scanCredit.findFirst({
+        where: { userId, usedAt: null },
+        orderBy: { purchasedAt: 'asc' },
+      });
+      if (!availableCredit) {
+        throw new AppError({ message: 'You can only scan your face twice per week. Try again later.', statusCode: 429, type: 'RATE_LIMIT' });
+      }
+      // Consume the oldest available credit
+      await prisma.scanCredit.update({
+        where: { id: availableCredit.id },
+        data: { usedAt: new Date() },
+      });
+      usedCredit = true;
+    }
+  }
+
+  const now = new Date();
+  // Reset the 7-day window if it expired or doesn't exist yet
+  const windowStillOpen =
+    existingProfile?.faceScanWeekStart &&
+    now.getTime() - existingProfile.faceScanWeekStart.getTime() < 7 * 24 * 60 * 60 * 1000;
+  const faceScanWeekStart = windowStillOpen ? existingProfile.faceScanWeekStart : now;
+  const faceScanCountThisWeek = windowStillOpen ? existingProfile!.faceScanCountThisWeek + 1 : 1;
 
   const analysis = await analyzeSkinWithScan(userId, photoUrl);
 
@@ -117,6 +144,9 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
       aiAnalysisRaw: _raw ? JSON.parse(JSON.stringify(_raw)) : undefined,
       analysisSource: _source ?? undefined,
       scanData: _scanData ? JSON.parse(JSON.stringify(_scanData)) : undefined,
+      lastFaceScanAt: now,
+      faceScanWeekStart,
+      faceScanCountThisWeek,
     },
     create: {
       userId,
@@ -126,6 +156,9 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
       aiAnalysisRaw: _raw ? JSON.parse(JSON.stringify(_raw)) : undefined,
       analysisSource: _source ?? undefined,
       scanData: _scanData ? JSON.parse(JSON.stringify(_scanData)) : undefined,
+      lastFaceScanAt: now,
+      faceScanWeekStart,
+      faceScanCountThisWeek,
     },
   });
 

@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import GlassCard from '../ui/GlassCard';
 
 const MOODS = [
-  { label: 'Bad', emoji: '😞', color: '#FF6B6B' },
-  { label: 'Meh', emoji: '😐', color: '#FFB347' },
-  { label: 'Okay', emoji: '🙂', color: '#FFD700' },
-  { label: 'Good', emoji: '😊', color: '#90EE90' },
-  { label: 'Great', emoji: '😄', color: '#34C759' },
+  { label: 'Bad', icon: 'sad-outline' as const, color: '#FF6B6B' },
+  { label: 'Meh', icon: 'remove-circle-outline' as const, color: '#FFB347' },
+  { label: 'Okay', icon: 'ellipse-outline' as const, color: '#FFD700' },
+  { label: 'Good', icon: 'happy-outline' as const, color: '#90EE90' },
+  { label: 'Great', icon: 'sparkles' as const, color: '#34C759' },
 ];
 
 interface MoodTrackerProps {
@@ -20,7 +21,7 @@ export default function MoodTracker({ selectedMood, onSelectMood }: MoodTrackerP
     <GlassCard style={{ marginBottom: 16 }}>
       <Text className="text-base font-poppins-bold text-skin-text mb-3.5">How's your skin feeling?</Text>
       <View className="flex-row justify-between gap-2">
-        {MOODS.map(({ label, emoji, color }) => {
+        {MOODS.map(({ label, icon, color }) => {
           const isSelected = selectedMood === label;
           return (
             <Pressable
@@ -33,7 +34,7 @@ export default function MoodTracker({ selectedMood, onSelectMood }: MoodTrackerP
                   : { backgroundColor: 'rgba(255,255,255,0.4)' }
               }
             >
-              <Text className="text-2xl">{emoji}</Text>
+              <Ionicons name={icon} size={24} color={isSelected ? color : '#999'} />
               <Text
                 className={`text-[11px] font-poppins-semibold ${
                   isSelected ? 'text-skin-text' : 'text-skin-text-secondary'

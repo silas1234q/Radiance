@@ -18,6 +18,7 @@ import * as SplashScreen from "expo-splash-screen";
 import Toast from "react-native-toast-message";
 import { tokenCache } from "../lib/clerk";
 import { apiCall, authHeaders } from "../api/apiClient";
+import { getAppState, setAppState, clearAppState } from "../lib/appStateCache";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { RevenueCatProvider } from "../providers/RevenueCatProvider";
@@ -99,7 +100,32 @@ function AuthRouter() {
   const router = useRouter();
   const segments = useSegments();
   const navigatedForSignIn = useRef(false);
+  const cachedNavDone = useRef(false);
+  const cachedNavState = useRef<{ isSignedIn: boolean; isOnboarded: boolean } | null>(null);
 
+  // Phase 1: Optimistic navigation from cache (runs once, before Clerk loads)
+  useEffect(() => {
+    if (cachedNavDone.current) return;
+    cachedNavDone.current = true;
+
+    (async () => {
+      const cached = await getAppState();
+      if (!cached) return; // no cache — fall through to blocking flow
+
+      cachedNavState.current = { isSignedIn: cached.isSignedIn, isOnboarded: cached.isOnboarded };
+
+      if (cached.isSignedIn && cached.isOnboarded) {
+        router.replace("/(tabs)");
+      } else if (cached.isSignedIn && !cached.isOnboarded) {
+        router.replace("/(onboarding)/quiz");
+      } else {
+        router.replace("/auth");
+      }
+      setNavReady();
+    })();
+  }, []);
+
+  // Phase 2: Backend confirmation (still runs the same logic, corrects if needed)
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -115,6 +141,7 @@ function AuthRouter() {
         if (lastUserId !== user.id) {
           queryClient.clear();
           await persister.removeClient();
+          await clearAppState();
           await AsyncStorage.setItem(LAST_USER_KEY, user.id);
         }
 
@@ -122,7 +149,21 @@ function AuthRouter() {
         await user.reload();
 
         const isOnboarded = backendOnboarded ?? !!user.publicMetadata?.onboarded;
-        router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+
+        // Update the app state cache for next cold start
+        await setAppState({ isSignedIn: true, isOnboarded, userId: user.id });
+
+        // Only navigate if the real state differs from what the cache predicted,
+        // or if there was no cached navigation at all.
+        const cached = cachedNavState.current;
+        const needsNav =
+          !cached ||
+          cached.isSignedIn !== true ||
+          cached.isOnboarded !== isOnboarded;
+
+        if (needsNav) {
+          router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+        }
         // Destination is mounted — let the animated splash fade out.
         setNavReady();
       })();
@@ -133,9 +174,13 @@ function AuthRouter() {
       queryClient.clear();
       void persister.removeClient();
       void AsyncStorage.removeItem(LAST_USER_KEY);
+      void clearAppState();
 
-      if (segments[0] !== "auth") {
-        router.replace("/auth");
+      const cached = cachedNavState.current;
+      if (!cached || cached.isSignedIn !== false) {
+        if (segments[0] !== "auth") {
+          router.replace("/auth");
+        }
       }
       // Signed-out destination resolved (already on or navigating to /auth).
       setNavReady();

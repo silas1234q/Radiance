@@ -86,7 +86,7 @@ export async function reconcileLocalNotifications(
     if (am && am.steps.length > 0) {
       await schedule(
         {
-          title: 'Morning glow ☀️',
+          title: 'Morning glow',
           body: 'Time for your AM skincare routine.',
           data: { route: '/(tabs)/routine' },
         },
@@ -98,7 +98,7 @@ export async function reconcileLocalNotifications(
     if (pm && pm.steps.length > 0) {
       await schedule(
         {
-          title: 'Evening wind-down 🌙',
+          title: 'Evening wind-down',
           body: 'Your PM skincare routine is waiting.',
           data: { route: '/(tabs)/routine' },
         },
@@ -151,13 +151,13 @@ export async function reconcileLocalNotifications(
       let content: NotificationsTypes.NotificationContentInput | null = null;
       if (streakActive) {
         content = {
-          title: `Keep your ${streak}-day streak 🔥`,
+          title: `Keep your ${streak}-day streak`,
           body: 'Finish your routine and log today so your streak stays alive.',
           data: { route: '/skin-log-modal' },
         };
       } else if (settings.dailyLog) {
         content = {
-          title: 'How’s your skin today? ✨',
+          title: "How’s your skin today?",
           body: 'Log your mood and skin to complete today.',
           data: { route: '/skin-log-modal' },
         };

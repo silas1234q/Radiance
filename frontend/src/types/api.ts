@@ -39,6 +39,9 @@ export interface SkinProfile {
   routineLength: string | null;
   productBudget: string | null;
   ingredientsToAvoid: string[];
+  faceScanWeekStart: string | null;
+  faceScanCountThisWeek: number;
+  lastFaceScanAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,10 +1,15 @@
 import { catchAsync } from '../utils/catchAsync';
 import prisma from '../config/db.config';
+import AppError from '../errors/AppError';
 import NotFoundError from '../errors/NotFoundError';
 import ValidationErrors from '../errors/ValidationError';
 import { getOrCreateAnalysis } from '../services/productAnalysisService';
 import { searchProducts as obfSearch, getProductByBarcode as obfGetByBarcode } from '../services/openBeautyFactsService';
 import { extractIngredientsFromImage } from '../services/openAIService';
+import * as revenueCatService from '../services/revenueCatService';
+import { getAuth } from '@clerk/express';
+
+const FREE_PRODUCT_SCAN_LIMIT = 10;
 
 const VALID_CATEGORIES = [
   'Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Sunscreen',
@@ -37,6 +42,29 @@ export const getProductById = catchAsync(async (req, res) => {
 });
 
 export const getProductByBarcodeHandler = catchAsync(async (req, res) => {
+  // Enforce free product scan limit for non-Pro users
+  if (req.user) {
+    const scanCount = await prisma.userProduct.count({
+      where: { userId: req.user.id, source: 'scanned' },
+    });
+
+    if (scanCount >= FREE_PRODUCT_SCAN_LIMIT) {
+      // Check Pro status — if RevenueCat is configured, verify server-side
+      let isPro = false;
+      if (revenueCatService.isConfigured()) {
+        const auth = getAuth(req);
+        isPro = auth?.userId ? await revenueCatService.hasProEntitlement(auth.userId) : false;
+      }
+      if (!isPro) {
+        throw new AppError({
+          message: `You've used all ${FREE_PRODUCT_SCAN_LIMIT} free product scans. Upgrade to Radiance Pro for unlimited scans.`,
+          statusCode: 403,
+          type: 'PRODUCT_SCAN_LIMIT',
+        });
+      }
+    }
+  }
+
   const product = await obfGetByBarcode(req.params.code as string);
   if (!product) throw new NotFoundError('Product not found');
 
@@ -50,6 +78,27 @@ export const getProductByBarcodeHandler = catchAsync(async (req, res) => {
   }
 
   res.json(product);
+});
+
+export const getProductScanLimit = catchAsync(async (req, res) => {
+  const userId = req.user!.id;
+  const scanCount = await prisma.userProduct.count({
+    where: { userId, source: 'scanned' },
+  });
+
+  // Pro users get unlimited scans
+  let isPro = false;
+  if (revenueCatService.isConfigured()) {
+    const auth = getAuth(req);
+    isPro = auth?.userId ? await revenueCatService.hasProEntitlement(auth.userId) : false;
+  }
+
+  res.json({
+    scansUsed: scanCount,
+    freeLimit: FREE_PRODUCT_SCAN_LIMIT,
+    scansRemaining: isPro ? null : Math.max(0, FREE_PRODUCT_SCAN_LIMIT - scanCount),
+    isPro,
+  });
 });
 
 export const extractIngredients = catchAsync(async (req, res) => {

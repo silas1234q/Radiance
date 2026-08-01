@@ -462,6 +462,10 @@ export default function SkinLogModal() {
   const [selectedFeelings, setSelectedFeelings] = useState<string[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [supplements, setSupplements] = useState<string | null>(null);
+  const [supplementsList, setSupplementsList] = useState<string[]>([]);
+  const [supplementInput, setSupplementInput] = useState("");
+  const [showSupplementInput, setShowSupplementInput] = useState(false);
+  const supplementInputRef = useRef<TextInput>(null);
   const [sleepIndex, setSleepIndex] = useState(1);
   const [activityIndex, setActivityIndex] = useState(1);
   const [sunIndex, setSunIndex] = useState(1);
@@ -1043,6 +1047,8 @@ export default function SkinLogModal() {
               <Pressable
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowSupplementInput(false);
+                  setSupplementInput("");
                   setSupplements((prev) => (prev === "no" ? null : "no"));
                 }}
                 style={{
@@ -1053,19 +1059,21 @@ export default function SkinLogModal() {
                   paddingVertical: 8,
                   borderRadius: 999,
                   borderWidth: 1.5,
-                  borderColor: supplements === "no" ? COLORS.primary : "transparent",
-                  backgroundColor: supplements === "no" ? "rgba(240,102,128,0.08)" : "#F2F2F7",
+                  borderColor: supplements === "no" && supplementsList.length === 0 ? COLORS.primary : "transparent",
+                  backgroundColor: supplements === "no" && supplementsList.length === 0 ? "rgba(240,102,128,0.08)" : "#F2F2F7",
                 }}
               >
-                <Ionicons name="close-outline" size={14} color={supplements === "no" ? COLORS.primary : "#8E8E93"} />
-                <Text className="text-[13px]" style={{ fontWeight: "500", color: supplements === "no" ? COLORS.primary : "#48484A" }}>
+                <Ionicons name="close-outline" size={14} color={supplements === "no" && supplementsList.length === 0 ? COLORS.primary : "#8E8E93"} />
+                <Text className="text-[13px]" style={{ fontWeight: "500", color: supplements === "no" && supplementsList.length === 0 ? COLORS.primary : "#48484A" }}>
                   No, I don't
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setSupplements((prev) => (prev === "yes" ? null : "yes"));
+                  setSupplements("yes");
+                  setShowSupplementInput(true);
+                  setTimeout(() => supplementInputRef.current?.focus(), 100);
                 }}
                 style={{
                   flexDirection: "row",
@@ -1075,16 +1083,101 @@ export default function SkinLogModal() {
                   paddingVertical: 8,
                   borderRadius: 999,
                   borderWidth: 1.5,
-                  borderColor: supplements === "yes" ? COLORS.primary : "transparent",
-                  backgroundColor: supplements === "yes" ? "rgba(240,102,128,0.08)" : "#F2F2F7",
+                  borderColor: showSupplementInput || supplementsList.length > 0 ? COLORS.primary : "transparent",
+                  backgroundColor: showSupplementInput || supplementsList.length > 0 ? "rgba(240,102,128,0.08)" : "#F2F2F7",
                 }}
               >
-                <Ionicons name="add-outline" size={14} color={supplements === "yes" ? COLORS.primary : "#8E8E93"} />
-                <Text className="text-[13px]" style={{ fontWeight: "500", color: supplements === "yes" ? COLORS.primary : "#48484A" }}>
+                <Ionicons name="add-outline" size={14} color={showSupplementInput || supplementsList.length > 0 ? COLORS.primary : "#8E8E93"} />
+                <Text className="text-[13px]" style={{ fontWeight: "500", color: showSupplementInput || supplementsList.length > 0 ? COLORS.primary : "#48484A" }}>
                   Add
                 </Text>
               </Pressable>
+              {supplementsList.map((name) => (
+                <Pressable
+                  key={name}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    const updated = supplementsList.filter((s) => s !== name);
+                    setSupplementsList(updated);
+                    setSupplements(updated.length > 0 ? updated.join(", ") : null);
+                  }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 999,
+                    borderWidth: 1.5,
+                    borderColor: COLORS.primary,
+                    backgroundColor: "rgba(240,102,128,0.08)",
+                  }}
+                >
+                  <Text className="text-[13px]" style={{ fontWeight: "500", color: COLORS.primary }}>
+                    {name}
+                  </Text>
+                  <Ionicons name="close" size={12} color={COLORS.primary} />
+                </Pressable>
+              ))}
             </View>
+            {showSupplementInput && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 12,
+                  backgroundColor: "#F2F2F7",
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                }}
+              >
+                <TextInput
+                  ref={supplementInputRef}
+                  value={supplementInput}
+                  onChangeText={setSupplementInput}
+                  placeholder="e.g. Vitamin C, Zinc, Collagen…"
+                  placeholderTextColor="#C7C7CC"
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    const trimmed = supplementInput.trim();
+                    if (trimmed && !supplementsList.includes(trimmed)) {
+                      const updated = [...supplementsList, trimmed];
+                      setSupplementsList(updated);
+                      setSupplements(updated.join(", "));
+                    }
+                    setSupplementInput("");
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 12,
+                    fontSize: 14,
+                    color: "#1C1C1E",
+                  }}
+                />
+                <Pressable
+                  onPress={() => {
+                    const trimmed = supplementInput.trim();
+                    if (trimmed && !supplementsList.includes(trimmed)) {
+                      const updated = [...supplementsList, trimmed];
+                      setSupplementsList(updated);
+                      setSupplements(updated.join(", "));
+                    }
+                    setSupplementInput("");
+                  }}
+                  hitSlop={8}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: COLORS.primary,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="add" size={18} color="#fff" />
+                </Pressable>
+              </View>
+            )}
           </Card>
 
           {/* Sleep */}

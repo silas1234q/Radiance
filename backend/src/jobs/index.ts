@@ -12,11 +12,14 @@ import cron, { ScheduledTask } from 'node-cron';
 import { DateTime } from 'luxon';
 import prisma from '../config/db.config';
 import { sendPushToUsers } from '../services/notificationService';
+import { hasProEntitlement } from '../services/revenueCatService';
 
 const WEEKLY_SUMMARY_HOUR = 18; // 6pm local
 const WEEKLY_SUMMARY_WEEKDAY = 7; // luxon: Monday=1 … Sunday=7
 const WINBACK_INACTIVE_DAYS = 3;
 const WINBACK_MIN_GAP_DAYS = 7; // don't nag more than weekly
+const SCAN_REMINDER_HOUR = 10; // 10am local
+const SCAN_REMINDER_GAP_DAYS = 7; // remind at most once a week
 
 function localNow(timezone: string | null): DateTime {
   const dt = timezone ? DateTime.now().setZone(timezone) : DateTime.now().setZone('UTC');
@@ -168,6 +171,70 @@ export async function runWinbackJob(): Promise<void> {
   }
 }
 
+export async function runWeeklyScanReminderJob(): Promise<void> {
+  let users: {
+    id: string;
+    clerkId: string;
+    expoPushToken: string | null;
+    timezone: string | null;
+    lastScanReminderAt: Date | null;
+    skinProfile: { lastFaceScanAt: Date | null; photoUrl: string | null } | null;
+  }[];
+  try {
+    users = await prisma.user.findMany({
+      where: {
+        pushEnabled: true,
+        expoPushToken: { not: null },
+        skinProfile: { photoUrl: { not: null } },
+      },
+      select: {
+        id: true,
+        clerkId: true,
+        expoPushToken: true,
+        timezone: true,
+        lastScanReminderAt: true,
+        skinProfile: { select: { lastFaceScanAt: true, photoUrl: true } },
+      },
+    });
+  } catch (err) {
+    logJobError('scan-reminder', err);
+    return;
+  }
+
+  for (const user of users) {
+    try {
+      const now = localNow(user.timezone);
+      if (now.hour !== SCAN_REMINDER_HOUR) continue;
+
+      // Don't remind more than once a week
+      if (daysSince(user.lastScanReminderAt) < SCAN_REMINDER_GAP_DAYS) continue;
+
+      // Only remind if last scan was 7+ days ago (or never tracked)
+      if (daysSince(user.skinProfile?.lastFaceScanAt ?? null) < SCAN_REMINDER_GAP_DAYS) continue;
+
+      // Pro subscribers only
+      if (!(await hasProEntitlement(user.clerkId))) continue;
+
+      const sent = await sendPushToUsers(
+        [{ userId: user.id, expoPushToken: user.expoPushToken }],
+        {
+          title: 'Time for a skin check-in',
+          body: "It's been a week — scan your face to track your skin's progress.",
+          data: { route: '/(onboarding)/face-scan' },
+        },
+      );
+      if (sent > 0) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastScanReminderAt: new Date() },
+        });
+      }
+    } catch (err) {
+      console.error(`[scan-reminder] user ${user.id} failed:`, err);
+    }
+  }
+}
+
 let tasks: ScheduledTask[] = [];
 
 /** Schedule the push jobs. Idempotent — safe to call once at boot. */
@@ -185,6 +252,13 @@ export function startJobs(): void {
   tasks.push(
     cron.schedule('0 12 * * *', () => {
       void runWinbackJob();
+    }),
+  );
+
+  // Hourly — per-user local-time + 7-day gap check handles the rest.
+  tasks.push(
+    cron.schedule('0 * * * *', () => {
+      void runWeeklyScanReminderJob();
     }),
   );
 

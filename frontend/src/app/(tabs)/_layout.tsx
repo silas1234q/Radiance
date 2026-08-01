@@ -1,17 +1,31 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { StyleSheet, Text, View, Image } from "react-native";
 import { Tabs, useRouter } from "expo-router";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { COLORS } from "../../constants/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useProfile } from "@/src/hooks/queries/useProfile";
+import { useProfile, useSkinProfile } from "@/src/hooks/queries/useProfile";
+import { useProductScanLimit } from "@/src/hooks/queries/useProducts";
+import { useScanCredits } from "@/src/hooks/queries/useScanCredits";
 import ScanModal from "../../components/scan/ScanModal";
 
 
 export default function TabLayout() {
   const router = useRouter();
   const [scanModalVisible, setScanModalVisible] = useState(false);
+  const { data: skinProfile } = useSkinProfile();
+  const { data: scanLimitData } = useProductScanLimit();
+  const { data: scanCreditsData } = useScanCredits();
+
+  const faceScansLeft = useMemo(() => {
+    if (!skinProfile?.faceScanWeekStart) return 2;
+    const weekStart = new Date(skinProfile.faceScanWeekStart);
+    const now = new Date();
+    const daysSince = (now.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince >= 7) return 2;
+    return Math.max(0, 2 - skinProfile.faceScanCountThisWeek);
+  }, [skinProfile?.faceScanWeekStart, skinProfile?.faceScanCountThisWeek]);
 
   const handleFaceScan = useCallback(() => {
     setScanModalVisible(false);
@@ -30,6 +44,9 @@ export default function TabLayout() {
       onClose={() => setScanModalVisible(false)}
       onFaceScan={handleFaceScan}
       onCosmeticsScan={handleCosmeticsScan}
+      faceScansLeft={faceScansLeft}
+      faceCredits={scanCreditsData?.availableCredits ?? 0}
+      productScansLeft={scanLimitData ? scanLimitData.scansRemaining : 10}
     />
     <Tabs
       screenOptions={{

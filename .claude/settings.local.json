@@ -181,7 +181,25 @@
       "Bash(echo \"=== prebuild exit: $? ===\")",
       "WebFetch(domain:docs.infinite.red)",
       "Bash(ls C:/Users/Silas/Documents/radiance/backend/node_modules/expo-server-sdk/build/*.d.ts 2>&1 | head -5)",
-      "Bash(cd C:/Users/Silas/Documents/radiance/backend && npm run build 2>&1)"
+      "Bash(cd C:/Users/Silas/Documents/radiance/backend && npm run build 2>&1)",
+      "Bash(find /c/Users/Silas/Documents/radiance -name \"*scan*\" -type f | grep -E \"\\\\.\\(tsx?|jsx?\\)$\" | head -20)",
+      "Bash(cd C:/Users/Silas/Documents/radiance/backend && npx prisma generate 2>&1 && npx tsc --noEmit 2>&1 | head -10)",
+      "Bash(magick \"c:/Users/Silas/Downloads/WhatsApp Image 2026-08-01 at 10.32.39.jpeg\" -resize 1024x1024 -background white -gravity center -extent 1024x1024 \"c:/Users/Silas/Downloads/WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.jpeg\")",
+      "Bash(which convert:*)",
+      "Bash(pip install:*)",
+      "Bash(where python:*)",
+      "Bash(/c/Users/Silas/AppData/Local/Microsoft/WindowsApps/python.exe -c \"from PIL import Image; print\\('ok'\\)\" 2>&1 || /c/Users/Silas/AppData/Local/Microsoft/WindowsApps/python.exe -m pip install Pillow 2>&1)",
+      "Bash(where node:*)",
+      "Read(//tmp/node_modules/**)",
+      "Read(//c/Users/Silas/AppData/Local/Temp/node_modules/sharp/**)",
+      "Bash(magick \"c:/Users/Silas/Downloads/WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.png\" \"c:/Users/Silas/Downloads/WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.jpg\")",
+      "Bash(python -c \"from PIL import Image; img = Image.open\\(r'c:/Users/Silas/Downloads/WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.png'\\); img.convert\\('RGB'\\).save\\(r'c:/Users/Silas/Downloads/WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.jpg', 'JPEG', quality=95\\)\")",
+      "Bash(python3 -c \"from PIL import Image; img = Image.open\\(r'c:/Users/Silas/Downloads/WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.png'\\); img.convert\\('RGB'\\).save\\(r'c:/Users/Silas/Downloads/WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.jpg', 'JPEG', quality=95\\)\")",
+      "Bash(powershell.exe -Command \"Add-Type -AssemblyName System.Drawing; \\\\$img = [System.Drawing.Image]::FromFile\\('c:\\\\Users\\\\Silas\\\\Downloads\\\\WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.png'\\); \\\\$img.Save\\('c:\\\\Users\\\\Silas\\\\Downloads\\\\WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.jpg', [System.Drawing.Imaging.ImageFormat]::Jpeg\\); \\\\$img.Dispose\\(\\); Write-Host 'Done'\")",
+      "Bash(powershell.exe -Command \"Add-Type -AssemblyName System.Drawing; $i = [System.Drawing.Image]::FromFile\\('c:\\\\Users\\\\Silas\\\\Downloads\\\\WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.png'\\); $i.Save\\('c:\\\\Users\\\\Silas\\\\Downloads\\\\WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.jpg', [System.Drawing.Imaging.ImageFormat]::Jpeg\\); $i.Dispose\\(\\); Write-Host 'Done'\")",
+      "Bash(find C:/Users/Silas/Documents/radiance -name \".env*\" -o -name \"*.example\" 2>/dev/null | head -10)",
+      "Bash(grep -r \"faceScanCountThisWeek\\\\|faceScanWeekStart\\\\|lastFaceScanAt\" /c/Users/Silas/Documents/radiance/backend/src --include=\"*.ts\" 2>/dev/null | head -20)",
+      "Bash(npx --yes sharp-cli --version 2>&1 | head -3)"
     ]
   }
 }

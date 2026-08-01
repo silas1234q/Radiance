@@ -2,6 +2,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../useApi';
 import type { Product, ProductWithAnalysis, RoutineStep } from '../../types/api';
 
+interface ProductScanLimit {
+  scansUsed: number;
+  freeLimit: number;
+  scansRemaining: number | null;
+  isPro: boolean;
+}
+
+export function useProductScanLimit() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['productScanLimit'],
+    queryFn: () => api.fetch<ProductScanLimit>('/products/scan-limit'),
+  });
+}
+
 export function useProducts(category?: string) {
   const api = useApi();
   return useQuery({

@@ -40,7 +40,9 @@ export default function WeekDayTracker({
           isFullDay = completedDays.includes(index);
         }
 
-        const dayOfMonth = currentDayOfMonth - (currentDayOfWeek - index);
+        const dayDate = new Date(date);
+        dayDate.setDate(currentDayOfMonth - (currentDayOfWeek - index));
+        const dayOfMonth = dayDate.getDate();
 
         return (
           <View key={day} className="items-center gap-1.5">

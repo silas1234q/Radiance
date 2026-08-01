@@ -1,28 +1,32 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { COLORS } from '../../constants/theme';
-import { useNotificationSettings } from '../../hooks/useNotificationSettings';
-import { requestNotificationPermission } from '../../lib/notifications';
+import React, { useCallback, useState } from "react";
+import { View, Text, Pressable, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
+import { COLORS } from "../../constants/theme";
+import { useNotificationSettings } from "../../hooks/useNotificationSettings";
+import { requestNotificationPermission } from "../../lib/notifications";
 
-const PERKS: { icon: keyof typeof Ionicons.glyphMap; title: string; body: string }[] = [
+const PERKS: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  body: string;
+}[] = [
   {
-    icon: 'sunny-outline',
-    title: 'Routine reminders',
-    body: 'A gentle nudge for your AM and PM skincare.',
+    icon: "sunny-outline",
+    title: "Routine reminders",
+    body: "A gentle nudge for your AM and PM skincare.",
   },
   {
-    icon: 'flame-outline',
-    title: 'Keep your streak',
+    icon: "flame-outline",
+    title: "Keep your streak",
     body: "We'll remind you before your streak is at risk.",
   },
   {
-    icon: 'sparkles-outline',
-    title: 'Weekly progress',
-    body: 'See how your skin is improving each week.',
+    icon: "sparkles-outline",
+    title: "Weekly progress",
+    body: "See how your skin is improving each week.",
   },
 ];
 
@@ -31,7 +35,7 @@ export default function NotificationsOptInScreen() {
   const { setMany } = useNotificationSettings();
   const [busy, setBusy] = useState(false);
 
-  const finish = useCallback(() => router.replace('/(tabs)'), [router]);
+  const finish = useCallback(() => router.replace("/(tabs)/routine"), [router]);
 
   const handleEnable = useCallback(async () => {
     if (busy) return;
@@ -59,8 +63,8 @@ export default function NotificationsOptInScreen() {
   }, [setMany, finish]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
         <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 40 }}>
           <Animated.View entering={FadeIn.duration(400)}>
             <View
@@ -69,8 +73,8 @@ export default function NotificationsOptInScreen() {
                 height: 72,
                 borderRadius: 22,
                 backgroundColor: COLORS.primaryLight,
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: "center",
+                justifyContent: "center",
                 marginBottom: 24,
               }}
             >
@@ -79,24 +83,24 @@ export default function NotificationsOptInScreen() {
             <Text
               style={{
                 fontSize: 28,
-                fontFamily: 'SFProRounded_Bold',
+                fontFamily: "SFProRounded_Bold",
                 color: COLORS.text,
                 marginBottom: 10,
               }}
             >
-              Stay on track
+              Stay on tracks
             </Text>
             <Text
               style={{
                 fontSize: 15,
-                fontFamily: 'SFProRounded_Regular',
+                fontFamily: "SFProRounded_Regular",
                 color: COLORS.textSecondary,
                 lineHeight: 22,
                 marginBottom: 32,
               }}
             >
-              Turn on reminders so you never miss a routine — the best skin comes
-              from consistency.
+              Turn on reminders so you never miss a routine — the best skin
+              comes from consistency.
             </Text>
           </Animated.View>
 
@@ -104,7 +108,11 @@ export default function NotificationsOptInScreen() {
             <Animated.View
               key={perk.title}
               entering={FadeInDown.delay(120 * i + 150).duration(450)}
-              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 20,
+              }}
             >
               <View
                 style={{
@@ -112,8 +120,8 @@ export default function NotificationsOptInScreen() {
                   height: 44,
                   borderRadius: 14,
                   backgroundColor: COLORS.surfaceAlt,
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  alignItems: "center",
+                  justifyContent: "center",
                   marginRight: 14,
                 }}
               >
@@ -123,7 +131,7 @@ export default function NotificationsOptInScreen() {
                 <Text
                   style={{
                     fontSize: 16,
-                    fontFamily: 'SFProRounded_Semibold',
+                    fontFamily: "SFProRounded_Semibold",
                     color: COLORS.text,
                   }}
                 >
@@ -132,7 +140,7 @@ export default function NotificationsOptInScreen() {
                 <Text
                   style={{
                     fontSize: 13,
-                    fontFamily: 'SFProRounded_Regular',
+                    fontFamily: "SFProRounded_Regular",
                     color: COLORS.textSecondary,
                     marginTop: 2,
                   }}
@@ -145,42 +153,44 @@ export default function NotificationsOptInScreen() {
 
           <View style={{ flex: 1 }} />
 
-          <Pressable
+          <TouchableOpacity
             onPress={handleEnable}
             disabled={busy}
-            style={({ pressed }) => [
-              {
-                height: 56,
-                borderRadius: 16,
-                backgroundColor: COLORS.primary,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 12,
-              },
-              pressed && { opacity: 0.85 },
-            ]}
+            style={{
+              height: 56,
+              width: "100%",
+              borderRadius: 16,
+              backgroundColor: COLORS.primary,
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 12,
+            }}
           >
             <Text
               style={{
                 fontSize: 16,
-                fontFamily: 'SFProRounded_Semibold',
-                color: '#fff',
+                fontFamily: "SFProRounded_Semibold",
+                color: "#fff",
                 letterSpacing: 0.3,
               }}
             >
-              {busy ? 'Setting up…' : 'Enable reminders'}
+              {busy ? "Setting up…" : "Enable reminders"}
             </Text>
-          </Pressable>
+          </TouchableOpacity>
 
           <Pressable
             onPress={handleSkip}
             disabled={busy}
-            style={{ height: 44, alignItems: 'center', justifyContent: 'center' }}
+            style={{
+              height: 44,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             <Text
               style={{
                 fontSize: 15,
-                fontFamily: 'SFProRounded_Medium',
+                fontFamily: "SFProRounded_Medium",
                 color: COLORS.textSecondary,
               }}
             >

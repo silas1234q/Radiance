@@ -309,7 +309,7 @@ export default function ResultsScreen() {
       }
       setUnlocked(true);
     } catch {
-      setUnlockError(true);
+      setUnlockError('Something went wrong. Please try again.');
     } finally {
       setUnlocking(false);
     }
@@ -344,7 +344,7 @@ export default function ResultsScreen() {
       await analyze.mutateAsync({ buildRoutine: false });
       setUnlocked(true);
     } catch {
-      setUnlockError(true);
+      setUnlockError('Something went wrong. Please try again.');
     } finally {
       setUnlocking(false);
     }
@@ -380,7 +380,7 @@ export default function ResultsScreen() {
           onSubscribe={handleSubscribe}
           onSkip={handleSkip}
           loading={!unlockError}
-          errored={unlockError}
+          errored={Boolean(unlockError)}
           scanLoader={!!localPhoto}
         />
       );
@@ -391,7 +391,7 @@ export default function ResultsScreen() {
         onSubscribe={handleSubscribe}
         onSkip={handleSkip}
         loading={unlocking}
-        errored={unlockError}
+        errored={Boolean(unlockError)}
         scanLoader={scanLoader}
       />
     );
@@ -570,7 +570,7 @@ export default function ResultsScreen() {
         <Animated.View entering={FadeInDown.delay(cardIndex * 120 + 200).duration(500)} className="px-5 pt-6">
           <Pressable
             onPress={() =>
-              router.replace(hasError ? '/(onboarding)/quiz' : '/(onboarding)/notifications')
+              router.replace(hasError ? '/(onboarding)/quiz' : hasRoutine ? '/(tabs)' : '/(onboarding)/notifications')
             }
             className="h-[56px] rounded-2xl bg-primary items-center justify-center"
             style={({ pressed }) => [pressed && { opacity: 0.85 }]}
