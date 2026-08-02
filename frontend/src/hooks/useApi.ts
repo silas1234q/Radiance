@@ -5,8 +5,8 @@ import { emitSessionExpired } from '../lib/sessionExpiry';
 
 async function getTokenWithRetry(
   getToken: () => Promise<string | null>,
-  retries = 3,
-  delay = 500,
+  retries = 5,
+  delay = 600,
 ): Promise<string> {
   for (let i = 0; i < retries; i++) {
     const token = await getToken();
@@ -20,15 +20,13 @@ async function getTokenWithRetry(
 }
 
 export function useApi() {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken } = useAuth();
 
   const authenticatedFetch = useCallback(
     async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
-      if (!isSignedIn) {
-        emitSessionExpired();
-        throw { type: 'UNAUTHORIZED', message: 'Your session expired. Please sign in again.' };
-      }
-
+      // getToken() returns null while Clerk is still loading AND when the
+      // user is truly signed out. getTokenWithRetry waits up to ~1.5s for
+      // Clerk to hydrate before giving up and emitting session-expired.
       const token = await getTokenWithRetry(getToken);
 
       return apiCall<T>(url, {
@@ -39,7 +37,7 @@ export function useApi() {
         },
       });
     },
-    [getToken, isSignedIn]
+    [getToken]
   );
 
   return { fetch: authenticatedFetch };
