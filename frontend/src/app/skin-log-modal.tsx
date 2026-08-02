@@ -30,6 +30,7 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@clerk/clerk-expo";
 import { uploadSkinPhoto } from "../api/uploadPhoto";
+import { emitSessionExpired } from "../lib/sessionExpiry";
 import { COLORS } from "../constants/theme";
 import CircleIconButton from "../components/ui/CircleIconButton";
 import Chip from "../components/ui/Chip";
@@ -791,7 +792,7 @@ export default function SkinLogModal() {
       try {
         setIsUploading(true);
         const token = await getToken();
-        if (!token) return;
+        if (!token) { emitSessionExpired(); return; }
         const url = await uploadSkinPhoto(photoUri, token);
         autoSave.save({ photoUrl: url });
       } catch (e) {

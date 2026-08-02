@@ -27,6 +27,7 @@ import { COLORS, FONTS } from '../../constants/theme';
 import { useCreateProduct, useExtractIngredients } from '../../hooks/queries/useProducts';
 import { uploadProductPhoto } from '../../api/uploadPhoto';
 import { toast } from '../../lib/toast';
+import { emitSessionExpired } from '../../lib/sessionExpiry';
 
 const CATEGORIES = [
   'Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Sunscreen',
@@ -98,7 +99,7 @@ export default function ManualProductModal({
     setImageUploading(true);
     try {
       const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
+      if (!token) { emitSessionExpired(); return; }
       const url = await uploadProductPhoto(uri, token);
       setImageUrl(url);
     } catch {
@@ -132,7 +133,7 @@ export default function ManualProductModal({
     setScanningLabel(true);
     try {
       const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
+      if (!token) { emitSessionExpired(); return; }
       const url = await uploadProductPhoto(uri, token);
       const result = await extractIngredients.mutateAsync(url);
       if (result.ingredients.length > 0) {

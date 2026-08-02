@@ -1225,7 +1225,10 @@ export default function ProgressScreen() {
               </Text>
             )}
 
-            <Pressable style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+            <Pressable
+              onPress={() => router.push("/skin-summary")}
+              style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", marginTop: 6, opacity: pressed ? 0.6 : 1 })}
+            >
               <Text style={{ fontSize: 12, fontFamily: "SFProRounded_Semibold", color: ACCENT.primary }}>
                 View all
               </Text>

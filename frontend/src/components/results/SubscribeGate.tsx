@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +19,7 @@ const BENEFITS: {
   { icon: 'trending-up-outline', title: 'Progress tracking', subtitle: 'Watch your skin improve' },
 ];
 
-type PlanId = 'yearly' | 'monthly';
+type PlanId = 'yearly' | 'monthly' | 'weekly';
 
 interface DisplayPlan {
   id: PlanId;
@@ -57,14 +57,17 @@ function buildPlans(pkgs: PurchasesPackage[]): DisplayPlan[] {
   };
   const annual = pkgs.find((p) => matches(p, PACKAGE_TYPE.ANNUAL, 'year', 'annual'));
   const monthly = pkgs.find((p) => matches(p, PACKAGE_TYPE.MONTHLY, 'month'));
+  const weekly = pkgs.find((p) => matches(p, PACKAGE_TYPE.WEEKLY, 'week'));
 
   const plans: DisplayPlan[] = [];
 
   if (annual) {
     const perMo = annual.product.price / 12;
+    // Compare against the cheapest shorter-period option for a meaningful badge.
+    const refMonthly = monthly?.product.price ?? (weekly ? weekly.product.price * 4.33 : 0);
     let badge: string | undefined;
-    if (monthly && monthly.product.price > 0) {
-      const pct = Math.round((1 - perMo / monthly.product.price) * 100);
+    if (refMonthly > 0) {
+      const pct = Math.round((1 - perMo / refMonthly) * 100);
       if (pct > 0) badge = `SAVE ${pct}%`;
     }
     plans.push({
@@ -85,6 +88,17 @@ function buildPlans(pkgs: PurchasesPackage[]): DisplayPlan[] {
       price: monthly.product.priceString,
       perMonth: `${monthly.product.priceString} / mo`,
       billedNote: 'billed monthly',
+    });
+  }
+  if (weekly) {
+    const perMo = weekly.product.price * 4.33;
+    plans.push({
+      id: 'weekly',
+      name: 'Weekly',
+      pkg: weekly,
+      price: weekly.product.priceString,
+      perMonth: `~${formatMoney(perMo, weekly.product.currencyCode)} / mo`,
+      billedNote: 'billed weekly',
     });
   }
   return plans;
@@ -110,7 +124,7 @@ export default function SubscribeGate({
     () => buildPlans(offerings?.current?.availablePackages ?? []),
     [offerings],
   );
-  const [selected, setSelected] = useState<PlanId>('yearly');
+  const [selected, setSelected] = useState<PlanId>(plans[0]?.id ?? 'yearly');
   const plan = plans.find((p) => p.id === selected) ?? plans[0];
   const [restoring, setRestoring] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -148,7 +162,12 @@ export default function SubscribeGate({
       entering={SlideInDown.duration(320)}
       style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}
     >
-      <View style={styles.grabber} />
+      <ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+    
 
       {/* Header — left aligned, brand mark inline */}
       <View style={styles.titleRow}>
@@ -182,13 +201,18 @@ export default function SubscribeGate({
 
       {/* Plan selector */}
       <View style={styles.plans}>
-        {plans.map((p) => {
+        {plans.map((p, i) => {
           const isSelected = p.id === (plan?.id ?? selected);
+          const isFullWidth = plans.length === 3 && i === 0;
           return (
             <Pressable
               key={p.id}
               onPress={() => setSelected(p.id)}
-              style={[styles.planTile, isSelected ? styles.planTileActive : styles.planTileInactive]}
+              style={[
+                styles.planTile,
+                isSelected ? styles.planTileActive : styles.planTileInactive,
+                isFullWidth && styles.planTileFull,
+              ]}
             >
               {p.badge && (
                 <View style={styles.saveBadge}>
@@ -268,22 +292,21 @@ export default function SubscribeGate({
           {restoring ? 'Restoring…' : 'Restore Purchase'}
         </Text>
       </View>
+      </ScrollView>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   sheet: {
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    flex: 1,
     backgroundColor: '#fff',
-    paddingHorizontal: 22,
     paddingTop: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: -8 },
-    elevation: 16,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 22,
   },
   grabber: {
     alignSelf: 'center',
@@ -375,16 +398,22 @@ const styles = StyleSheet.create({
   // Plans
   plans: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     marginBottom: 16,
   },
   planTile: {
     flex: 1,
+    minWidth: '40%' as unknown as number,
     borderRadius: 18,
     borderWidth: 2,
     paddingHorizontal: 14,
     paddingTop: 16,
     paddingBottom: 14,
+  },
+  planTileFull: {
+    flex: undefined,
+    width: '100%' as unknown as number,
   },
   planTileActive: {
     borderColor: COLORS.primary,

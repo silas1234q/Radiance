@@ -719,6 +719,33 @@ export default function RoutineScreen() {
                   Scan My Skin
                 </Text>
               </Pressable>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 20 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+                <Text style={{ fontSize: 13, fontFamily: 'SFProRounded_Medium', color: COLORS.textTertiary }}>or</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+              </View>
+
+              <Pressable
+                onPress={() => router.push("/new-routine")}
+                className="flex-row items-center h-[48px] px-6 rounded-full"
+                style={({ pressed }) => [{
+                  borderWidth: 1.5,
+                  borderColor: COLORS.border,
+                  backgroundColor: '#fff',
+                  opacity: pressed ? 0.7 : 1,
+                }]}
+              >
+                <Ionicons
+                  name="add"
+                  size={18}
+                  color={COLORS.text}
+                  style={{ marginRight: 8 }}
+                />
+                <Text className="text-[15px] font-poppins-semibold text-skin-text">
+                  Create Custom Routine
+                </Text>
+              </Pressable>
             </View>
           )}
 

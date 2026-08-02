@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/clerk-expo';
 import { useCallback } from 'react';
 import { apiCall, authHeaders } from '../api/apiClient';
+import { emitSessionExpired } from '../lib/sessionExpiry';
 
 async function getTokenWithRetry(
   getToken: () => Promise<string | null>,
@@ -14,7 +15,8 @@ async function getTokenWithRetry(
       await new Promise((r) => setTimeout(r, delay));
     }
   }
-  throw new Error('Not authenticated');
+  emitSessionExpired();
+  throw { type: 'UNAUTHORIZED', message: 'Your session expired. Please sign in again.' };
 }
 
 export function useApi() {
@@ -23,7 +25,8 @@ export function useApi() {
   const authenticatedFetch = useCallback(
     async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
       if (!isSignedIn) {
-        throw new Error('Not authenticated');
+        emitSessionExpired();
+        throw { type: 'UNAUTHORIZED', message: 'Your session expired. Please sign in again.' };
       }
 
       const token = await getTokenWithRetry(getToken);

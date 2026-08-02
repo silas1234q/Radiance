@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Dimensions, InteractionManager, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Dimensions, InteractionManager, Linking, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -295,10 +295,19 @@ function FaceScanInner() {
           We use your front camera to scan your skin. Your photo is only used for your analysis.
         </Text>
         <Pressable
-          onPress={requestPermission}
+          onPress={() => {
+            if (permission.canAskAgain) {
+              requestPermission();
+            } else {
+              Linking.openSettings();
+            }
+          }}
           className="h-[48px] px-8 rounded-2xl bg-primary items-center justify-center"
+          style={({ pressed }) => [pressed && { opacity: 0.7 }]}
         >
-          <Text className="text-[14px] font-poppins-semibold text-white">Enable Camera</Text>
+          <Text className="text-[14px] font-poppins-semibold text-white">
+            {permission.canAskAgain ? 'Enable Camera' : 'Open Settings'}
+          </Text>
         </Pressable>
         <Pressable
           onPress={() =>

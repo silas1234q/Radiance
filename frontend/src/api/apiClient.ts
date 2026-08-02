@@ -1,3 +1,5 @@
+import { emitSessionExpired } from '../lib/sessionExpiry';
+
 export interface ApiError {
   success: false;
   type: string;
@@ -31,6 +33,9 @@ export async function apiCall<T = unknown>(url: string, options: RequestInit): P
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      emitSessionExpired();
+    }
     const error: ApiError = data as unknown as ApiError;
     throw error;
   }

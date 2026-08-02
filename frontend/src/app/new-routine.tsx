@@ -34,7 +34,8 @@ export default function NewRoutineScreen() {
       },
       {
         onSuccess: (data) => {
-          router.replace({ pathname: '/add-steps', params: { routineId: data.id } });
+          router.dismiss();
+          router.push({ pathname: '/add-steps', params: { routineId: data.id } });
         },
       },
     );

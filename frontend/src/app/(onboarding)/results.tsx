@@ -20,6 +20,7 @@ import SubscribeGate from '../../components/results/SubscribeGate';
 import ScanProcessing from '../../components/face-scan/ScanProcessing';
 import Skeleton from '../../components/ui/Skeleton';
 import { COLORS } from '../../constants/theme';
+import { emitSessionExpired } from '../../lib/sessionExpiry';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const HERO_H = Math.min(Math.round(SCREEN_H * 0.58), 560);
@@ -282,7 +283,9 @@ export default function ResultsScreen() {
   const analyzeWithScan = useAnalyzeSkinWithScan();
   const [unlocked, setUnlocked] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
   const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [isScanError, setIsScanError] = useState(false);
   // Which loader to show while unlocking: the branded scan-processing animation
   // (photo/YouCam analysis) vs. a simple loader (OpenAI quiz-only).
   const [scanLoader, setScanLoader] = useState(false);
@@ -296,20 +299,23 @@ export default function ResultsScreen() {
   // for already-subscribed customers.
   const runAnalysisAndUnlock = useCallback(async () => {
     setUnlockError(null);
+    setIsScanError(false);
     setScanLoader(!!localPhoto); // scan animation when there's a photo to analyze
     setUnlocking(true);
     try {
       if (localPhoto) {
         const token = await getToken();
-        if (!token) throw new Error('Not authenticated');
+        if (!token) { emitSessionExpired(); return; }
         const url = await uploadSkinPhoto(localPhoto, token);
         await analyzeWithScan.mutateAsync(url);
       } else {
         await analyze.mutateAsync({ buildRoutine: true });
       }
       setUnlocked(true);
-    } catch {
-      setUnlockError('Something went wrong. Please try again.');
+    } catch (err: any) {
+      const msg = err?.message || 'Something went wrong. Please try again.';
+      setUnlockError(msg);
+      if (err?.type === 'SCAN_ERROR') setIsScanError(true);
     } finally {
       setUnlocking(false);
     }
@@ -318,10 +324,12 @@ export default function ResultsScreen() {
   // "Get Radiance Pro": purchase the selected package (unless already Pro), then
   // run the analysis and unlock.
   const handleSubscribe = async (pkg: PurchasesPackage) => {
-    if (unlocking) return;
+    if (unlocking || purchasing) return;
     setUnlockError(null);
     if (!isPro) {
+      setPurchasing(true);
       const outcome = await purchasePackage(pkg);
+      setPurchasing(false);
       if (!outcome.entitled) {
         // Stay quiet if the customer simply cancelled the purchase sheet.
         if (outcome.result !== PAYWALL_RESULT.CANCELLED)
@@ -343,8 +351,9 @@ export default function ResultsScreen() {
       // Free path: quiz-only analysis, no routine (routines are Pro-only).
       await analyze.mutateAsync({ buildRoutine: false });
       setUnlocked(true);
-    } catch {
-      setUnlockError('Something went wrong. Please try again.');
+    } catch (err: any) {
+      const msg = err?.message || 'Something went wrong. Please try again.';
+      setUnlockError(msg);
     } finally {
       setUnlocking(false);
     }
@@ -376,11 +385,13 @@ export default function ResultsScreen() {
         <LockedResults
           photoUrl={localPhoto}
           hidePaywall
-          onRetry={runAnalysisAndUnlock}
+          onRetry={isScanError ? () => router.replace('/(onboarding)/face-scan') : runAnalysisAndUnlock}
           onSubscribe={handleSubscribe}
           onSkip={handleSkip}
           loading={!unlockError}
           errored={Boolean(unlockError)}
+          errorMessage={unlockError}
+          retryLabel={isScanError ? 'Retake Photo' : 'Try Again'}
           scanLoader={!!localPhoto}
         />
       );
@@ -391,7 +402,9 @@ export default function ResultsScreen() {
         onSubscribe={handleSubscribe}
         onSkip={handleSkip}
         loading={unlocking}
+        purchasing={purchasing}
         errored={Boolean(unlockError)}
+        errorMessage={unlockError}
         scanLoader={scanLoader}
       />
     );
@@ -406,7 +419,8 @@ export default function ResultsScreen() {
   }
 
   const score = profile?.skinScore ?? 0;
-  const photoUrl = localPhoto ?? profile?.photoUrl ?? null;
+  const isQuizOnly = !profile?.analysisSource || profile.analysisSource === 'quiz_only' || profile.analysisSource === 'rule_based';
+  const photoUrl = isQuizOnly ? null : (localPhoto ?? profile?.photoUrl ?? null);
   const faceMap = (profile?.faceMapIssues as Record<string, string[]>) ?? {};
   const aiRaw = profile?.aiAnalysisRaw as {
     summary?: string;
@@ -482,18 +496,27 @@ export default function ResultsScreen() {
         {/* Photo hero */}
         <Hero photoUrl={photoUrl} score={score} />
 
-        {/* Skin Analysis vitals card — overlaps the hero */}
-        <View style={{ marginTop: -104, marginBottom: 18 }}>
-          <SkinVitalsCard vitals={vitals} />
-        </View>
+        {/* Skin Analysis vitals card — overlaps the hero (scan-based only) */}
+        {!isQuizOnly && (
+          <View style={{ marginTop: -104, marginBottom: 18 }}>
+            <SkinVitalsCard vitals={vitals} />
+          </View>
+        )}
 
         {/* Summary Card */}
         {summary && (
           <Card index={cardIndex++}>
-            <SectionHeader title="Summary" />
+            <SectionHeader title={isQuizOnly ? 'Skin Estimate' : 'Summary'} />
             <Text className="text-[15px] font-poppins-regular text-skin-text-secondary leading-[24px]">
               {summary}
             </Text>
+            {isQuizOnly && (
+              <View className="mt-4 px-3 py-2.5 rounded-xl bg-warning/[0.08]">
+                <Text className="text-[12px] font-poppins-medium text-[#CC7A00] leading-[18px]">
+                  This is an estimate based on your quiz answers. For a more accurate analysis, upgrade to Radiance Pro and use the face scan.
+                </Text>
+              </View>
+            )}
           </Card>
         )}
 
@@ -519,11 +542,13 @@ export default function ResultsScreen() {
           </Card>
         )}
 
-        {/* Metrics Card */}
-        <Card index={cardIndex++}>
-          <SectionHeader title={hasScan ? 'Overall Metrics' : 'Skin Metrics'} />
-          <MetricsGrid metrics={metrics} />
-        </Card>
+        {/* Metrics Card (scan-based only) */}
+        {!isQuizOnly && (
+          <Card index={cardIndex++}>
+            <SectionHeader title={hasScan ? 'Overall Metrics' : 'Skin Metrics'} />
+            <MetricsGrid metrics={metrics} />
+          </Card>
+        )}
 
         {/* Concerns Card */}
         {concerns.length > 0 && (
@@ -595,19 +620,25 @@ function LockedResults({
   onSubscribe,
   onSkip,
   loading,
+  purchasing = false,
   errored,
   hidePaywall = false,
   onRetry,
   scanLoader = false,
+  errorMessage,
+  retryLabel = 'Try Again',
 }: {
   photoUrl: string | null;
   onSubscribe: (pkg: PurchasesPackage) => void;
   onSkip: () => void;
   loading: boolean;
+  purchasing?: boolean;
   errored: boolean;
   hidePaywall?: boolean;
   onRetry?: () => void;
   scanLoader?: boolean;
+  errorMessage?: string | null;
+  retryLabel?: string;
 }) {
   return (
     <View className="flex-1" style={{ backgroundColor: COLORS.dark }}>
@@ -660,29 +691,30 @@ function LockedResults({
             }}
           >
             <Text className="text-[14px] font-poppins-medium text-white text-center mb-4">
-              Something went wrong preparing your results.
+              {errorMessage || 'Something went wrong preparing your results.'}
             </Text>
             <Pressable
               onPress={onRetry}
               className="h-[52px] px-10 rounded-2xl bg-primary items-center justify-center"
+              style={({ pressed }) => [pressed && { opacity: 0.85 }]}
             >
-              <Text className="text-[15px] font-poppins-semibold text-white">Try Again</Text>
+              <Text className="text-[15px] font-poppins-semibold text-white">{retryLabel}</Text>
             </Pressable>
           </View>
         ) : null
       ) : (
-        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
+        <View style={StyleSheet.absoluteFill}>
           {errored && (
             <View
               className="self-center mb-3 px-4 py-2.5 rounded-2xl"
-              style={{ backgroundColor: 'rgba(255,255,255,0.95)' }}
+              style={{ position: 'absolute', top: 60, zIndex: 1, backgroundColor: 'rgba(255,255,255,0.95)' }}
             >
               <Text className="text-[13px] font-poppins-medium text-primary text-center">
-                Something went wrong. Please try again.
+                {errorMessage || 'Something went wrong. Please try again.'}
               </Text>
             </View>
           )}
-          <SubscribeGate onSubscribe={onSubscribe} onSkip={onSkip} loading={loading} />
+          <SubscribeGate onSubscribe={onSubscribe} onSkip={onSkip} loading={loading || purchasing} />
         </View>
       )}
 

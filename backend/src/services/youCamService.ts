@@ -1,4 +1,5 @@
 import aiConfig from '../config/ai.config';
+import AppError from '../errors/AppError';
 
 // --- Real API types ---
 
@@ -208,7 +209,11 @@ async function pollTask(taskId: string): Promise<YouCamOutputItem[]> {
         'error_src_multiple_faces': 'Multiple faces detected. Please make sure only your face is in the photo.',
         'error_src_face_occluded': 'Your face is partially covered. Please remove any obstructions and try again.',
       };
-      throw new Error(userFriendlyErrors[errorMsg] || `Skin analysis failed: ${errorMsg}`);
+      const friendlyMsg = userFriendlyErrors[errorMsg];
+      if (friendlyMsg) {
+        throw new AppError({ message: friendlyMsg, statusCode: 400, type: 'SCAN_ERROR' });
+      }
+      throw new Error(`Skin analysis failed: ${errorMsg}`);
     }
 
     console.log(`[YouCam] Poll ${attempt}/${maxAttempts} — status: ${body.data.task_status}`);

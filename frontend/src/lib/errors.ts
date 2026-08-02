@@ -30,6 +30,10 @@ export function isNetworkError(err: unknown): boolean {
   return getErrorType(err) === 'NETWORK_ERROR';
 }
 
+export function isUnauthorizedError(err: unknown): boolean {
+  return getErrorType(err) === 'UNAUTHORIZED';
+}
+
 export function getErrorMessage(err: unknown, fallback: string = DEFAULT_MESSAGE): string {
   // Known type → friendly copy takes precedence over the raw server message.
   const type = getErrorType(err);

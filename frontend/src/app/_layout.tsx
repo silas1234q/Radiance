@@ -5,6 +5,7 @@ import {
   ClerkLoaded,
   useAuth,
   useUser,
+  useClerk,
 } from "@clerk/clerk-expo";
 import {
   QueryClient,
@@ -28,7 +29,8 @@ import AnimatedSplash from "../components/splash/AnimatedSplash";
 import { setNavReady } from "../lib/splash/ready";
 import { toastConfig } from "../components/ui/toastConfig";
 import { toast } from "../lib/toast";
-import { isNetworkError } from "../lib/errors";
+import { isNetworkError, isUnauthorizedError } from "../lib/errors";
+import { onSessionExpired, resetSessionExpiry } from "../lib/sessionExpiry";
 import { persister, persistOptions } from "../lib/queryPersister";
 import "../../global.css";
 
@@ -50,7 +52,7 @@ const queryClient = new QueryClient({
       networkMode: "offlineFirst",
       // Fail fast on network errors — the cached data is already on screen, so
       // there's no point retrying 3× before the "No connection" toast shows.
-      retry: (count, err) => !isNetworkError(err) && count < 2,
+      retry: (count, err) => !isNetworkError(err) && !isUnauthorizedError(err) && count < 2,
     },
   },
   // Failed mutations toast by default. Opt out per-mutation with
@@ -58,6 +60,7 @@ const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (err, _vars, _ctx, mutation) => {
       if (mutation.meta?.suppressErrorToast) return;
+      if (isUnauthorizedError(err)) return;
       toast.fromError(err);
     },
   }),
@@ -97,11 +100,22 @@ async function syncUserWithBackend(
 function AuthRouter() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   const { user } = useUser();
+  const { signOut } = useClerk();
   const router = useRouter();
   const segments = useSegments();
   const navigatedForSignIn = useRef(false);
   const cachedNavDone = useRef(false);
   const cachedNavState = useRef<{ isSignedIn: boolean; isOnboarded: boolean } | null>(null);
+
+  // Auto sign-out when the backend returns 401 (session expired)
+  useEffect(() => {
+    return onSessionExpired(() => {
+      toast.error('Your session expired. Please sign in again.');
+      queryClient.cancelQueries();
+      queryClient.clear();
+      signOut();
+    });
+  }, [signOut]);
 
   // Phase 1: Optimistic navigation from cache (runs once, before Clerk loads)
   useEffect(() => {
@@ -128,47 +142,64 @@ function AuthRouter() {
   // Phase 2: Backend confirmation (still runs the same logic, corrects if needed)
   useEffect(() => {
     if (!isLoaded) return;
+    // During sign-up, `isSignedIn` can flip to `true` before the `user` object
+    // is hydrated. Wait for both so the else (signed-out) branch doesn't race
+    // the sign-in navigation with cache wipes and a redirect back to /auth.
+    if (isSignedIn && !user) return;
 
     if (isSignedIn && user) {
       if (navigatedForSignIn.current) return;
       navigatedForSignIn.current = true;
 
       (async () => {
-        // Only wipe the (persisted) cache when a DIFFERENT user signs in — for
-        // the same user resuming, keep it so their data is available offline on
-        // cold start; a background refetch updates it when online.
-        const lastUserId = await AsyncStorage.getItem(LAST_USER_KEY);
-        if (lastUserId !== user.id) {
-          queryClient.clear();
-          await persister.removeClient();
-          await clearAppState();
-          await AsyncStorage.setItem(LAST_USER_KEY, user.id);
-        }
+        try {
+          // Only wipe the (persisted) cache when a DIFFERENT user signs in — for
+          // the same user resuming, keep it so their data is available offline on
+          // cold start; a background refetch updates it when online.
+          const lastUserId = await AsyncStorage.getItem(LAST_USER_KEY);
+          if (lastUserId !== user.id) {
+            queryClient.clear();
+            await persister.removeClient();
+            await clearAppState();
+            await AsyncStorage.setItem(LAST_USER_KEY, user.id);
+          }
 
-        const backendOnboarded = await syncUserWithBackend(getToken);
-        await user.reload();
+          const backendOnboarded = await syncUserWithBackend(getToken);
+          try {
+            await user.reload();
+          } catch {
+            // user.reload() can fail on flaky networks — continue with what we have.
+          }
 
-        const isOnboarded = backendOnboarded ?? !!user.publicMetadata?.onboarded;
+          const isOnboarded = backendOnboarded ?? !!user.publicMetadata?.onboarded;
 
-        // Update the app state cache for next cold start
-        await setAppState({ isSignedIn: true, isOnboarded, userId: user.id });
+          // Update the app state cache for next cold start
+          await setAppState({ isSignedIn: true, isOnboarded, userId: user.id });
 
-        // Only navigate if the real state differs from what the cache predicted,
-        // or if there was no cached navigation at all.
-        const cached = cachedNavState.current;
-        const needsNav =
-          !cached ||
-          cached.isSignedIn !== true ||
-          cached.isOnboarded !== isOnboarded;
+          // Only navigate if the real state differs from what the cache predicted,
+          // or if there was no cached navigation at all.
+          const cached = cachedNavState.current;
+          const needsNav =
+            !cached ||
+            cached.isSignedIn !== true ||
+            cached.isOnboarded !== isOnboarded;
 
-        if (needsNav) {
+          if (needsNav) {
+            router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+          }
+        } catch {
+          // If everything fails, still navigate — a new user goes to quiz,
+          // an existing user goes to tabs based on whatever metadata we have.
+          const isOnboarded = !!user.publicMetadata?.onboarded;
           router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+        } finally {
+          // Destination is mounted — let the animated splash fade out.
+          setNavReady();
         }
-        // Destination is mounted — let the animated splash fade out.
-        setNavReady();
       })();
     } else {
       navigatedForSignIn.current = false;
+      resetSessionExpiry();
       // Signed out: drop the cache and its persisted snapshot so it can't
       // rehydrate into the next account.
       queryClient.clear();
