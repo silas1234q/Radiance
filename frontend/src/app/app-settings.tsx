@@ -7,7 +7,7 @@ import {
   Alert,
   Pressable,
   Platform,
-  Modal,
+  Modal
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -399,6 +399,7 @@ export default function AppSettingsScreen() {
     </View>
   );
 }
+
 
 function ToggleRow({
   label,

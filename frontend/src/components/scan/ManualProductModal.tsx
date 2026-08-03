@@ -22,12 +22,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '@clerk/clerk-expo';
 import { COLORS, FONTS } from '../../constants/theme';
 import { useCreateProduct, useExtractIngredients } from '../../hooks/queries/useProducts';
 import { uploadProductPhoto } from '../../api/uploadPhoto';
 import { toast } from '../../lib/toast';
-import { emitSessionExpired } from '../../lib/sessionExpiry';
+import { useGetToken } from '../../hooks/useApi';
 
 const CATEGORIES = [
   'Cleanser', 'Toner', 'Serum', 'Moisturizer', 'Sunscreen',
@@ -48,7 +47,7 @@ export default function ManualProductModal({
   onProductCreated,
 }: ManualProductModalProps) {
   const insets = useSafeAreaInsets();
-  const { getToken } = useAuth();
+  const getToken = useGetToken();
   const createProduct = useCreateProduct();
   const extractIngredients = useExtractIngredients();
 
@@ -99,7 +98,7 @@ export default function ManualProductModal({
     setImageUploading(true);
     try {
       const token = await getToken();
-      if (!token) { emitSessionExpired(); return; }
+      if (!token) { toast.error("Could not authenticate. Please try again."); return; }
       const url = await uploadProductPhoto(uri, token);
       setImageUrl(url);
     } catch {
@@ -133,7 +132,7 @@ export default function ManualProductModal({
     setScanningLabel(true);
     try {
       const token = await getToken();
-      if (!token) { emitSessionExpired(); return; }
+      if (!token) { toast.error("Could not authenticate. Please try again."); return; }
       const url = await uploadProductPhoto(uri, token);
       const result = await extractIngredients.mutateAsync(url);
       if (result.ingredients.length > 0) {

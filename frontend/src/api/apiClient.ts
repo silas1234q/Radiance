@@ -33,10 +33,16 @@ export async function apiCall<T = unknown>(url: string, options: RequestInit): P
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
-      emitSessionExpired();
-    }
     const error: ApiError = data as unknown as ApiError;
+    if (response.status === 401) {
+      // "User not synced" means the Clerk token is valid but the DB row
+      // doesn't exist yet (startup race during sign-up). This is NOT a real
+      // session expiration — skip the sign-out side effect.
+      const msg = (error?.message ?? '').toLowerCase();
+      if (!msg.includes('user not synced')) {
+        emitSessionExpired();
+      }
+    }
     throw error;
   }
   return data;

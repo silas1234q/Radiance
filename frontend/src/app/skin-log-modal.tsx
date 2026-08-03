@@ -28,10 +28,10 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import { useAuth } from "@clerk/clerk-expo";
 import { uploadSkinPhoto } from "../api/uploadPhoto";
-import { emitSessionExpired } from "../lib/sessionExpiry";
+import { useGetToken } from "../hooks/useApi";
 import { COLORS } from "../constants/theme";
+import { toast } from "../lib/toast";
 import CircleIconButton from "../components/ui/CircleIconButton";
 import Chip from "../components/ui/Chip";
 import FaceIcon from "../components/dashboard/FaceIcon";
@@ -539,7 +539,7 @@ export default function SkinLogModal() {
     ]);
   };
 
-  const { getToken } = useAuth();
+  const getToken = useGetToken();
   const logMood = useLogMood();
   const autoSave = useAutoSaveSkinLog();
   const [isUploading, setIsUploading] = useState(false);
@@ -792,7 +792,7 @@ export default function SkinLogModal() {
       try {
         setIsUploading(true);
         const token = await getToken();
-        if (!token) { emitSessionExpired(); return; }
+        if (!token) { toast.error("Could not authenticate. Please try again."); return; }
         const url = await uploadSkinPhoto(photoUri, token);
         autoSave.save({ photoUrl: url });
       } catch (e) {

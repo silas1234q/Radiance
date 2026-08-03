@@ -30,7 +30,7 @@ import { setNavReady } from "../lib/splash/ready";
 import { toastConfig } from "../components/ui/toastConfig";
 import { toast } from "../lib/toast";
 import { isNetworkError, isUnauthorizedError } from "../lib/errors";
-import { onSessionExpired, resetSessionExpiry } from "../lib/sessionExpiry";
+import { onSessionExpired, resetSessionExpiry, suppressSessionExpiry } from "../lib/sessionExpiry";
 import { persister, persistOptions } from "../lib/queryPersister";
 import "../../global.css";
 
@@ -110,6 +110,7 @@ function AuthRouter() {
   // Auto sign-out when the backend returns 401 (session expired)
   useEffect(() => {
     return onSessionExpired(() => {
+      suppressSessionExpiry();
       toast.error('Your session expired. Please sign in again.');
       queryClient.cancelQueries();
       queryClient.clear();

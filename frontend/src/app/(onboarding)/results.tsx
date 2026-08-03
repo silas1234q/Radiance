@@ -5,14 +5,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { useAuth } from '@clerk/clerk-expo';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSkinProfile } from '../../hooks/queries/useProfile';
-import { useRoutines } from '../../hooks/queries/useRoutines';
 import { useAnalyzeSkin, useAnalyzeSkinWithScan } from '../../hooks/queries/useQuiz';
 import type { PurchasesPackage } from 'react-native-purchases';
 import { useRevenueCat, PAYWALL_RESULT } from '../../providers/RevenueCatProvider';
 import { uploadSkinPhoto } from '../../api/uploadPhoto';
+import { useGetToken } from '../../hooks/useApi';
 import CircularProgress from '../../components/ui/CircularProgress';
 import ScanMetricsCard from '../../components/results/ScanMetricsCard';
 import SkinVitalsCard, { type Vital } from '../../components/results/SkinVitalsCard';
@@ -20,7 +19,6 @@ import SubscribeGate from '../../components/results/SubscribeGate';
 import ScanProcessing from '../../components/face-scan/ScanProcessing';
 import Skeleton from '../../components/ui/Skeleton';
 import { COLORS } from '../../constants/theme';
-import { emitSessionExpired } from '../../lib/sessionExpiry';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const HERO_H = Math.min(Math.round(SCREEN_H * 0.58), 560);
@@ -271,13 +269,8 @@ export default function ResultsScreen() {
   }>();
   const hasError = error === '1';
   const { data: profile, isLoading } = useSkinProfile();
-  // Routines are Pro-only. When the skin was analyzed with the free (OpenAI
-  // quiz-only) path, no routine is generated, so we send the user straight to
-  // the dashboard instead of a routine they don't have.
-  const { data: routines } = useRoutines();
-  const hasRoutine = (routines?.length ?? 0) > 0;
 
-  const { getToken } = useAuth();
+  const getToken = useGetToken();
   const { purchasePackage, isPro, isReady } = useRevenueCat();
   const analyze = useAnalyzeSkin();
   const analyzeWithScan = useAnalyzeSkinWithScan();
@@ -305,7 +298,7 @@ export default function ResultsScreen() {
     try {
       if (localPhoto) {
         const token = await getToken();
-        if (!token) { emitSessionExpired(); return; }
+        if (!token) { throw new Error('Could not authenticate. Please try again.'); }
         const url = await uploadSkinPhoto(localPhoto, token);
         await analyzeWithScan.mutateAsync(url);
       } else {
@@ -595,13 +588,13 @@ export default function ResultsScreen() {
         <Animated.View entering={FadeInDown.delay(cardIndex * 120 + 200).duration(500)} className="px-5 pt-6">
           <Pressable
             onPress={() =>
-              router.replace(hasError ? '/(onboarding)/quiz' : hasRoutine ? '/(tabs)' : '/(onboarding)/notifications')
+              router.replace(hasError ? '/(onboarding)/quiz' : '/(onboarding)/notifications')
             }
             className="h-[56px] rounded-2xl bg-primary items-center justify-center"
             style={({ pressed }) => [pressed && { opacity: 0.85 }]}
           >
             <Text className="text-[16px] font-poppins-semibold text-white tracking-[0.5px]">
-              {hasError ? 'Try Again' : hasRoutine ? 'View My Routine' : 'Continue to Dashboard'}
+              {hasError ? 'Try Again' : 'Continue'}
             </Text>
           </Pressable>
         </Animated.View>

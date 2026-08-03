@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --font-poppins: "Poppins", sans-serif;
+
+  --color-primary: #F06680;
+  --color-primary-light: #FFE0E6;
+  --color-primary-dark: #D44D6A;
+  --color-gradient-start: #F06680;
+  --color-gradient-end: #FF8FA3;
+  --color-dark-start: #1C1C2E;
+  --color-dark-end: #2C2C3E;
+  --color-glass-pink: #FFF0F3;
+  --color-glass-purple: #F3E8FF;
+  --color-glass-blue: #E8F0FF;
+  --color-text: #1C1C1E;
+  --color-text-secondary: #8E8E93;
+}
+
+* {
+  font-family: var(--font-poppins);
+}
+
+html {
+  scroll-behavior: smooth;
+}

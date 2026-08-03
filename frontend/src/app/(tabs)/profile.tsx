@@ -24,7 +24,7 @@ import Animated, {
   FadeInDown,
 } from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
-import { useAuth, useClerk } from "@clerk/clerk-expo";
+import { useClerk } from "@clerk/clerk-expo";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useProfile,
@@ -38,7 +38,8 @@ import { useSkinScores } from "../../hooks/queries/useSkinScores";
 import GlassCard from "../../components/ui/GlassCard";
 import { COLORS } from "../../constants/theme";
 import { toast } from "../../lib/toast";
-import { emitSessionExpired, suppressSessionExpiry } from "../../lib/sessionExpiry";
+import { suppressSessionExpiry } from "../../lib/sessionExpiry";
+import { useGetToken } from "../../hooks/useApi";
 
 function AnimatedDot({ active }: { active: boolean }) {
   const width = useSharedValue(active ? 16 : 6);
@@ -62,7 +63,7 @@ function AnimatedDot({ active }: { active: boolean }) {
 export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useClerk();
-  const { getToken } = useAuth();
+  const getToken = useGetToken();
   const queryClient = useQueryClient();
   const { data: user } = useProfile();
   const updateProfile = useUpdateProfile();
@@ -107,7 +108,7 @@ export default function ProfileScreen() {
     setAvatarUploading(true);
     try {
       const token = await getToken();
-      if (!token) { emitSessionExpired(); return; }
+      if (!token) { toast.error("Could not authenticate. Please try again."); return; }
       const url = await uploadSkinPhoto(result.assets[0].uri, token);
       updateProfile.mutate({ avatarUrl: url });
     } catch {

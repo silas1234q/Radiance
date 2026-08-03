@@ -199,7 +199,8 @@
       "Bash(powershell.exe -Command \"Add-Type -AssemblyName System.Drawing; $i = [System.Drawing.Image]::FromFile\\('c:\\\\Users\\\\Silas\\\\Downloads\\\\WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.png'\\); $i.Save\\('c:\\\\Users\\\\Silas\\\\Downloads\\\\WhatsApp Image 2026-08-01 at 10.32.39_1024x1024.jpg', [System.Drawing.Imaging.ImageFormat]::Jpeg\\); $i.Dispose\\(\\); Write-Host 'Done'\")",
       "Bash(find C:/Users/Silas/Documents/radiance -name \".env*\" -o -name \"*.example\" 2>/dev/null | head -10)",
       "Bash(grep -r \"faceScanCountThisWeek\\\\|faceScanWeekStart\\\\|lastFaceScanAt\" /c/Users/Silas/Documents/radiance/backend/src --include=\"*.ts\" 2>/dev/null | head -20)",
-      "Bash(npx --yes sharp-cli --version 2>&1 | head -3)"
+      "Bash(npx --yes sharp-cli --version 2>&1 | head -3)",
+      "Bash(cd C:/Users/Silas/Documents/radiance/web && npx vite build 2>&1 | tail -15)"
     ]
   }
 }

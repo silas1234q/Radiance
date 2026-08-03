@@ -16,7 +16,7 @@ import { Platform } from 'react-native';
 import type * as NotificationsTypes from 'expo-notifications';
 import type { GamificationSummary, Routine } from '../../types/api';
 import { notificationsModule as Notifications } from './native';
-import { REMINDERS_CHANNEL_ID } from './handler';
+import { getRemindersChannelId, ensureAndroidChannel } from './handler';
 import { hasNotificationPermission } from './permissions';
 import { NotificationSettings, parseTime } from './settings';
 
@@ -31,16 +31,21 @@ export interface ReconcileInput {
   todayIsFullDay?: boolean;
 }
 
-const androidChannel =
-  Platform.OS === 'android' ? { channelId: REMINDERS_CHANNEL_ID } : {};
+function androidChannel() {
+  return Platform.OS === 'android'
+    ? { channelId: getRemindersChannelId() }
+    : {};
+}
 
-function dailyTrigger(time: string): NotificationsTypes.NotificationTriggerInput {
+function dailyTrigger(
+  time: string,
+): NotificationsTypes.NotificationTriggerInput {
   const { hour, minute } = parseTime(time);
   return {
     type: Notifications!.SchedulableTriggerInputTypes.DAILY,
     hour,
     minute,
-    ...androidChannel,
+    ...androidChannel(),
   };
 }
 
@@ -57,7 +62,10 @@ async function schedule(
   content: NotificationsTypes.NotificationContentInput,
   trigger: NotificationsTypes.NotificationTriggerInput,
 ): Promise<void> {
-  await Notifications!.scheduleNotificationAsync({ content, trigger });
+  await Notifications!.scheduleNotificationAsync({
+    content,
+    trigger,
+  });
 }
 
 /**
@@ -77,6 +85,9 @@ export async function reconcileLocalNotifications(
 
   if (!settings.pushNotifications) return;
   if (!(await hasNotificationPermission())) return;
+
+  // Ensure the Android channel exists before scheduling.
+  await ensureAndroidChannel();
 
   // ── Routine reminders (daily, unconditional) ──
   if (settings.routineReminders) {
@@ -157,18 +168,21 @@ export async function reconcileLocalNotifications(
         };
       } else if (settings.dailyLog) {
         content = {
-          title: "How’s your skin today?",
+          title: "How's your skin today?",
           body: 'Log your mood and skin to complete today.',
           data: { route: '/skin-log-modal' },
         };
       }
       if (!content) continue;
 
-      await schedule(content, {
-        type: Notifications!.SchedulableTriggerInputTypes.DATE,
-        date: when,
-        ...androidChannel,
-      });
+      await schedule(
+        content,
+        {
+          type: Notifications!.SchedulableTriggerInputTypes.DATE,
+          date: when,
+          ...androidChannel(),
+        },
+      );
     }
   }
 }

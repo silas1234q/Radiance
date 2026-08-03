@@ -10,13 +10,17 @@
 import { Platform } from 'react-native';
 import { notificationsModule as Notifications } from './native';
 
-export const REMINDERS_CHANNEL_ID = 'reminders';
+const CHANNEL_ID = 'reminders';
 
-let installed = false;
+export function getRemindersChannelId(): string {
+  return CHANNEL_ID;
+}
+
+let handlerInstalled = false;
 
 export async function installNotificationHandler(): Promise<void> {
-  if (installed || !Notifications) return;
-  installed = true;
+  if (handlerInstalled || !Notifications) return;
+  handlerInstalled = true;
 
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -26,13 +30,18 @@ export async function installNotificationHandler(): Promise<void> {
       shouldSetBadge: false,
     }),
   });
+}
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(REMINDERS_CHANNEL_ID, {
-      name: 'Reminders',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      sound: 'default',
-      vibrationPattern: [0, 250, 250, 250],
-    });
-  }
+/**
+ * (Re-)create the Android notification channel.
+ * Called on every reconcile so the channel is always present.
+ */
+export async function ensureAndroidChannel(): Promise<void> {
+  if (Platform.OS !== 'android' || !Notifications) return;
+
+  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+    name: 'Reminders',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 250, 250, 250],
+  });
 }
