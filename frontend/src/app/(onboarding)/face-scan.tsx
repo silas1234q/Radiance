@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Dimensions, InteractionManager, Linking, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Brightness from 'expo-brightness';
 import Animated, {
@@ -68,6 +68,8 @@ type Phase = 'preview' | 'capturing' | 'validating';
  * sizes come back as "WIDTHxHEIGHT" strings, so we pick the largest by area.
  */
 function pickBestPictureSize(sizes: string[]): string | undefined {
+  // 'photo' uses the full native sensor resolution — always prefer it.
+  if (sizes.includes('photo')) return 'photo';
   let best: string | undefined;
   let bestArea = 0;
   for (const s of sizes) {
@@ -80,7 +82,6 @@ function pickBestPictureSize(sizes: string[]): string | undefined {
       }
     }
   }
-  if (sizes.includes('photo')) return 'photo';
   return best;
 }
 
@@ -101,6 +102,8 @@ function FaceScanInner() {
   const isOnboarding = onboarding === '1';
   const detector = useFaceDetection();
   const [permission, requestPermission] = useCameraPermissions();
+
+  const { top } = useSafeAreaInsets();
 
   const { data: scanCreditsData, refetch: refetchScanCredits } = useScanCredits();
   const { purchaseScanCredit, scanCreditPackage } = useRevenueCat();
@@ -221,8 +224,8 @@ function FaceScanInner() {
 
       const photo = await cameraRef.current.takePictureAsync({
         quality: 1,
-        skipProcessing: false,
-        exif: false,
+        skipProcessing: true,
+        exif: true,
       });
 
       if (flashOn) {
@@ -440,9 +443,9 @@ function FaceScanInner() {
       {showCreditPrompt && (
         <Animated.View
           entering={FadeIn.duration(200)}
-          style={[StyleSheet.absoluteFill, { backgroundColor: '#fff' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#fff'}]}
         >
-          <SafeAreaView className="flex-1">
+          <View className="flex-1" style={{ paddingTop: top + 5}}>
             {/* Close button */}
             <Pressable
               onPress={() => {
@@ -452,14 +455,19 @@ function FaceScanInner() {
               hitSlop={12}
               style={{
                 position: 'absolute',
-                top: 8,
+                top,
                 right: 16,
                 width: 44,
                 height: 44,
                 borderRadius: 22,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.06)',
+                backgroundColor: '#fff',
+                shadowColor: '#000',
+                shadowOpacity: 0.08,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 3,
                 zIndex: 1,
               }}
             >
@@ -530,7 +538,7 @@ function FaceScanInner() {
                 <Text className="text-[15px] font-poppins-medium text-skin-text-tertiary">Not now</Text>
               </Pressable>
             </View>
-          </SafeAreaView>
+          </View>
         </Animated.View>
       )}
 

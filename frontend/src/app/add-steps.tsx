@@ -11,11 +11,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRoutines, useAddStep, useUpdateStep, useDeleteStep, useReorderSteps, useDetailedInsight } from '../hooks/queries/useRoutines';
+import { useRoutines, useAddStep, useUpdateStep, useUpdateRoutine, useDeleteStep, useReorderSteps, useDetailedInsight } from '../hooks/queries/useRoutines';
 import AddProductSheet, { type AddProductSheetRef } from '../components/routine/AddProductSheet';
 import DraggableStepList from '../components/routine/DraggableStepList';
 import RoutineStepCard from '../components/routine/RoutineStepCard';
+import RoutineReminderFields, { type RoutineReminderValue } from '../components/routine/RoutineReminderFields';
 import CircleIconButton from '../components/ui/CircleIconButton';
+import ActionMenu, { type ActionMenuGroup } from '../components/ui/ActionMenu';
 import TimePickerSheet from '../components/routine/TimePickerSheet';
 import FrequencyPickerSheet from '../components/routine/FrequencyPickerSheet';
 import { COLORS } from '../constants/theme';
@@ -154,6 +156,7 @@ export default function AddStepsScreen() {
   const queryClient = useQueryClient();
   const addStep = useAddStep();
   const updateStep = useUpdateStep();
+  const updateRoutine = useUpdateRoutine();
   const deleteStep = useDeleteStep();
   const reorderSteps = useReorderSteps();
   const reorderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,6 +166,7 @@ export default function AddStepsScreen() {
   const addProductSheetRef = useRef<AddProductSheetRef>(null);
   const timePickerRef = useRef<BottomSheetModal>(null);
   const frequencyPickerRef = useRef<BottomSheetModal>(null);
+  const actionSheetRef = useRef<BottomSheetModal>(null);
 
   const firstName = user?.firstName || '';
   const routine = routines?.find((r) => r.id === routineId);
@@ -193,6 +197,96 @@ export default function AddStepsScreen() {
 
   // Track pending step creation promises so handleFrequencySelect can wait for the real stepId
   const pendingStepResolvers = useRef<Map<string, { promise: Promise<string>; resolve: (id: string) => void }>>(new Map());
+
+  // ─── Reminder state (synced from routine data) ───
+  const [reminder, setReminder] = useState<RoutineReminderValue>({
+    amReminderTime: null,
+    pmReminderTime: null,
+  });
+  const [showReminders, setShowReminders] = useState(false);
+
+  useEffect(() => {
+    if (routine) {
+      setReminder({
+        amReminderTime: routine.amReminderTime ?? null,
+        pmReminderTime: routine.pmReminderTime ?? null,
+      });
+    }
+  }, [routine?.id, routine?.amReminderTime, routine?.pmReminderTime]);
+
+  const handleReminderChange = useCallback(
+    (next: RoutineReminderValue) => {
+      setReminder(next);
+      if (!routineId) return;
+      // For default routines, update both AM and PM
+      if (isDefaultRoutine) {
+        if (amRoutineData) {
+          updateRoutine.mutate({
+            routineId: amRoutineData.id,
+            data: {
+              reminderEnabled: !!(next.amReminderTime || next.pmReminderTime),
+              amReminderTime: next.amReminderTime,
+              pmReminderTime: next.pmReminderTime,
+            },
+          });
+        }
+      } else {
+        updateRoutine.mutate({
+          routineId,
+          data: {
+            reminderEnabled: !!(next.amReminderTime || next.pmReminderTime),
+            amReminderTime: next.amReminderTime,
+            pmReminderTime: next.pmReminderTime,
+          },
+        });
+      }
+    },
+    [routineId, isDefaultRoutine, amRoutineData, updateRoutine],
+  );
+
+  // ─── Routine category ───
+  const ROUTINE_CATEGORIES = [
+    { label: 'Skincare', value: 'skincare', icon: 'sparkles-outline' as const },
+    { label: 'Haircare', value: 'haircare', icon: 'cut-outline' as const },
+    { label: 'Bodycare', value: 'bodycare', icon: 'body-outline' as const },
+    { label: 'Wellness', value: 'wellness', icon: 'leaf-outline' as const },
+  ];
+
+  const currentCategory = routine?.category ?? 'skincare';
+
+  const handleCategoryChange = useCallback(
+    (category: string) => {
+      if (!routineId) return;
+      if (isDefaultRoutine) {
+        if (amRoutineData) updateRoutine.mutate({ routineId: amRoutineData.id, data: { category } });
+        if (pmRoutineData) updateRoutine.mutate({ routineId: pmRoutineData.id, data: { category } });
+      } else {
+        updateRoutine.mutate({ routineId, data: { category } });
+      }
+    },
+    [routineId, isDefaultRoutine, amRoutineData, pmRoutineData, updateRoutine],
+  );
+
+  // ─── Action menu groups ───
+  const actionGroups = React.useMemo((): ActionMenuGroup[] => {
+    const categoryGroup: ActionMenuGroup = ROUTINE_CATEGORIES.map((cat) => ({
+      icon: cat.value === currentCategory ? 'checkmark-circle' : cat.icon,
+      label: cat.label,
+      iconColor: cat.value === currentCategory ? COLORS.primary : undefined,
+      textColor: cat.value === currentCategory ? COLORS.primary : undefined,
+      onPress: () => handleCategoryChange(cat.value),
+    }));
+
+    const settingsGroup: ActionMenuGroup = [
+      {
+        icon: 'notifications-outline',
+        label: 'Reminders',
+        onPress: () => setShowReminders((prev) => !prev),
+      },
+    ];
+
+    return [categoryGroup, settingsGroup];
+  }, [currentCategory, handleCategoryChange]);
 
   // Use the same detailed insight hook as routine screen & insight screen
   const hasProducts = addedSteps.some((s) => s.hasProduct);
@@ -577,16 +671,47 @@ export default function AddStepsScreen() {
   const customMorningSteps = addedSteps.filter((s) => s.section === 'morning' && s.templateKey.includes('-added-'));
   const customEveningSteps = addedSteps.filter((s) => s.section === 'evening' && s.templateKey.includes('-added-'));
 
+  // Capture whether the routine already had steps when the screen first loaded.
+  // This ref is set once and never changes, so adding steps during this session
+  // won't hide the template placeholders.
+  const routineHadStepsRef = useRef<boolean | null>(null);
+  if (routineHadStepsRef.current === null && routines && routineId) {
+    const r = routines.find((rt) => rt.id === routineId);
+    const isDefault = r?.type === 'AM' || r?.type === 'PM';
+    if (isDefault) {
+      const am = routines.find((rt) => rt.type === 'AM');
+      const pm = routines.find((rt) => rt.type === 'PM');
+      routineHadStepsRef.current = (am?.steps?.length ?? 0) > 0 || (pm?.steps?.length ?? 0) > 0;
+    } else {
+      routineHadStepsRef.current = (r?.steps?.length ?? 0) > 0;
+    }
+  }
+  const routineHadSteps = routineHadStepsRef.current ?? false;
+
+  const visibleMorningTemplates = MORNING_STEPS
+    .map((t, i) => ({ template: t, index: i }))
+    .filter(({ index }) => {
+      if (!routineHadSteps) return true;
+      return addedSteps.some((s) => s.templateKey === `morning-${index}`);
+    });
+
+  const visibleEveningTemplates = EVENING_STEPS
+    .map((t, i) => ({ template: t, index: i }))
+    .filter(({ index }) => {
+      if (!routineHadSteps) return true;
+      return addedSteps.some((s) => s.templateKey === `evening-${index}`);
+    });
+
   // Unified step items for draggable lists
   type SectionItem = { type: 'template'; template: StepTemplate; index: number; section: string } | { type: 'custom'; step: AddedStep };
 
   const morningItems: SectionItem[] = [
-    ...MORNING_STEPS.map((t, i) => ({ type: 'template' as const, template: t, index: i, section: 'morning' })),
+    ...visibleMorningTemplates.map(({ template: t, index: i }) => ({ type: 'template' as const, template: t, index: i, section: 'morning' })),
     ...customMorningSteps.map((s) => ({ type: 'custom' as const, step: s })),
   ];
 
   const eveningItems: SectionItem[] = [
-    ...EVENING_STEPS.map((t, i) => ({ type: 'template' as const, template: t, index: i, section: 'evening' })),
+    ...visibleEveningTemplates.map(({ template: t, index: i }) => ({ type: 'template' as const, template: t, index: i, section: 'evening' })),
     ...customEveningSteps.map((s) => ({ type: 'custom' as const, step: s })),
   ];
 
@@ -714,13 +839,13 @@ export default function AddStepsScreen() {
           {/* Header */}
           <View className="relative items-center justify-center mt-2 mb-5" style={{ height: 44 }}>
             <Text className="text-[20px] tracking-[-0.4px] text-skin-text" style={{ fontWeight: '600' }}>
-              {routine?.name || 'New Routine'}
+              {routine?.name || (isDefaultRoutine ? 'My Routine' : 'New Routine')}
             </Text>
             <View className="absolute left-0">
               <CircleIconButton icon="chevron-back" onPress={() => router.back()} />
             </View>
             <View className="absolute right-0 flex-row items-center gap-2">
-              <CircleIconButton icon="ellipsis-horizontal" onPress={() => {}} />
+              <CircleIconButton icon="ellipsis-horizontal" onPress={() => actionSheetRef.current?.present()} />
               <CircleIconButton icon="add" onPress={handleAddButtonPress} />
             </View>
           </View>
@@ -866,6 +991,23 @@ export default function AddStepsScreen() {
             )}
           </LinearGradient>
 
+          {/* Reminders (toggled from action menu) */}
+          {showReminders && (
+            <Animated.View entering={FadeInDown.duration(300)} style={{ marginBottom: 20 }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: 'SFProRounded_Semibold',
+                  color: COLORS.textSecondary,
+                  marginBottom: 6,
+                }}
+              >
+                Reminders
+              </Text>
+              <RoutineReminderFields value={reminder} onChange={handleReminderChange} />
+            </Animated.View>
+          )}
+
           {/* Morning section */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 8 }}>
             <Text style={{ fontSize: 18, fontFamily: 'SFProRounded_Semibold', color: COLORS.text }}>
@@ -955,6 +1097,14 @@ export default function AddStepsScreen() {
 
         {/* Frequency picker */}
         <FrequencyPickerSheet ref={frequencyPickerRef} onSelect={handleFrequencyDispatch} />
+
+        {/* Action menu */}
+        <ActionMenu
+          ref={actionSheetRef}
+          title="Routine Settings"
+          subtitle="Customize your routine"
+          groups={actionGroups}
+        />
       </SafeAreaView>
     </View>
   );

@@ -4,12 +4,12 @@ import { useSSO, useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { toast } from "@/src/lib/toast";
 import { getErrorMessage } from "@/src/lib/errors";
-import * as AuthSession from "expo-auth-session";
 import Svg, { Path } from "react-native-svg";
 import GoogleLogo from '@/src/assets/images/googleimage.png'
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS } from "@/src/constants/theme";
+import CircleIconButton from "@/src/components/ui/CircleIconButton";
 
 export default function AuthScreen() {
   const { startSSOFlow } = useSSO();
@@ -23,7 +23,6 @@ export default function AuthScreen() {
     try {
       const { createdSessionId, setActive, signIn, signUp } = await startSSOFlow({
         strategy,
-        redirectUrl: AuthSession.makeRedirectUri(),
       });
 
       const sessionId =
@@ -44,6 +43,7 @@ export default function AuthScreen() {
         setLoading(null);
       }
     } catch (err: unknown) {
+      console.log("SSO Error:", JSON.stringify(err, null, 2));
       const clerkErr = err as { errors?: { code?: string; message?: string }[] };
       if (clerkErr?.errors?.[0]?.code !== "session_exists") {
         toast.error(getErrorMessage(err, "Sign in failed"));
@@ -153,17 +153,23 @@ export default function AuthScreen() {
         onRequestClose={() => setLegalModal(null)}
       >
         <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top']}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, height: 52 }}>
-            <Text style={{ fontSize: 17, fontWeight: '600', color: '#1C1C1E' }}>
-              {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Use'}
-            </Text>
-            <Pressable
-              onPress={() => setLegalModal(null)}
-              hitSlop={12}
-              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Ionicons name="close" size={18} color="#1C1C1E" />
-            </Pressable>
+          <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
+            <View
+              style={{
+                width: 36,
+                height: 5,
+                borderRadius: 3,
+                backgroundColor: 'rgba(0,0,0,0.15)',
+                marginBottom: 12,
+              }}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 24 }}>
+              <View style={{ width: 40 }} />
+              <Text style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600', color: '#1C1C1E' }}>
+                {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Use'}
+              </Text>
+              <CircleIconButton icon="close" onPress={() => setLegalModal(null)} />
+            </View>
           </View>
           <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
             {legalModal === 'privacy' ? <PrivacyPolicyContent /> : <TermsOfUseContent />}

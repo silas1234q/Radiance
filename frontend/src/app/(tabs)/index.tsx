@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Pressable ,Image} from "react-native";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoutines, useDetailedInsight } from "../../hooks/queries/useRoutines";
@@ -26,6 +26,8 @@ export default function HomeScreen() {
   const { data: latestScore, isLoading: scoreLoading } = useLatestScore();
   const { data: gamification } = useGamification();
   const restoreStreak = useRestoreStreak();
+
+  const {top} = useSafeAreaInsets();
 
   const isLoading = routinesLoading || profileLoading || scoreLoading;
 
@@ -67,12 +69,10 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F2F2F7" }}>
-      <SafeAreaView className="flex-1 bg-transparent" edges={["top"]}>
         <Animated.ScrollView
           entering={FadeIn.duration(400)}
           className="flex-1"
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 ,paddingTop: top}}
           showsVerticalScrollIndicator={false}
         >
           {/* Greeting */}
@@ -274,7 +274,5 @@ export default function HomeScreen() {
           <SectionDivider label="Skin Diary" />
           <SkinDiaryCard />
         </Animated.ScrollView>
-      </SafeAreaView>
-    </View>
   );
 }

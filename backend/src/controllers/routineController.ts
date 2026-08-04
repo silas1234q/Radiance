@@ -240,8 +240,10 @@ export const updateRoutine = catchAsync(async (req, res) => {
   });
   if (!routine) throw new NotFoundError('Routine not found');
 
+  const VALID_CATEGORIES = ['skincare', 'haircare', 'bodycare', 'wellness'];
   const data: {
     name?: string;
+    category?: string;
     isActive?: boolean;
     reminderEnabled?: boolean;
     amReminderTime?: string | null;
@@ -249,6 +251,10 @@ export const updateRoutine = catchAsync(async (req, res) => {
   } = {};
 
   if (req.body.name !== undefined) data.name = String(req.body.name).trim();
+  if (req.body.category !== undefined) {
+    const cat = String(req.body.category).toLowerCase();
+    if (VALID_CATEGORIES.includes(cat)) data.category = cat;
+  }
   if (req.body.isActive !== undefined) data.isActive = !!req.body.isActive;
   if (req.body.reminderEnabled !== undefined) data.reminderEnabled = !!req.body.reminderEnabled;
   if (req.body.amReminderTime !== undefined) {

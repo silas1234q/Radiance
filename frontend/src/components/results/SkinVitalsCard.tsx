@@ -22,14 +22,22 @@ export type Vital = {
  * percentage ring, name, and description) beside a concentric ring chart that
  * plots all three vitals at once. Styled to sit over the hero photo.
  */
-export default function SkinVitalsCard({ vitals }: { vitals: Vital[] }) {
+export default function SkinVitalsCard({ vitals, score }: { vitals: Vital[]; score?: number }) {
   return (
     <Animated.View entering={FadeInDown.delay(120).duration(500).springify()} style={styles.wrap}>
       <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={styles.tintOverlay} />
 
       <View style={styles.content}>
-        <Text style={styles.overline}>Skin Analysis</Text>
+        <View style={styles.header}>
+          <Text style={styles.overline}>Skin Analysis</Text>
+          {score != null && (
+            <View style={styles.scoreBadge}>
+              <Text style={styles.scoreValue}>{score}</Text>
+              <Text style={styles.scoreLabel}>Score</Text>
+            </View>
+          )}
+        </View>
 
         <View style={styles.body}>
           {/* Vitals list */}
@@ -138,13 +146,37 @@ const styles = StyleSheet.create({
   },
   tintOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(20,20,26,0.5)' },
   content: { padding: 18 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
   overline: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 11,
     fontFamily: 'SFProRounded_Semibold',
     letterSpacing: 2,
     textTransform: 'uppercase',
-    marginBottom: 14,
+  },
+  scoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    gap: 4,
+  },
+  scoreValue: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'SFProRounded_Bold',
+  },
+  scoreLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
+    fontFamily: 'SFProRounded_Medium',
   },
   body: { flexDirection: 'row', alignItems: 'center' },
   list: { flex: 1, gap: 12 },

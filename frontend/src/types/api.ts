@@ -102,6 +102,7 @@ export interface Routine {
   userId: string;
   type: RoutineType;
   name: string | null;
+  category: string;
   isActive: boolean;
   /** When true, local reminders are scheduled for this routine's time(s). */
   reminderEnabled: boolean;

@@ -30,7 +30,7 @@ import { setNavReady } from "../lib/splash/ready";
 import { toastConfig } from "../components/ui/toastConfig";
 import { toast } from "../lib/toast";
 import { isNetworkError, isUnauthorizedError } from "../lib/errors";
-import { onSessionExpired, resetSessionExpiry, suppressSessionExpiry } from "../lib/sessionExpiry";
+import { onSessionExpired, resetSessionExpiry, suppressSessionExpiry, markAuthSettled } from "../lib/sessionExpiry";
 import { persister, persistOptions } from "../lib/queryPersister";
 import "../../global.css";
 
@@ -106,6 +106,8 @@ function AuthRouter() {
   const navigatedForSignIn = useRef(false);
   const cachedNavDone = useRef(false);
   const cachedNavState = useRef<{ isSignedIn: boolean; isOnboarded: boolean } | null>(null);
+  const hasEverBeenSignedIn = useRef(false);
+  const coldStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto sign-out when the backend returns 401 (session expired)
   useEffect(() => {
@@ -149,6 +151,13 @@ function AuthRouter() {
     if (isSignedIn && !user) return;
 
     if (isSignedIn && user) {
+      hasEverBeenSignedIn.current = true;
+      markAuthSettled();
+      // Cancel any pending cold-start sign-out timer.
+      if (coldStartTimer.current) {
+        clearTimeout(coldStartTimer.current);
+        coldStartTimer.current = null;
+      }
       if (navigatedForSignIn.current) return;
       navigatedForSignIn.current = true;
 
@@ -199,7 +208,35 @@ function AuthRouter() {
         }
       })();
     } else {
+      // Cold-start guard: when the app is killed and restarted, Clerk's JWT is
+      // often expired and isSignedIn briefly reads `false` while the token is
+      // being refreshed. If the user was signed in before this cold start, give
+      // Clerk a grace period before wiping everything.
+      if (!hasEverBeenSignedIn.current && cachedNavState.current?.isSignedIn) {
+        // Schedule a fallback: if Clerk doesn't flip isSignedIn to true within
+        // 5 seconds, treat it as a real sign-out.
+        if (!coldStartTimer.current) {
+          coldStartTimer.current = setTimeout(() => {
+            coldStartTimer.current = null;
+            // Force the wipe — Clerk couldn't refresh in time.
+            hasEverBeenSignedIn.current = true; // prevent re-entering this guard
+            markAuthSettled();
+            navigatedForSignIn.current = false;
+            resetSessionExpiry();
+            queryClient.clear();
+            void persister.removeClient();
+            void AsyncStorage.removeItem(LAST_USER_KEY);
+            void clearAppState();
+            router.replace("/auth");
+          }, 5000);
+        }
+        // Don't wipe yet — wait for Clerk to potentially refresh.
+        setNavReady();
+        return;
+      }
+
       navigatedForSignIn.current = false;
+      markAuthSettled();
       resetSessionExpiry();
       // Signed out: drop the cache and its persisted snapshot so it can't
       // rehydrate into the next account.

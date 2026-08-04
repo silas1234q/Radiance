@@ -9,6 +9,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSkinProfile } from '../../hooks/queries/useProfile';
 import { useAnalyzeSkin, useAnalyzeSkinWithScan } from '../../hooks/queries/useQuiz';
 import type { PurchasesPackage } from 'react-native-purchases';
+import { useUser } from '@clerk/clerk-expo';
 import { useRevenueCat, PAYWALL_RESULT } from '../../providers/RevenueCatProvider';
 import { uploadSkinPhoto } from '../../api/uploadPhoto';
 import { useGetToken } from '../../hooks/useApi';
@@ -214,8 +215,8 @@ function FaceZoneRow({ zone, issues }: { zone: string; issues: string[] }) {
       </Text>
       <View className="flex-1 flex-row flex-wrap gap-1.5">
         {issues.map((issue) => (
-          <View key={issue} className="px-2.5 py-[5px] rounded-full bg-[#F9F0F2]">
-            <Text className="text-[12px] font-poppins-medium text-primary-dark">{issue}</Text>
+          <View key={issue} className="px-2.5 py-[5px] rounded-full bg-[#EBF2FF]">
+            <Text className="text-[12px] font-poppins-medium text-[#3B6FD4]">{issue}</Text>
           </View>
         ))}
       </View>
@@ -268,6 +269,8 @@ export default function ResultsScreen() {
     uri?: string;
   }>();
   const hasError = error === '1';
+  const { user } = useUser();
+  const isOnboarded = !!user?.publicMetadata?.onboarded;
   const { data: profile, isLoading } = useSkinProfile();
 
   const getToken = useGetToken();
@@ -492,7 +495,7 @@ export default function ResultsScreen() {
         {/* Skin Analysis vitals card — overlaps the hero (scan-based only) */}
         {!isQuizOnly && (
           <View style={{ marginTop: -104, marginBottom: 18 }}>
-            <SkinVitalsCard vitals={vitals} />
+            <SkinVitalsCard vitals={vitals} score={score} />
           </View>
         )}
 
@@ -560,7 +563,7 @@ export default function ResultsScreen() {
         {/* Face Map Card */}
         {faceMapEntries.length > 0 && (
           <Card index={cardIndex++}>
-            <SectionHeader title="Face Map" />
+            <SectionHeader title="Areas to Focus On" />
             {faceMapEntries.map(([zone, issues], i) => (
               <React.Fragment key={zone}>
                 <FaceZoneRow zone={zone} issues={issues as string[]} />
@@ -588,7 +591,13 @@ export default function ResultsScreen() {
         <Animated.View entering={FadeInDown.delay(cardIndex * 120 + 200).duration(500)} className="px-5 pt-6">
           <Pressable
             onPress={() =>
-              router.replace(hasError ? '/(onboarding)/quiz' : '/(onboarding)/notifications')
+              router.replace(
+                hasError
+                  ? '/(onboarding)/quiz'
+                  : isOnboarded
+                    ? '/(tabs)'
+                    : '/(onboarding)/notifications'
+              )
             }
             className="h-[56px] rounded-2xl bg-primary items-center justify-center"
             style={({ pressed }) => [pressed && { opacity: 0.85 }]}

@@ -12,16 +12,11 @@ async function getTokenWithRetry(
   retries = 5,
   delay = 600,
 ): Promise<string> {
-  // Clerk knows the user is signed out — fail immediately instead of waiting
-  // through 5 retries (~3 seconds) for a token that will never arrive.
-  if (isSignedIn === false) {
-    emitSessionExpired();
-    throw { type: 'UNAUTHORIZED', message: 'Your session expired. Please sign in again.' };
-  }
-
   for (let i = 0; i < retries; i++) {
     const token = await getToken();
     if (token) return token;
+    // Clerk definitively says signed out — no point retrying further.
+    if (isSignedIn === false) break;
     if (i < retries - 1) {
       await new Promise((r) => setTimeout(r, delay));
     }

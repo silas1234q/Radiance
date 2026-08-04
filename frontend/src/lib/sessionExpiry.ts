@@ -4,10 +4,15 @@ let listener: Listener | null = null;
 let suppressed = false;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Auth hasn't been confirmed yet on cold start. Until Phase 2 in _layout.tsx
+// calls markAuthSettled(), session-expired emissions are suppressed so a brief
+// isSignedIn===false during Clerk token refresh doesn't wipe user data.
+let authSettled = false;
+
 const DEBOUNCE_MS = 5_000;
 
 export function emitSessionExpired() {
-  if (suppressed) return;
+  if (suppressed || !authSettled) return;
   // Collapse rapid duplicate emissions into one; the first fires after the
   // debounce window, and subsequent calls within the window are no-ops.
   if (debounceTimer) return;
@@ -15,6 +20,11 @@ export function emitSessionExpired() {
     debounceTimer = null;
   }, DEBOUNCE_MS);
   listener?.();
+}
+
+/** Mark that the initial auth state has been confirmed by AuthRouter Phase 2. */
+export function markAuthSettled() {
+  authSettled = true;
 }
 
 export function onSessionExpired(fn: Listener): () => void {
@@ -35,6 +45,10 @@ export function suppressSessionExpiry() {
 
 export function resetSessionExpiry() {
   suppressed = false;
+  // authSettled is intentionally NOT reset here — it stays true once the first
+  // Phase 2 confirmation has run, so subsequent sign-out→sign-in cycles still
+  // emit session-expired correctly. It only resets on a full app restart
+  // (module re-init).
   if (debounceTimer) {
     clearTimeout(debounceTimer);
     debounceTimer = null;

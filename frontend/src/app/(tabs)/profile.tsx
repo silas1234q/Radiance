@@ -15,6 +15,7 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import CircleIconButton from "../../components/ui/CircleIconButton";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -41,23 +42,65 @@ import { toast } from "../../lib/toast";
 import { suppressSessionExpiry } from "../../lib/sessionExpiry";
 import { useGetToken } from "../../hooks/useApi";
 
-function AnimatedDot({ active }: { active: boolean }) {
-  const width = useSharedValue(active ? 16 : 6);
-  const bgOpacity = useSharedValue(active ? 1 : 0.3);
+const DOT_SIZE = 6;
+const DOT_ACTIVE_W = 16;
+const DOT_GAP = 6;
+// Total width of one dot slot (widest possible): DOT_ACTIVE_W + DOT_GAP
+// 3 fixed dots: positions 0, 1, 2 (right to left visually since row-reverse)
+// Active index cycles: 0 → 1 → 2 → 0 → 1 → 2 …
+
+function PaginationDots({ activeIndex }: { activeIndex: number }) {
+  // The sliding active indicator overlays 3 static background dots.
+  // activeIndex: 0 = rightmost, 1 = middle, 2 = leftmost (in row-reverse)
+  const clamped = Math.max(0, Math.min(2, activeIndex));
+
+  // x offset for the active pill (in row-reverse, index 0 = right end)
+  // Each dot slot = DOT_SIZE + DOT_GAP, active pill is wider
+  const slotWidth = DOT_SIZE + DOT_GAP;
+  // Negative because we move left from right: 0
+  const translateX = useSharedValue(-clamped * slotWidth);
 
   useEffect(() => {
-    width.value = withSpring(active ? 16 : 6, { damping: 18, stiffness: 200 });
-    bgOpacity.value = withTiming(active ? 1 : 0.3, { duration: 200 });
-  }, [active]);
+    translateX.value = withSpring(-clamped * slotWidth, {
+      damping: 18,
+      stiffness: 220,
+    });
+  }, [clamped]);
 
-  const dotStyle = useAnimatedStyle(() => ({
-    width: width.value,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: `rgba(28, 28, 30, ${bgOpacity.value})`,
+  const activeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
   }));
 
-  return <Animated.View style={dotStyle} />;
+  return (
+    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: DOT_GAP }}>
+      {/* 3 static background dots */}
+      {[0, 1, 2].map((i) => (
+        <View
+          key={i}
+          style={{
+            width: DOT_SIZE,
+            height: DOT_SIZE,
+            borderRadius: DOT_SIZE / 2,
+            backgroundColor: 'rgba(28, 28, 30, 0.15)',
+          }}
+        />
+      ))}
+      {/* Sliding active pill */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            right: -(DOT_ACTIVE_W - DOT_SIZE) / 2,
+            width: DOT_ACTIVE_W,
+            height: DOT_SIZE,
+            borderRadius: DOT_SIZE / 2,
+            backgroundColor: 'rgba(28, 28, 30, 1)',
+          },
+          activeStyle,
+        ]}
+      />
+    </View>
+  );
 }
 
 export default function ProfileScreen() {
@@ -611,11 +654,7 @@ export default function ProfileScreen() {
               </Animated.Text>
             </Pressable>
             {/* Page dots */}
-            <View style={{ flexDirection: "row-reverse", gap: 6, alignItems: "center" }}>
-              {[monthOffset, monthOffset + 1, monthOffset + 2].map((o) => (
-                <AnimatedDot key={o} active={o === monthOffset} />
-              ))}
-            </View>
+            <PaginationDots activeIndex={((monthOffset % 3) + 3) % 3} />
             <View style={{ width: 50 }} />
           </View>
         </GlassCard>
@@ -773,17 +812,23 @@ export default function ProfileScreen() {
         onRequestClose={() => setLegalModal(null)}
       >
         <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top']}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, height: 52 }}>
-            <Text style={{ fontSize: 17, fontWeight: '600', color: COLORS.text }}>
-              {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Use'}
-            </Text>
-            <Pressable
-              onPress={() => setLegalModal(null)}
-              hitSlop={12}
-              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Ionicons name="close" size={18} color={COLORS.text} />
-            </Pressable>
+          <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
+            <View
+              style={{
+                width: 36,
+                height: 5,
+                borderRadius: 3,
+                backgroundColor: 'rgba(0,0,0,0.15)',
+                marginBottom: 12,
+              }}
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 24 }}>
+              <View style={{ width: 40 }} />
+              <Text style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '600', color: COLORS.text }}>
+                {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Use'}
+              </Text>
+              <CircleIconButton icon="close" onPress={() => setLegalModal(null)} />
+            </View>
           </View>
           <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
             {legalModal === 'privacy' ? <PrivacyPolicyContent /> : <TermsOfUseContent />}

@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import {
   useRoutines,
+  useAddStep,
   useUpdateStep,
   useToggleStep,
   useDeleteRoutine,
@@ -38,14 +39,32 @@ import CircleIconButton from "../../components/ui/CircleIconButton";
 import ActionMenu, {
   type ActionMenuGroup,
 } from "../../components/ui/ActionMenu";
+import TimePickerSheet from "../../components/routine/TimePickerSheet";
+import FrequencyPickerSheet from "../../components/routine/FrequencyPickerSheet";
 import { COLORS } from "../../constants/theme";
 import type { Routine, RoutineStep } from "../../types/api";
+
+function getProductDescription(category?: string, brand?: string): string {
+  if (!category) return brand ? `By ${brand}` : 'Custom skincare step';
+  const cat = category.toLowerCase();
+  if (cat.includes('cleanser') || cat.includes('wash') || cat.includes('cleansing')) return 'Cleanse & refresh your skin';
+  if (cat.includes('moisturizer') || cat.includes('cream') || cat.includes('lotion')) return 'Hydrate & nourish your skin';
+  if (cat.includes('sunscreen') || cat.includes('spf')) return 'Shield from UV damage';
+  if (cat.includes('serum')) return 'Target specific concerns';
+  if (cat.includes('toner')) return 'Balance & prep your skin';
+  if (cat.includes('mask')) return 'Deep treatment for your skin';
+  if (cat.includes('eye')) return 'Nourish the eye area';
+  if (cat.includes('exfoli') || cat.includes('scrub') || cat.includes('peel')) return 'Smooth & renew your skin';
+  return brand ? `By ${brand}` : 'Custom skincare step';
+}
 
 export default function RoutineScreen() {
   const router = useRouter();
   const addSheetRef = useRef<AddProductSheetRef>(null);
   const actionSheetRef = useRef<BottomSheetModal>(null);
   const productSelectSheetRef = useRef<AddProductSheetRef>(null);
+  const timePickerRef = useRef<BottomSheetModal>(null);
+  const frequencyPickerRef = useRef<BottomSheetModal>(null);
   const openAddSheet = useCallback(() => addSheetRef.current?.present(), []);
   const { data: routines, isLoading, isFetching } = useRoutines();
   const { data: skinProfile } = useSkinProfile();
@@ -53,10 +72,16 @@ export default function RoutineScreen() {
   const [xpToastVisible, setXpToastVisible] = useState(false);
 
 
+  const addStep = useAddStep();
   const updateStep = useUpdateStep();
   const toggleStep = useToggleStep();
   const deleteRoutine = useDeleteRoutine();
   const completeRoutine = useCompleteRoutine();
+
+  const [pendingAddProduct, setPendingAddProduct] = useState<{
+    id: string; name: string; brand: string; imageUrl?: string; category?: string;
+  } | null>(null);
+  const [pendingAddSection, setPendingAddSection] = useState<'morning' | 'evening' | null>(null);
 
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>("default");
 
@@ -210,6 +235,52 @@ export default function RoutineScreen() {
       setSelectedStepTarget(null);
     },
     [selectedStepTarget, updateStep],
+  );
+
+  // ─── Add product as step flow: product → time → frequency → create ───
+  const handleAddProductSelect = useCallback(
+    (product: { id: string; name: string; brand: string; imageUrl?: string; category?: string }) => {
+      setPendingAddProduct(product);
+      setTimeout(() => timePickerRef.current?.present(), 300);
+    },
+    [],
+  );
+
+  const handleTimeSelect = useCallback(
+    (section: 'morning' | 'evening') => {
+      if (!pendingAddProduct) return;
+      setPendingAddSection(section);
+      setTimeout(() => frequencyPickerRef.current?.present(), 300);
+    },
+    [pendingAddProduct],
+  );
+
+  const handleFrequencySelect = useCallback(
+    (frequency: string) => {
+      if (!pendingAddProduct || !pendingAddSection) return;
+      const section = pendingAddSection;
+      // For the default view, pick the AM or PM routine; for custom, use the selected routine
+      const targetRoutineId =
+        selectedRoutineId === 'default'
+          ? section === 'morning'
+            ? amRoutine?.id
+            : pmRoutine?.id
+          : selectedRoutineId;
+      if (!targetRoutineId) return;
+
+      const desc = getProductDescription(pendingAddProduct.category, pendingAddProduct.brand);
+      const sectionTag = section === 'morning' ? '[AM]' : '[PM]';
+
+      addStep.mutate({
+        routineId: targetRoutineId,
+        name: pendingAddProduct.name,
+        description: `${sectionTag} ${desc} · ${frequency}`,
+        productId: pendingAddProduct.id,
+      });
+      setPendingAddProduct(null);
+      setPendingAddSection(null);
+    },
+    [pendingAddProduct, pendingAddSection, selectedRoutineId, amRoutine, pmRoutine, addStep],
   );
 
   const actionGroups = useMemo((): ActionMenuGroup[] => {
@@ -762,12 +833,15 @@ export default function RoutineScreen() {
         )}
       </ScrollView>
 
-      <AddProductSheet ref={addSheetRef} />
+      <AddProductSheet ref={addSheetRef} onSelect={handleAddProductSelect} />
 
       <AddProductSheet
         ref={productSelectSheetRef}
         onSelect={handleProductSelect}
       />
+
+      <TimePickerSheet ref={timePickerRef} onSelect={handleTimeSelect} />
+      <FrequencyPickerSheet ref={frequencyPickerRef} onSelect={handleFrequencySelect} />
 
       <ActionMenu
         ref={actionSheetRef}

@@ -79,7 +79,7 @@ export function useUpdateRoutine() {
       data,
     }: {
       routineId: string;
-      data: RoutineReminderInput & { name?: string; isActive?: boolean };
+      data: RoutineReminderInput & { name?: string; category?: string; isActive?: boolean };
     }) =>
       api.fetch<Routine>(`/routines/${routineId}`, {
         method: 'PATCH',

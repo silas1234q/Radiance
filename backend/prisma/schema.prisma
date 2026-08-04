@@ -99,6 +99,7 @@ model Routine {
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   type     String        // "AM", "PM", or "CUSTOM"
   name     String?       // null for AM/PM, user-provided for CUSTOM
+  category String        @default("skincare") // "skincare", "haircare", "bodycare", "wellness"
   isActive Boolean       @default(true)
   reminderEnabled Boolean @default(false) // schedule local reminders for this routine
   amReminderTime  String? // "HH:mm" 24h morning reminder, null if unset
