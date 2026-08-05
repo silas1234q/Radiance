@@ -24,12 +24,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import { useSkinProfile } from '../hooks/queries/useProfile';
-import { useSkinScores } from '../hooks/queries/useSkinScores';
-import { useSkinLogs } from '../hooks/queries/useSkinLogs';
-import { COLORS } from '../constants/theme';
-import CircleIconButton from '../components/ui/CircleIconButton';
-import type { SkinScore } from '../types/api';
+import { useSkinProfile } from '../../hooks/queries/useProfile';
+import { useSkinScores } from '../../hooks/queries/useSkinScores';
+import { useSkinLogs } from '../../hooks/queries/useSkinLogs';
+import { COLORS } from '../../constants/theme';
+import CircleIconButton from '../../components/ui/CircleIconButton';
+import type { SkinScore } from '../../types/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

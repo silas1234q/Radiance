@@ -9,9 +9,9 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
-import GlassCard from "../components/ui/GlassCard";
-import CircleIconButton from "../components/ui/CircleIconButton";
-import { COLORS } from "../constants/theme";
+import GlassCard from "../../components/ui/GlassCard";
+import CircleIconButton from "../../components/ui/CircleIconButton";
+import { COLORS } from "../../constants/theme";
 
 const FAQ_DATA = [
   {

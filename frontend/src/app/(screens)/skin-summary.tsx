@@ -5,12 +5,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import CircleIconButton from "../components/ui/CircleIconButton";
-import { useSkinProfile } from "../hooks/queries/useProfile";
-import { useSkinScores } from "../hooks/queries/useSkinScores";
-import { useGamification } from "../hooks/queries/useGamification";
-import { buildAiInsight, buildEarnedBadges } from "../lib/skinSummary";
-import { COLORS } from "../constants/theme";
+import CircleIconButton from "../../components/ui/CircleIconButton";
+import { useSkinProfile } from "../../hooks/queries/useProfile";
+import { useSkinScores } from "../../hooks/queries/useSkinScores";
+import { useGamification } from "../../hooks/queries/useGamification";
+import { buildAiInsight, buildEarnedBadges } from "../../lib/skinSummary";
+import { COLORS } from "../../constants/theme";
 import Fire from "@/src/assets/images/fire.png";
 
 function MetricBar({ label, value }: { label: string; value: number }) {

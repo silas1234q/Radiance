@@ -3,12 +3,12 @@ import { View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform } fro
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSkinProfile, useUpdateSkinProfile } from '../hooks/queries/useProfile';
-import { COLORS } from '../constants/theme';
-import CircleIconButton from '../components/ui/CircleIconButton';
-import Button from '../components/ui/Button';
-import QuestionCard from '../components/quiz/QuestionCard';
-import ToneSwatches from '../components/quiz/ToneSwatches';
+import { useSkinProfile, useUpdateSkinProfile } from '../../hooks/queries/useProfile';
+import { COLORS } from '../../constants/theme';
+import CircleIconButton from '../../components/ui/CircleIconButton';
+import Button from '../../components/ui/Button';
+import QuestionCard from '../../components/quiz/QuestionCard';
+import ToneSwatches from '../../components/quiz/ToneSwatches';
 
 type FieldKey = 'skinType' | 'sensitivityLevel' | 'skinTone' | 'concerns' | 'allergies';
 

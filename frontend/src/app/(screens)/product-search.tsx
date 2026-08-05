@@ -14,9 +14,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { useProductSearch } from '../hooks/queries/useProducts';
-import { COLORS } from '../constants/theme';
-import type { Product } from '../types/api';
+import { useProductSearch } from '../../hooks/queries/useProducts';
+import { COLORS } from '../../constants/theme';
+import type { Product } from '../../types/api';
 
 const RECENT_SEARCHES_KEY = 'radiance:recent-product-searches';
 const MAX_RECENT = 10;

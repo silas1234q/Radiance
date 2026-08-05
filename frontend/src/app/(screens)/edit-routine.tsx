@@ -3,13 +3,13 @@ import { View, Text, FlatList, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRoutines, useDeleteStep, useUpdateStep, useUpdateRoutine } from '../hooks/queries/useRoutines';
-import AddProductSheet, { type AddProductSheetRef } from '../components/routine/AddProductSheet';
-import AddStepSheet, { type AddStepSheetRef } from '../components/routine/AddStepSheet';
-import RoutineStepCard from '../components/routine/RoutineStepCard';
-import RoutineReminderFields, { type RoutineReminderValue } from '../components/routine/RoutineReminderFields';
-import CircleIconButton from '../components/ui/CircleIconButton';
-import { COLORS } from '../constants/theme';
+import { useRoutines, useDeleteStep, useUpdateStep, useUpdateRoutine } from '../../hooks/queries/useRoutines';
+import AddProductSheet, { type AddProductSheetRef } from '../../components/routine/AddProductSheet';
+import AddStepSheet, { type AddStepSheetRef } from '../../components/routine/AddStepSheet';
+import RoutineStepCard from '../../components/routine/RoutineStepCard';
+import RoutineReminderFields, { type RoutineReminderValue } from '../../components/routine/RoutineReminderFields';
+import CircleIconButton from '../../components/ui/CircleIconButton';
+import { COLORS } from '../../constants/theme';
 
 export default function EditRoutineScreen() {
   const { routineId } = useLocalSearchParams<{ routineId: string }>();

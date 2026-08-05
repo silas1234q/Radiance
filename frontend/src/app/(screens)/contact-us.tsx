@@ -4,9 +4,9 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import GlassCard from "../components/ui/GlassCard";
-import CircleIconButton from "../components/ui/CircleIconButton";
-import { COLORS } from "../constants/theme";
+import GlassCard from "../../components/ui/GlassCard";
+import CircleIconButton from "../../components/ui/CircleIconButton";
+import { COLORS } from "../../constants/theme";
 
 const SUPPORT_EMAIL = "support@radianceapp.com";
 

@@ -28,19 +28,19 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import { uploadSkinPhoto } from "../api/uploadPhoto";
-import { useGetToken } from "../hooks/useApi";
-import { COLORS } from "../constants/theme";
-import { toast } from "../lib/toast";
-import CircleIconButton from "../components/ui/CircleIconButton";
-import Chip from "../components/ui/Chip";
-import FaceIcon from "../components/dashboard/FaceIcon";
-import { useLogMood } from "../hooks/queries/useMoods";
-import { useRoutines } from "../hooks/queries/useRoutines";
-import { useQuizAnswers } from "../hooks/queries/useQuiz";
-import { useAutoSaveSkinLog } from "../hooks/useAutoSaveSkinLog";
-import Card from "../components/ui/Card";
-import type { RoutineStep } from "../types/api";
+import { uploadSkinPhoto } from "../../api/uploadPhoto";
+import { useGetToken } from "../../hooks/useApi";
+import { COLORS } from "../../constants/theme";
+import { toast } from "../../lib/toast";
+import CircleIconButton from "../../components/ui/CircleIconButton";
+import Chip from "../../components/ui/Chip";
+import FaceIcon from "../../components/dashboard/FaceIcon";
+import { useLogMood } from "../../hooks/queries/useMoods";
+import { useRoutines } from "../../hooks/queries/useRoutines";
+import { useQuizAnswers } from "../../hooks/queries/useQuiz";
+import { useAutoSaveSkinLog } from "../../hooks/useAutoSaveSkinLog";
+import Card from "../../components/ui/Card";
+import type { RoutineStep } from "../../types/api";
 
 const MOODS = [
   { label: "Bad", value: "Bad", color: "#FF3B30" },

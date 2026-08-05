@@ -3,12 +3,12 @@ import { View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, Activ
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/theme';
-import CircleIconButton from '../components/ui/CircleIconButton';
-import { useCreateCustomRoutine } from '../hooks/queries/useRoutines';
+import { COLORS } from '../../constants/theme';
+import CircleIconButton from '../../components/ui/CircleIconButton';
+import { useCreateCustomRoutine } from '../../hooks/queries/useRoutines';
 import RoutineReminderFields, {
   RoutineReminderValue,
-} from '../components/routine/RoutineReminderFields';
+} from '../../components/routine/RoutineReminderFields';
 
 export default function NewRoutineScreen() {
   const router = useRouter();

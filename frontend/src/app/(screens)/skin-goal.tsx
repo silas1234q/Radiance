@@ -13,12 +13,12 @@ import {
 } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { useSkinProfile } from "../hooks/queries/useProfile";
-import { useWeeklyPlan } from "../hooks/queries/useWeeklyPlan";
+import { useSkinProfile } from "../../hooks/queries/useProfile";
+import { useWeeklyPlan } from "../../hooks/queries/useWeeklyPlan";
 import { LinearGradient } from "expo-linear-gradient";
-import { COLORS } from "../constants/theme";
-import CircleIconButton from "../components/ui/CircleIconButton";
-import Skeleton from "../components/ui/Skeleton";
+import { COLORS } from "../../constants/theme";
+import CircleIconButton from "../../components/ui/CircleIconButton";
+import Skeleton from "../../components/ui/Skeleton";
 
 interface WeekMilestone {
   week: string;

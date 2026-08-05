@@ -13,10 +13,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeOut } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { useProductAnalysis } from '../hooks/queries/useProducts';
-import { COLORS } from '../constants/theme';
-import CircleIconButton from '../components/ui/CircleIconButton';
-import Skeleton from '../components/ui/Skeleton';
+import { useProductAnalysis } from '../../hooks/queries/useProducts';
+import { COLORS } from '../../constants/theme';
+import CircleIconButton from '../../components/ui/CircleIconButton';
+import Skeleton from '../../components/ui/Skeleton';
 
 function FitScoreRing({ score }: { score: number }) {
   const color =

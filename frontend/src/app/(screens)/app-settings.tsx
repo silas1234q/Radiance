@@ -17,18 +17,18 @@ import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import GlassCard from "../components/ui/GlassCard";
-import CircleIconButton from "../components/ui/CircleIconButton";
-import { COLORS } from "../constants/theme";
-import { useRevenueCat } from "../providers/RevenueCatProvider";
-import { useNotificationSettings } from "../hooks/useNotificationSettings";
+import GlassCard from "../../components/ui/GlassCard";
+import CircleIconButton from "../../components/ui/CircleIconButton";
+import { COLORS } from "../../constants/theme";
+import { useRevenueCat } from "../../providers/RevenueCatProvider";
+import { useNotificationSettings } from "../../hooks/useNotificationSettings";
 import {
   NOTIFICATION_SETTINGS_KEY,
   NotificationSettings,
   formatTime,
   requestNotificationPermission,
   timeToDate,
-} from "../lib/notifications";
+} from "../../lib/notifications";
 
 /** Notification keys that require the OS permission before they do anything. */
 const PERMISSION_KEYS: (keyof NotificationSettings)[] = [

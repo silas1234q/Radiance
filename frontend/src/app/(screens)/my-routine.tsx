@@ -3,12 +3,12 @@ import { View, Text, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import CircleIconButton from "../components/ui/CircleIconButton";
-import { useRoutines } from "../hooks/queries/useRoutines";
-import WeekDayTracker from "../components/routine/WeekDayTracker";
-import SectionDivider from "../components/routine/SectionDivider";
-import RoutineStepCard from "../components/routine/RoutineStepCard";
-import AddProductSheet, { type AddProductSheetRef } from "../components/routine/AddProductSheet";
+import CircleIconButton from "../../components/ui/CircleIconButton";
+import { useRoutines } from "../../hooks/queries/useRoutines";
+import WeekDayTracker from "../../components/routine/WeekDayTracker";
+import SectionDivider from "../../components/routine/SectionDivider";
+import RoutineStepCard from "../../components/routine/RoutineStepCard";
+import AddProductSheet, { type AddProductSheetRef } from "../../components/routine/AddProductSheet";
 
 export default function MyRoutineScreen() {
   const router = useRouter();

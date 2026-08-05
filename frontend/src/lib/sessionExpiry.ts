@@ -43,6 +43,10 @@ export function suppressSessionExpiry() {
   }
 }
 
+export function isSessionExpirySuppressed() {
+  return suppressed;
+}
+
 export function resetSessionExpiry() {
   suppressed = false;
   // authSettled is intentionally NOT reset here — it stays true once the first

@@ -5,9 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
-import { useDetailedInsight } from '../hooks/queries/useRoutines';
-import CircleIconButton from '../components/ui/CircleIconButton';
-import { COLORS } from '../constants/theme';
+import { useDetailedInsight } from '../../hooks/queries/useRoutines';
+import CircleIconButton from '../../components/ui/CircleIconButton';
+import { COLORS } from '../../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const RING_SIZE = 160;

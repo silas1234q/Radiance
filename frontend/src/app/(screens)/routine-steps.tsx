@@ -4,11 +4,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp, FadeInDown } from 'react-native-reanimated';
-import StepDetailPage from '../components/routine/StepDetailPage';
-import { useRoutines } from '../hooks/queries/useRoutines';
-import { useSkinProfile } from '../hooks/queries/useProfile';
-import { COLORS } from '../constants/theme';
-import CircleIconButton from '../components/ui/CircleIconButton';
+import StepDetailPage from '../../components/routine/StepDetailPage';
+import { useRoutines } from '../../hooks/queries/useRoutines';
+import { useSkinProfile } from '../../hooks/queries/useProfile';
+import { COLORS } from '../../constants/theme';
+import CircleIconButton from '../../components/ui/CircleIconButton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

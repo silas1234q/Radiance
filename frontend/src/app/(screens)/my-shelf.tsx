@@ -4,10 +4,10 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useUserProducts } from '../hooks/queries/useUserProducts';
-import { COLORS } from '../constants/theme';
-import CircleIconButton from '../components/ui/CircleIconButton';
-import type { UserProduct } from '../types/api';
+import { useUserProducts } from '../../hooks/queries/useUserProducts';
+import { COLORS } from '../../constants/theme';
+import CircleIconButton from '../../components/ui/CircleIconButton';
+import type { UserProduct } from '../../types/api';
 
 const TABS = [
   { key: 'recommended', label: 'Recommended' },

@@ -9,8 +9,8 @@ let inflightTokenPromise: Promise<string> | null = null;
 async function getTokenWithRetry(
   getToken: () => Promise<string | null>,
   isSignedIn: boolean | undefined,
-  retries = 5,
-  delay = 600,
+  retries = 8,
+  delay = 800,
 ): Promise<string> {
   for (let i = 0; i < retries; i++) {
     const token = await getToken();
@@ -43,13 +43,39 @@ export function useApi() {
     async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
       const token = await deduplicatedGetToken(getToken, isSignedIn);
 
-      return apiCall<T>(url, {
-        ...options,
-        headers: {
-          ...authHeaders(token),
-          ...options.headers,
-        },
-      });
+      try {
+        return await apiCall<T>(url, {
+          ...options,
+          headers: {
+            ...authHeaders(token),
+            ...options.headers,
+          },
+        });
+      } catch (error: any) {
+        // On 401, force-refresh the token and retry once before giving up.
+        if (error?.type === 'UNAUTHORIZED' || error?.status === 401) {
+          const freshToken = await getToken({ skipCache: true } as any);
+          if (freshToken && freshToken !== token) {
+            try {
+              return await apiCall<T>(url, {
+                ...options,
+                headers: {
+                  ...authHeaders(freshToken),
+                  ...options.headers,
+                },
+              });
+            } catch (retryError: any) {
+              if (retryError?.type === 'UNAUTHORIZED' || retryError?.status === 401) {
+                emitSessionExpired();
+              }
+              throw retryError;
+            }
+          }
+          // Couldn't get a fresh token — session is truly expired.
+          emitSessionExpired();
+        }
+        throw error;
+      }
     },
     [getToken, isSignedIn]
   );

@@ -3,10 +3,10 @@ import { View, Text, ScrollView, Pressable, TextInput, Alert } from 'react-nativ
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSkinProfile, useUpdateSkinProfile } from '../hooks/queries/useProfile';
-import { COLORS } from '../constants/theme';
-import GlassCard from '../components/ui/GlassCard';
-import CircleIconButton from '../components/ui/CircleIconButton';
+import { useSkinProfile, useUpdateSkinProfile } from '../../hooks/queries/useProfile';
+import { COLORS } from '../../constants/theme';
+import GlassCard from '../../components/ui/GlassCard';
+import CircleIconButton from '../../components/ui/CircleIconButton';
 
 const ROUTINE_LENGTHS = [
   { value: 'minimal', label: 'Minimal', desc: '3-4 steps' },

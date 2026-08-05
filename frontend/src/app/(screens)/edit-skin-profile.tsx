@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSkinProfile, useProfile } from '../hooks/queries/useProfile';
-import { COLORS } from '../constants/theme';
-import CircleIconButton from '../components/ui/CircleIconButton';
+import { useSkinProfile, useProfile } from '../../hooks/queries/useProfile';
+import { COLORS } from '../../constants/theme';
+import CircleIconButton from '../../components/ui/CircleIconButton';
 
 export default function EditSkinProfileScreen() {
   const router = useRouter();

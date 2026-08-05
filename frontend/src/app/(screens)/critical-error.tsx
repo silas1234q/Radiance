@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import ErrorScreen from '../components/ui/ErrorScreen';
+import ErrorScreen from '../../components/ui/ErrorScreen';
 
 /**
  * Navigable fatal-error route for non-crash catastrophic states

@@ -30,7 +30,7 @@ import { setNavReady } from "../lib/splash/ready";
 import { toastConfig } from "../components/ui/toastConfig";
 import { toast } from "../lib/toast";
 import { isNetworkError, isUnauthorizedError } from "../lib/errors";
-import { onSessionExpired, resetSessionExpiry, suppressSessionExpiry, markAuthSettled } from "../lib/sessionExpiry";
+import { onSessionExpired, resetSessionExpiry, suppressSessionExpiry, isSessionExpirySuppressed, markAuthSettled } from "../lib/sessionExpiry";
 import { persister, persistOptions } from "../lib/queryPersister";
 import "../../global.css";
 
@@ -112,6 +112,7 @@ function AuthRouter() {
   // Auto sign-out when the backend returns 401 (session expired)
   useEffect(() => {
     return onSessionExpired(() => {
+      if (isSessionExpirySuppressed()) return;
       suppressSessionExpiry();
       toast.error('Your session expired. Please sign in again.');
       queryClient.cancelQueries();
@@ -228,7 +229,7 @@ function AuthRouter() {
             void AsyncStorage.removeItem(LAST_USER_KEY);
             void clearAppState();
             router.replace("/auth");
-          }, 5000);
+          }, 10000);
         }
         // Don't wipe yet — wait for Clerk to potentially refresh.
         setNavReady();
@@ -257,17 +258,17 @@ function AuthRouter() {
   }, [isSignedIn, isLoaded, user]);
 
   return (
-    <Stack screenOptions={{ headerShown: false }} initialRouteName="auth">
-      <Stack.Screen name="auth" options={{ animation: "fade" }} />
+    <Stack screenOptions={{ headerShown: false }} initialRouteName="(screens)/auth">
+      <Stack.Screen name="(screens)/auth" options={{ animation: "fade" }} />
       <Stack.Screen name="(onboarding)" options={{ animation: "fade" }} />
       <Stack.Screen name="(tabs)" options={{animation:'fade'}}/>
-      <Stack.Screen name="skin-log-modal" options={{ presentation: "modal" }} />
+      <Stack.Screen name="(screens)/skin-log-modal" options={{ presentation: "modal" }} />
       <Stack.Screen
-        name="routine-steps"
+        name="(screens)/routine-steps"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
       />
       <Stack.Screen
-        name="skin-goal"
+        name="(screens)/skin-goal"
         options={{
           presentation: "card",
           animation: "slide_from_bottom",
@@ -275,11 +276,11 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="skin-comparison-modal"
+        name="(screens)/skin-comparison-modal"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
       />
       <Stack.Screen
-        name="product-search"
+        name="(screens)/product-search"
         options={{
           presentation: "transparentModal",
           animation: "fade",
@@ -287,7 +288,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="product-detail"
+        name="(screens)/product-detail"
         options={{
           headerShown: false,
           presentation: "card",
@@ -295,11 +296,11 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="new-routine"
+        name="(screens)/new-routine"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
       />
       <Stack.Screen
-        name="add-steps"
+        name="(screens)/add-steps"
         options={{
           headerShown: false,
           presentation: "card",
@@ -307,7 +308,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="edit-skin-profile"
+        name="(screens)/edit-skin-profile"
         options={{
           headerShown: false,
           presentation: "card",
@@ -315,7 +316,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="edit-skin-field"
+        name="(screens)/edit-skin-field"
         options={{
           headerShown: false,
           presentation: "card",
@@ -323,7 +324,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="routine-preferences"
+        name="(screens)/routine-preferences"
         options={{
           headerShown: false,
           presentation: "card",
@@ -331,7 +332,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="my-shelf"
+        name="(screens)/my-shelf"
         options={{
           headerShown: false,
           presentation: "modal",
@@ -339,7 +340,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="faq"
+        name="(screens)/faq"
         options={{
           headerShown: false,
           presentation: "card",
@@ -347,7 +348,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="app-settings"
+        name="(screens)/app-settings"
         options={{
           headerShown: false,
           presentation: "card",
@@ -355,7 +356,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="contact-us"
+        name="(screens)/contact-us"
         options={{
           headerShown: false,
           presentation: "card",
@@ -363,7 +364,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="skin-summary"
+        name="(screens)/skin-summary"
         options={{
           headerShown: false,
           presentation: "modal",
@@ -371,7 +372,7 @@ function AuthRouter() {
         }}
       />
       <Stack.Screen
-        name="critical-error"
+        name="(screens)/critical-error"
         options={{
           headerShown: false,
           presentation: "transparentModal",

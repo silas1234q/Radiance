@@ -168,8 +168,8 @@ export default function ProfileScreen() {
         text: "Sign out",
         style: "destructive",
         onPress: async () => {
-          setSigningOut(true);
           suppressSessionExpiry();
+          setSigningOut(true);
           try {
             queryClient.cancelQueries();
             queryClient.clear();
