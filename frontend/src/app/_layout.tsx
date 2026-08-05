@@ -154,6 +154,7 @@ function AuthRouter() {
     if (isSignedIn && user) {
       hasEverBeenSignedIn.current = true;
       markAuthSettled();
+      resetSessionExpiry();
       // Cancel any pending cold-start sign-out timer.
       if (coldStartTimer.current) {
         clearTimeout(coldStartTimer.current);
@@ -223,7 +224,7 @@ function AuthRouter() {
             hasEverBeenSignedIn.current = true; // prevent re-entering this guard
             markAuthSettled();
             navigatedForSignIn.current = false;
-            resetSessionExpiry();
+            suppressSessionExpiry();
             queryClient.clear();
             void persister.removeClient();
             void AsyncStorage.removeItem(LAST_USER_KEY);
@@ -238,7 +239,9 @@ function AuthRouter() {
 
       navigatedForSignIn.current = false;
       markAuthSettled();
-      resetSessionExpiry();
+      // NOTE: Do NOT resetSessionExpiry() here — it races with in-flight token
+      // retries that call emitSessionExpired() after sign-out, causing a spurious
+      // "session expired" toast. Suppression is reset when the user signs back in.
       // Signed out: drop the cache and its persisted snapshot so it can't
       // rehydrate into the next account.
       queryClient.clear();
