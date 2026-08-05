@@ -594,9 +594,7 @@ export default function ResultsScreen() {
               router.replace(
                 hasError
                   ? '/(onboarding)/quiz'
-                  : isOnboarded
-                    ? '/(tabs)'
-                    : '/(onboarding)/notifications'
+                  : '/(tabs)'
               )
             }
             className="h-[56px] rounded-2xl bg-primary items-center justify-center"

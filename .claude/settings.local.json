@@ -204,7 +204,8 @@
       "WebFetch(domain:clerk.com)",
       "Bash(cd \"C:/Users/Silas/Documents/radiance/frontend/src/app\" && mkdir -p \"\\(screens\\)\" && for f in add-steps.tsx app-settings.tsx auth.tsx contact-us.tsx critical-error.tsx edit-routine.tsx edit-skin-field.tsx edit-skin-profile.tsx faq.tsx my-routine.tsx my-shelf.tsx new-routine.tsx product-detail.tsx product-search.tsx routine-insight.tsx routine-preferences.tsx routine-steps.tsx skin-comparison-modal.tsx skin-goal.tsx skin-log-modal.tsx skin-summary.tsx; do mv \"$f\" \"\\(screens\\)/$f\"; done)",
       "Bash(ls -1 \"C:/Users/Silas/Documents/radiance/frontend/src/app/\\(screens\\)/\")",
-      "Bash(cd \"C:/Users/Silas/Documents/radiance/frontend/src/app/\\(screens\\)\" && for f in *.tsx; do sed -i \"s|from '\\\\.\\\\./|from '../../|g; s|from \\\\\"\\\\.\\\\./|from \\\\\"../../|g\" \"$f\"; done)"
+      "Bash(cd \"C:/Users/Silas/Documents/radiance/frontend/src/app/\\(screens\\)\" && for f in *.tsx; do sed -i \"s|from '\\\\.\\\\./|from '../../|g; s|from \\\\\"\\\\.\\\\./|from \\\\\"../../|g\" \"$f\"; done)",
+      "Bash(taskkill //F //IM node.exe 2>/dev/null; true)"
     ]
   }
 }

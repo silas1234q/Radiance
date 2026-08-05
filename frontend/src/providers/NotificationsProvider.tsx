@@ -19,6 +19,7 @@ import { useRoutines } from '../hooks/queries/useRoutines';
 import { useGamification, useWeeklyCompletions } from '../hooks/queries/useGamification';
 import { useRegisterPushToken } from '../hooks/queries/useRegisterPushToken';
 import { useNotificationSettings } from '../hooks/useNotificationSettings';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getDeviceTimezone,
   getExpoPushToken,
@@ -27,6 +28,8 @@ import {
   installNotificationHandler,
   notificationsModule,
   reconcileLocalNotifications,
+  requestNotificationPermission,
+  NOTIFICATION_SETTINGS_KEY,
 } from '../lib/notifications';
 
 /** Runs the query-driven reconcile loop; only mounted while signed in. */
@@ -121,6 +124,20 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     void installNotificationHandler();
     void hydrateSettings();
   }, []);
+
+  // Auto-prompt for notification permission on first app start after sign-in.
+  // If no settings have been persisted yet (fresh install / new user), request
+  // the OS permission so the defaults (all reminders enabled) take effect.
+  const permissionPrompted = useRef(false);
+  useEffect(() => {
+    if (!isSignedIn || permissionPrompted.current) return;
+    permissionPrompted.current = true;
+    (async () => {
+      const stored = await AsyncStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+      if (stored) return; // user already made a choice — don't re-prompt
+      await requestNotificationPermission();
+    })();
+  }, [isSignedIn]);
 
   // Route a notification tap to its target screen.
   const handleResponse = useCallback(
