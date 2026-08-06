@@ -7,6 +7,7 @@ import Animated, { SlideInDown } from 'react-native-reanimated';
 import { PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases';
 import { COLORS, GRADIENTS } from '../../constants/theme';
 import { useRevenueCat } from '../../providers/RevenueCatProvider';
+import LegalModal, { type LegalDoc } from '../legal/LegalModal';
 
 const BENEFITS: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -128,6 +129,7 @@ export default function SubscribeGate({
   const plan = plans.find((p) => p.id === selected) ?? plans[0];
   const [restoring, setRestoring] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
 
   const handleRestore = async () => {
     if (restoring || loading) return;
@@ -284,15 +286,29 @@ export default function SubscribeGate({
 
       {/* Footer legal links */}
       <View style={styles.footer}>
-        <Text style={styles.footerLink}>Terms of Service</Text>
+        <Text
+          style={styles.footerLink}
+          onPress={() => setLegalDoc('terms')}
+          suppressHighlighting
+        >
+          Terms of Service
+        </Text>
         <Text style={styles.footerDot}>·</Text>
-        <Text style={styles.footerLink}>Privacy Policy</Text>
+        <Text
+          style={styles.footerLink}
+          onPress={() => setLegalDoc('privacy')}
+          suppressHighlighting
+        >
+          Privacy Policy
+        </Text>
         <Text style={styles.footerDot}>·</Text>
-        <Text style={styles.footerLink} onPress={handleRestore}>
+        <Text style={styles.footerLink} onPress={handleRestore} suppressHighlighting>
           {restoring ? 'Restoring…' : 'Restore Purchase'}
         </Text>
       </View>
       </ScrollView>
+
+      <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
     </Animated.View>
   );
 }

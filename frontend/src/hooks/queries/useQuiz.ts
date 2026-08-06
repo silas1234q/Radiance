@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../useApi';
+import { markOnboarded } from '../../lib/appStateCache';
 import type { QuizAnswer, SkinProfile } from '../../types/api';
 
 export function useQuizAnswers() {
@@ -15,6 +16,13 @@ export function useSubmitQuiz() {
   return useMutation({
     mutationFn: (answers: { questionId: number; answer: string }[]) =>
       api.fetch<{ success: true; count: number }>('/quiz', { method: 'POST', body: JSON.stringify({ answers }) }),
+    onSuccess: () => {
+      // The backend defines "onboarded" as having quiz answers (see
+      // `authService.ts`), so the moment this succeeds the user is onboarded.
+      // Recording it now means the next cold start navigates straight to the
+      // tabs instead of flashing the quiz while the backend confirms.
+      void markOnboarded();
+    },
   });
 }
 

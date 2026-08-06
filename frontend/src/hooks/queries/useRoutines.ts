@@ -1,6 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type MutateOptions } from '@tanstack/react-query';
 import { useApi } from '../useApi';
+import {
+  MUTATION_KEYS,
+  now,
+  type CompleteRoutineVars,
+  type ToggleStepVars,
+} from '../../lib/mutationDefaults';
 import type { Routine, RoutineStep, DetailedInsight } from '../../types/api';
+
+/** Rollback context for the optimistic routine updates. */
+type RoutinesSnapshot = { previous?: Routine[] };
 
 export function useRoutines() {
   const api = useApi();
@@ -130,13 +139,19 @@ export function useDetailedInsight(routineId?: string, enabled = true) {
   });
 }
 
+/**
+ * Completing a routine and ticking a step are queued when offline: no
+ * `mutationFn` or `onSettled` here, they come from the mutation defaults keyed
+ * by `mutationKey` (see `lib/mutationDefaults.ts`) so a write persisted across
+ * a force-quit can still find its function on replay. `onMutate` stays local —
+ * it runs at tap time and its optimistic write to `['routines']` is itself
+ * persisted, so the tick survives a restart even before the write goes out.
+ */
 export function useCompleteRoutine() {
-  const api = useApi();
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (routineId: string) =>
-      api.fetch<Routine>(`/routines/${routineId}/complete`, { method: 'POST' }),
-    onMutate: async (routineId) => {
+  const mutation = useMutation<Routine, unknown, CompleteRoutineVars, RoutinesSnapshot>({
+    mutationKey: MUTATION_KEYS.completeRoutine,
+    onMutate: async ({ routineId }) => {
       await queryClient.cancelQueries({ queryKey: ['routines'] });
       const previous = queryClient.getQueryData<Routine[]>(['routines']);
       queryClient.setQueryData<Routine[]>(['routines'], (old) => {
@@ -158,19 +173,23 @@ export function useCompleteRoutine() {
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(['routines'], context.previous);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['routines'] });
-      queryClient.invalidateQueries({ queryKey: ['gamification'] });
-    },
   });
+
+  // Keeps the call-site API as `mutate(routineId)` while stamping the tap time
+  // the queue needs for correct day attribution.
+  return {
+    ...mutation,
+    mutate: (routineId: string, options?: MutateOptions<Routine, unknown, CompleteRoutineVars>) =>
+      mutation.mutate({ routineId, occurredAt: now() }, options),
+    mutateAsync: (routineId: string) =>
+      mutation.mutateAsync({ routineId, occurredAt: now() }),
+  };
 }
 
 export function useToggleStep() {
-  const api = useApi();
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ routineId, stepId }: { routineId: string; stepId: string }) =>
-      api.fetch<RoutineStep>(`/routines/${routineId}/steps/${stepId}`, { method: 'PATCH' }),
+  const mutation = useMutation<RoutineStep, unknown, ToggleStepVars, RoutinesSnapshot>({
+    mutationKey: MUTATION_KEYS.toggleStep,
     onMutate: async ({ routineId, stepId }) => {
       await queryClient.cancelQueries({ queryKey: ['routines'] });
       const previous = queryClient.getQueryData<Routine[]>(['routines']);
@@ -191,9 +210,13 @@ export function useToggleStep() {
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(['routines'], context.previous);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['routines'] });
-      queryClient.invalidateQueries({ queryKey: ['gamification'] });
-    },
   });
+
+  return {
+    ...mutation,
+    mutate: (vars: { routineId: string; stepId: string }) =>
+      mutation.mutate({ ...vars, occurredAt: now() }),
+    mutateAsync: (vars: { routineId: string; stepId: string }) =>
+      mutation.mutateAsync({ ...vars, occurredAt: now() }),
+  };
 }

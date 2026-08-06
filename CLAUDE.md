@@ -69,7 +69,7 @@ The generated client lives at `backend/generated/prisma/` (not the default locat
 5. API routes — all feature routers are aggregated in `src/routes/routes.ts` and mounted at `/api`; individual routers apply `requireAuth()` + `syncUser` as needed
 6. `globalErrorHandler` (catches `AppError` subclasses and unhandled errors)
 
-Route prefixes: `/auth`, `/users`, `/quiz`, `/skin-profile`, `/routines`, `/skin-logs`, `/skin-scores`, `/moods`, `/products`, `/upload`, `/gamification`, `/user-products`. Health check at `/api/health` (no auth).
+Route prefixes: `/auth`, `/users`, `/quiz`, `/skin-profile`, `/routines`, `/skin-logs`, `/skin-scores`, `/moods`, `/products`, `/upload`, `/gamification`, `/user-products`, `/scan-credits`. Health check at `/api/health` (no auth).
 
 ### Auth Pattern
 - **Backend:** `clerkMiddleware()` runs globally. Protected routes chain `requireAuth()` → `syncUser`. `syncUser` upserts the Clerk user into the DB and sets `req.user` (the DB User, not the Clerk user).
@@ -82,6 +82,9 @@ Route prefixes: `/auth`, `/users`, `/quiz`, `/skin-profile`, `/routines`, `/skin
 - `skinAnalysisService.ts` and `routineService.ts` — AI-first with rule-based fallback if OpenAI fails
 - `openBeautyFactsService.ts` — Product search with DB caching and rate limiting
 - `productAnalysisService.ts` — AI-powered product-skin fit scoring (fitScore, pros/cons, ingredient flags)
+- `routineInsightService.ts` — cached routine insights (per-user `RoutineInsightCache`)
+- `weeklyPlanService.ts` — weekly skincare plan generation
+- `revenueCatService.ts` — server-side subscription validation
 - `youCamService.ts` — interface + 501 stubs (deferred)
 - Skin analysis has two entry points: `POST /skin-profile/analyze` (quiz answers only) and `POST /skin-profile/analyze-with-scan` (quiz + face-scan photo)
 
@@ -98,7 +101,7 @@ Route prefixes: `/auth`, `/users`, `/quiz`, `/skin-profile`, `/routines`, `/skin
 `RevenueCatProvider` wraps the app (inside `ClerkProvider`, outside `QueryClientProvider`). It configures `react-native-purchases` with the Clerk user ID as the app user ID, exposes `presentPaywall()` (via `react-native-purchases-ui`), and tracks entitlement status. The `SubscribeGate` component on the results screen calls `presentPaywall()` to gate the full skin analysis behind a subscription. Error codes from the SDK are mapped to user-friendly messages — never surface raw SDK errors.
 
 ### Push Notifications
-- **Frontend (local):** `NotificationsProvider` installs the notification handler, hydrates persisted settings, and reconciles locally-scheduled reminders (routine reminders, streak nudges) whenever routines/gamification data or app foreground state change. Settings persistence and scheduling logic live in `src/lib/notifications.ts`. Phase 2 registers the Expo push token with the backend via `useRegisterPushToken`.
+- **Frontend (local):** `NotificationsProvider` installs the notification handler, hydrates persisted settings, and reconciles locally-scheduled reminders (routine reminders, streak nudges) whenever routines/gamification data or app foreground state change. Settings persistence and scheduling logic live in `src/lib/notifications/` (modular: `settings.ts`, `scheduler.ts`, `handler.ts`, `store.ts`, `permissions.ts`, `push.ts`, `native.ts`). Phase 2 registers the Expo push token with the backend via `useRegisterPushToken`.
 - **Backend (server push):** `src/jobs/index.ts` runs `node-cron` scheduled tasks — weekly summary (hourly cron, fires at 18:00 local Sunday) and win-back (daily, for users inactive ≥ 3 days). Uses each user's stored IANA `timezone` and `luxon` for local-time checks. Push delivery via `expo-server-sdk` in `src/services/notificationService.ts`.
 
 ### Query Persistence
@@ -120,7 +123,7 @@ React Query is configured with `@tanstack/query-async-storage-persister` + `@tan
 ### Frontend Data Flow
 - React Query hooks in `src/hooks/queries/` (useProfile, useRoutines, useSkinScores, useQuiz, etc.)
 - Each hook uses `useApi().fetch` for authenticated requests
-- Navigation: Expo Router file-based routing — `auth.tsx` (login), `(onboarding)/` (quiz flow), `(tabs)/` (main app with index/routine/progress/profile/products/scan tabs), plus standalone routes: `skin-log-modal` (modal), `skin-comparison-modal` (modal), `routine-steps`, `edit-skin-profile`, `edit-skin-field`, `skin-goal`, `routine-insight`, `routine-preferences`, `add-steps`, `product-detail`, `product-search`, `edit-routine`, `new-routine`, `my-routine`, `my-shelf`, `app-settings`, `contact-us`, `faq`
+- Navigation: Expo Router file-based routing — `(onboarding)/` (quiz flow), `(tabs)/` (main app with index/routine/progress/profile/scan tabs), `(screens)/` (all non-tab screens: `auth`, `skin-log-modal`, `skin-comparison-modal`, `routine-steps`, `edit-skin-profile`, `edit-skin-field`, `skin-goal`, `skin-summary`, `routine-insight`, `routine-preferences`, `add-steps`, `product-detail`, `product-search`, `edit-routine`, `new-routine`, `my-routine`, `my-shelf`, `app-settings`, `contact-us`, `faq`, `critical-error`)
 
 ### Error Handling
 Controllers use `catchAsync` wrapper. Errors extend `AppError` with `statusCode`, `type`, and `isOperational` fields. `globalErrorHandler` formats the response. Frontend expects `{ success: false, type, message }` shape on errors.

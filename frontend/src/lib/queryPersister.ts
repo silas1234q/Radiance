@@ -3,16 +3,23 @@
  *
  * Persists the query cache so reads work offline: on a cold start the cache is
  * rehydrated from AsyncStorage and screens render their last-known data even
- * with no network. Mutations are NOT persisted/queued — writes still require
- * the network and notify on failure (see the mutationCache handler in
- * _layout.tsx).
+ * with no network.
+ *
+ * *Paused* mutations are persisted too — that's the offline write queue (see
+ * `lib/mutationDefaults.ts`). Only paused ones: a mutation that already ran and
+ * failed for a real reason shouldn't come back from the dead on next launch.
  *
  * `persister` is exported so AuthRouter can wipe the snapshot on sign-out / user
  * change (per-user isolation).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { defaultShouldDehydrateQuery, type Query } from '@tanstack/react-query';
+import {
+  defaultShouldDehydrateMutation,
+  defaultShouldDehydrateQuery,
+  type Mutation,
+  type Query,
+} from '@tanstack/react-query';
 import type { PersistQueryClientOptions } from '@tanstack/react-query-persist-client';
 
 /** AsyncStorage key for the persisted cache (namespaced, no collisions). */
@@ -39,10 +46,20 @@ function shouldDehydrateQuery(query: Query): boolean {
   return true;
 }
 
+/**
+ * Persist queued (paused) writes so they survive a force-quit and replay on the
+ * next launch once we're back online. `defaultShouldDehydrateMutation` is
+ * exactly "is this mutation paused?" — spelled out here because it's load-
+ * bearing for the offline queue, not an incidental default.
+ */
+function shouldDehydrateMutation(mutation: Mutation): boolean {
+  return defaultShouldDehydrateMutation(mutation);
+}
+
 export const persistOptions: Omit<PersistQueryClientOptions, 'queryClient'> = {
   persister,
   maxAge: MAX_AGE,
   // Bump this to invalidate all persisted caches after a breaking data-shape change.
   buster: '1',
-  dehydrateOptions: { shouldDehydrateQuery },
+  dehydrateOptions: { shouldDehydrateQuery, shouldDehydrateMutation },
 };

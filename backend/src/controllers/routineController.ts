@@ -133,12 +133,16 @@ export const toggleStep = catchAsync(async (req, res) => {
   });
   if (!step) throw new NotFoundError('Step not found');
 
+  // The app may have queued this while offline; `occurredAt` is when the user
+  // actually tapped, so a replay after midnight still credits the right day.
+  const { at, day } = gamificationService.resolveOccurrence(req.body?.occurredAt);
+
   const togglingOn = !step.isCompleted;
   const updated = await prisma.routineStep.update({
     where: { id: stepId },
     data: {
       isCompleted: togglingOn,
-      completedAt: togglingOn ? new Date() : null,
+      completedAt: togglingOn ? at : null,
     },
   });
 
@@ -148,13 +152,11 @@ export const toggleStep = catchAsync(async (req, res) => {
     const allSteps = step.routine.steps;
     const allComplete = allSteps.every((s) => (s.id === stepId ? true : s.isCompleted));
     if (allComplete) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       const userId = req.user!.id;
       const field = completionFieldFor(step.routine.type);
       if (field) {
-        await gamificationService.awardXp(userId, `COMPLETE_${step.routine.type}`, 50, today);
-        await gamificationService.updateDailyCompletion(userId, field);
+        await gamificationService.awardXp(userId, `COMPLETE_${step.routine.type}`, 50, day);
+        await gamificationService.updateDailyCompletion(userId, field, day);
       }
     }
   }
@@ -170,9 +172,12 @@ export const completeRoutine = catchAsync(async (req, res) => {
   });
   if (!routine) throw new NotFoundError('Routine not found');
 
+  // See `toggleStep` — honours the tap time for writes queued while offline.
+  const { at, day } = gamificationService.resolveOccurrence(req.body?.occurredAt);
+
   await prisma.routineStep.updateMany({
     where: { routineId },
-    data: { isCompleted: true, completedAt: new Date() },
+    data: { isCompleted: true, completedAt: at },
   });
 
   const updated = await prisma.routine.findFirst({
@@ -183,11 +188,9 @@ export const completeRoutine = catchAsync(async (req, res) => {
   // Gamification: award XP for completing AM/PM/custom routines
   const field = completionFieldFor(routine.type);
   if (field) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const userId = req.user!.id;
-    await gamificationService.awardXp(userId, `COMPLETE_${routine.type}`, 50, today);
-    await gamificationService.updateDailyCompletion(userId, field);
+    await gamificationService.awardXp(userId, `COMPLETE_${routine.type}`, 50, day);
+    await gamificationService.updateDailyCompletion(userId, field, day);
   }
 
   res.json(updated);

@@ -23,7 +23,7 @@ import Animated, {
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { COLORS } from '../../constants/theme';
-import { getNavReady, subscribeNavReady } from '../../lib/splash/ready';
+import { getNavReady, getSplashHold, subscribeNavReady } from '../../lib/splash/ready';
 
 // Match the native splash config in app.json (imageWidth: 200, contain, white).
 const ICON_SIZE = 200;
@@ -34,7 +34,10 @@ const EXIT_MS = 400;
 export default function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
   const { height } = useWindowDimensions();
 
+  // Two scalar subscriptions rather than one object snapshot — returning a fresh
+  // object from getSnapshot would re-render forever.
   const navReady = useSyncExternalStore(subscribeNavReady, getNavReady, getNavReady);
+  const hold = useSyncExternalStore(subscribeNavReady, getSplashHold, getSplashHold);
 
   // Animation drivers. The icon starts fully visible (opacity 1, scale 1) so it
   // matches the native splash exactly — only a gentle breathing scale plays.
@@ -76,7 +79,11 @@ export default function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
   };
 
   // Dismiss when the app is ready (respecting the minimum), with a hard cap.
+  // While the cold-start gate holds the splash we schedule nothing at all — not
+  // even the cap — because dropping the overlay would reveal an app that can't
+  // reach the backend. The gate is responsible for releasing the hold.
   useEffect(() => {
+    if (hold) return;
     const elapsed = Date.now() - mountedAt.current;
     let timer: ReturnType<typeof setTimeout>;
     if (navReady) {
@@ -85,7 +92,7 @@ export default function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
       timer = setTimeout(runExit, Math.max(0, MAX_VISIBLE_MS - elapsed));
     }
     return () => clearTimeout(timer);
-  }, [navReady]);
+  }, [navReady, hold]);
 
   const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
   const wordmarkStyle = useAnimatedStyle(() => ({

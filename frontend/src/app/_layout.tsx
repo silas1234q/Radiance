@@ -32,6 +32,10 @@ import { toast } from "../lib/toast";
 import { isNetworkError, isUnauthorizedError } from "../lib/errors";
 import { onSessionExpired, resetSessionExpiry, suppressSessionExpiry, isSessionExpirySuppressed, markAuthSettled } from "../lib/sessionExpiry";
 import { persister, persistOptions } from "../lib/queryPersister";
+import { registerMutationDefaults } from "../lib/mutationDefaults";
+import { checkConnectivity, getIsOnline, startConnectivityWatch } from "../lib/connectivity";
+import { setClerkAuth } from "../lib/authToken";
+import { useColdStartGate } from "../hooks/useColdStartGate";
 import "../../global.css";
 
 // Tracks which Clerk user the persisted cache belongs to, so we only wipe it on
@@ -54,6 +58,12 @@ const queryClient = new QueryClient({
       // there's no point retrying 3× before the "No connection" toast shows.
       retry: (count, err) => !isNetworkError(err) && !isUnauthorizedError(err) && count < 2,
     },
+    mutations: {
+      // Fail fast rather than hang when offline. The handful of writes that are
+      // *meant* to survive an outage opt into `networkMode: 'online'` (which
+      // pauses + queues them) in lib/mutationDefaults.ts.
+      networkMode: "offlineFirst",
+    },
   },
   // Failed mutations toast by default. Opt out per-mutation with
   // `meta: { suppressErrorToast: true }` when a screen renders its own error UI.
@@ -61,6 +71,9 @@ const queryClient = new QueryClient({
     onError: (err, _vars, _ctx, mutation) => {
       if (mutation.meta?.suppressErrorToast) return;
       if (isUnauthorizedError(err)) return;
+      // A queued write that's simply waiting for a connection hasn't failed —
+      // don't nag about it.
+      if (mutation.state.isPaused) return;
       toast.fromError(err);
     },
   }),
@@ -73,6 +86,11 @@ const queryClient = new QueryClient({
     },
   }),
 });
+
+// Must run before anything can enqueue a write, and before the persister
+// restores queued writes from a previous launch — a restored mutation finds its
+// `mutationFn` only through these defaults.
+registerMutationDefaults(queryClient);
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -109,10 +127,19 @@ function AuthRouter() {
   const hasEverBeenSignedIn = useRef(false);
   const coldStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Keep the module-level token registry current so the offline write queue can
+  // authenticate replays from outside React.
+  useEffect(() => {
+    setClerkAuth(getToken, isSignedIn);
+  }, [getToken, isSignedIn]);
+
   // Auto sign-out when the backend returns 401 (session expired)
   useEffect(() => {
     return onSessionExpired(() => {
       if (isSessionExpirySuppressed()) return;
+      // Never sign anyone out over a connectivity blip — offline, Clerk can't
+      // refresh its token and every request looks like a dead session.
+      if (!getIsOnline()) return;
       suppressSessionExpiry();
       toast.error('Your session expired. Please sign in again.');
       queryClient.cancelQueries();
@@ -135,7 +162,13 @@ function AuthRouter() {
       if (cached.isSignedIn && cached.isOnboarded) {
         router.replace("/(tabs)");
       } else if (cached.isSignedIn && !cached.isOnboarded) {
+        // Deliberately no setNavReady() here. "Signed in but not onboarded" is
+        // the one prediction that's routinely stale — it's what a brand-new
+        // account cached at sign-up — so we keep the splash up and let Phase 2
+        // confirm. Dropping the splash now is what showed users the quiz for a
+        // second before bouncing them to the home screen.
         router.replace("/(onboarding)/quiz");
+        return;
       } else {
         router.replace("/auth");
       }
@@ -210,17 +243,30 @@ function AuthRouter() {
         }
       })();
     } else {
-      // Cold-start guard: when the app is killed and restarted, Clerk's JWT is
-      // often expired and isSignedIn briefly reads `false` while the token is
-      // being refreshed. If the user was signed in before this cold start, give
-      // Clerk a grace period before wiping everything.
-      if (!hasEverBeenSignedIn.current && cachedNavState.current?.isSignedIn) {
-        // Schedule a fallback: if Clerk doesn't flip isSignedIn to true within
-        // 5 seconds, treat it as a real sign-out.
-        if (!coldStartTimer.current) {
-          coldStartTimer.current = setTimeout(() => {
+      // Clerk says signed out. That's only trustworthy if we can reach the
+      // network — offline it can't refresh the session and reports `false` for a
+      // perfectly valid account. `hadSession` covers both the cold-start case
+      // (cache says they were signed in) and a mid-session blip. A deliberate
+      // sign-out always sets the suppression flag first, so it skips the guard
+      // and takes effect immediately.
+      const hadSession =
+        !isSessionExpirySuppressed() &&
+        (hasEverBeenSignedIn.current || !!cachedNavState.current?.isSignedIn);
+
+      if (hadSession) {
+        // Grace period: when the app is killed and restarted, Clerk's JWT is
+        // often expired and isSignedIn briefly reads `false` while the token is
+        // being refreshed. Wait it out before wiping everything.
+        const armGuard = () => {
+          coldStartTimer.current = setTimeout(async () => {
             coldStartTimer.current = null;
-            // Force the wipe — Clerk couldn't refresh in time.
+            // Still nothing from Clerk. Before destroying the user's cached
+            // data, make sure this isn't just an outage — otherwise a subway
+            // ride ends with them signed out and their offline data gone.
+            if ((await checkConnectivity()) !== "online") {
+              armGuard(); // keep watching; nothing destructive while offline
+              return;
+            }
             hasEverBeenSignedIn.current = true; // prevent re-entering this guard
             markAuthSettled();
             navigatedForSignIn.current = false;
@@ -231,7 +277,8 @@ function AuthRouter() {
             void clearAppState();
             router.replace("/auth");
           }, 10000);
-        }
+        };
+        if (!coldStartTimer.current) armGuard();
         // Don't wipe yet — wait for Clerk to potentially refresh.
         setNavReady();
         return;
@@ -395,6 +442,15 @@ export default function RootLayout() {
   });
   const [splashDone, setSplashDone] = useState(false);
 
+  // Connectivity lives above ClerkProvider on purpose: offline, Clerk may never
+  // finish loading, and `ClerkLoaded` would then never render `AuthRouter`. The
+  // gate has to work regardless, so the user gets "turn on your data" instead of
+  // a splash that fades into nothing.
+  useEffect(() => {
+    return startConnectivityWatch();
+  }, []);
+  useColdStartGate();
+
   // Native splash stays up (preventAutoHideAsync) until fonts resolve and the
   // animated overlay mounts, so this early return shows no blank frame. Proceed
   // on a font error too, otherwise the held native splash would never hide.
@@ -409,6 +465,11 @@ export default function RootLayout() {
               <PersistQueryClientProvider
                 client={queryClient}
                 persistOptions={persistOptions}
+                // Writes queued in a previous session are restored paused; they
+                // only replay once something asks them to. (React Query resumes
+                // automatically when `onlineManager` flips online, but nothing
+                // flips on a launch that's already online.)
+                onSuccess={() => queryClient.resumePausedMutations()}
               >
                 <RevenueCatProvider>
                   <NotificationsProvider>

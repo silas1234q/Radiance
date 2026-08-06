@@ -3,20 +3,21 @@ import prisma from '../config/db.config';
 import * as gamificationService from '../services/gamificationService';
 
 export const createMood = catchAsync(async (req, res) => {
-  const { mood } = req.body;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const { mood, occurredAt } = req.body;
+  // The app may have queued this while offline; `occurredAt` is when the user
+  // actually logged the mood, so a replay after midnight credits the right day.
+  const { day } = gamificationService.resolveOccurrence(occurredAt);
 
   const entry = await prisma.moodEntry.upsert({
-    where: { userId_date: { userId: req.user!.id, date: today } },
+    where: { userId_date: { userId: req.user!.id, date: day } },
     update: { mood },
-    create: { userId: req.user!.id, mood, date: today },
+    create: { userId: req.user!.id, mood, date: day },
   });
 
   // Gamification: award XP for logging mood
   const userId = req.user!.id;
-  await gamificationService.awardXp(userId, 'LOG_MOOD', 15, today);
-  await gamificationService.updateDailyCompletion(userId, 'moodLogged');
+  await gamificationService.awardXp(userId, 'LOG_MOOD', 15, day);
+  await gamificationService.updateDailyCompletion(userId, 'moodLogged', day);
 
   res.json(entry);
 });

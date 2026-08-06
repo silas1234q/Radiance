@@ -7,6 +7,7 @@ import {
   Alert,
   Share,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,6 +23,8 @@ import {
   useCompleteRoutine,
 } from "../../hooks/queries/useRoutines";
 import { useWeeklyCompletions } from "../../hooks/queries/useGamification";
+import { getIsOnline } from "../../lib/connectivity";
+import { useRefreshQueries } from "../../hooks/useRefreshQueries";
 import XpToast from "../../components/ui/XpToast";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -77,6 +80,14 @@ export default function RoutineScreen() {
   const toggleStep = useToggleStep();
   const deleteRoutine = useDeleteRoutine();
   const completeRoutine = useCompleteRoutine();
+  const { refreshing, onRefresh } = useRefreshQueries();
+
+  // React Query v4 reports a *queued* (paused) mutation as loading, so check
+  // both — otherwise these buttons stay disabled for the whole time a write is
+  // sitting in the offline queue. (`isPending` is v5 API and was always
+  // undefined here, which is why nothing was ever actually disabled before.)
+  const isCompletingRoutine = completeRoutine.isLoading && !completeRoutine.isPaused;
+  const isTogglingStep = toggleStep.isLoading && !toggleStep.isPaused;
 
   const [pendingAddProduct, setPendingAddProduct] = useState<{
     id: string; name: string; brand: string; imageUrl?: string; category?: string;
@@ -122,6 +133,13 @@ export default function RoutineScreen() {
   const handleCompleteRoutine = useCallback(
     (routineId: string) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (!getIsOnline()) {
+        // Queued for replay on reconnect — `onSuccess` wouldn't fire until then,
+        // so acknowledge the tap now to match the optimistic tick.
+        completeRoutine.mutate(routineId);
+        setXpToastVisible(true);
+        return;
+      }
       completeRoutine.mutate(routineId, {
         onSuccess: () => setXpToastVisible(true),
       });
@@ -137,6 +155,18 @@ export default function RoutineScreen() {
       const pending = steps.filter((s) => !s.isCompleted);
       if (pending.length === 0) return;
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      if (!getIsOnline()) {
+        // These pause and won't settle until we reconnect, so awaiting them
+        // would hang here. Fire them into the queue instead — they replay in
+        // order and the optimistic ticks are already on screen.
+        for (const step of pending) {
+          toggleStep.mutate({ routineId, stepId: step.id });
+        }
+        setXpToastVisible(true);
+        return;
+      }
+
       try {
         for (const step of pending) {
           await toggleStep.mutateAsync({ routineId, stepId: step.id });
@@ -388,7 +418,7 @@ export default function RoutineScreen() {
   const renderDoneButton = (onPress: () => void) => (
     <Pressable
       onPress={onPress}
-      disabled={completeRoutine.isPending || toggleStep.isPending}
+      disabled={isCompletingRoutine || isTogglingStep}
       style={{
         backgroundColor: COLORS.primary,
         borderRadius: 999,
@@ -430,6 +460,13 @@ export default function RoutineScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
+        }
       >
         {/* Header */}
         <View
@@ -451,8 +488,9 @@ export default function RoutineScreen() {
         {/* Week tracker */}
         <WeekDayTracker weeklyCompletions={weeklyCompletions} />
 
-        {/* Syncing indicator */}
-        {isFetching && !isLoading && (
+        {/* Syncing indicator — the pull-to-refresh spinner already covers a
+            manual refresh, so don't show both at once. */}
+        {isFetching && !isLoading && !refreshing && (
           <View
             style={{
               flexDirection: "row",
@@ -580,7 +618,7 @@ export default function RoutineScreen() {
             {amSteps.length > 0 && !amAllDone && amRoutine && (
               <Pressable
                 onPress={() => handleCompleteRoutine(amRoutine.id)}
-                disabled={completeRoutine.isPending}
+                disabled={isCompletingRoutine}
                 style={{
                   backgroundColor: COLORS.primary,
                   borderRadius: 999,
@@ -616,7 +654,7 @@ export default function RoutineScreen() {
             {pmSteps.length > 0 && !pmAllDone && pmRoutine && (
               <Pressable
                 onPress={() => handleCompleteRoutine(pmRoutine.id)}
-                disabled={completeRoutine.isPending}
+                disabled={isCompletingRoutine}
                 style={{
                   backgroundColor: COLORS.primary,
                   borderRadius: 999,

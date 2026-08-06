@@ -48,6 +48,44 @@ function getYesterdayMidnight(): Date {
   return d;
 }
 
+/** How far back a client is allowed to date a completion. */
+const MAX_BACKDATE_MS = 48 * 60 * 60 * 1000;
+/** Tolerance for a client clock running slightly fast. */
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * Resolves when a completion actually happened.
+ *
+ * The app queues routine/mood writes while offline and replays them on
+ * reconnect, which can be after midnight — so the client sends `occurredAt`,
+ * the moment the user tapped, and we credit that day rather than the day the
+ * request finally arrived. Clamped to the last 48 hours and never meaningfully
+ * in the future, so a client can't backfill arbitrary streaks.
+ *
+ * Returns both the instant (for `completedAt` timestamps) and its midnight
+ * (for the `DailyCompletion` / `XpEvent` day bucket).
+ */
+export function resolveOccurrence(occurredAt?: string | null): { at: Date; day: Date } {
+  const now = new Date();
+
+  if (occurredAt) {
+    const parsed = new Date(occurredAt);
+    const valid =
+      !Number.isNaN(parsed.getTime()) &&
+      parsed.getTime() <= now.getTime() + CLOCK_SKEW_MS &&
+      now.getTime() - parsed.getTime() <= MAX_BACKDATE_MS;
+
+    if (valid) {
+      const at = parsed.getTime() > now.getTime() ? now : parsed;
+      const day = new Date(at);
+      day.setHours(0, 0, 0, 0);
+      return { at, day };
+    }
+  }
+
+  return { at: now, day: getTodayMidnight() };
+}
+
 export async function ensureGamification(userId: string) {
   return prisma.userGamification.upsert({
     where: { userId },
@@ -81,8 +119,10 @@ export async function awardXp(userId: string, action: string, xpAmount: number, 
 export async function updateDailyCompletion(
   userId: string,
   field: 'amCompleted' | 'pmCompleted' | 'customCompleted' | 'moodLogged',
+  // Defaults to today; a queued offline write passes the day it was made.
+  day: Date = getTodayMidnight(),
 ) {
-  const today = getTodayMidnight();
+  const today = day;
 
   const completion = await prisma.dailyCompletion.upsert({
     where: { userId_date: { userId, date: today } },
@@ -111,16 +151,17 @@ export async function updateDailyCompletion(
     await awardXp(userId, 'DAILY_BONUS', XP_TABLE.DAILY_BONUS, today);
 
     // Update streak
-    await updateStreak(userId);
+    await updateStreak(userId, today);
   }
 
   return completion;
 }
 
-async function updateStreak(userId: string) {
+async function updateStreak(userId: string, day: Date = getTodayMidnight()) {
   const gamification = await ensureGamification(userId);
-  const today = getTodayMidnight();
-  const yesterday = getYesterdayMidnight();
+  const today = day;
+  const yesterday = new Date(day);
+  yesterday.setDate(yesterday.getDate() - 1);
 
   let newStreak = gamification.currentStreak;
 
@@ -128,8 +169,9 @@ async function updateStreak(userId: string) {
     const lastDate = new Date(gamification.lastCompletionDate);
     lastDate.setHours(0, 0, 0, 0);
 
-    if (lastDate.getTime() === today.getTime()) {
-      // Already counted today
+    if (lastDate.getTime() >= today.getTime()) {
+      // Already counted for this day — or for a later one, which happens when a
+      // queued offline completion replays after the streak has already moved on.
       return;
     } else if (lastDate.getTime() === yesterday.getTime()) {
       // Consecutive day

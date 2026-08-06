@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import {
   View,
@@ -11,7 +11,6 @@ import {
   Modal,
   RefreshControl,
 } from "react-native";
-import { useQueryClient } from "@tanstack/react-query";
 import Svg, {
   Circle,
   Polygon,
@@ -35,6 +34,8 @@ import { COLORS, GLASS } from "@/src/constants/theme";
 import defaultProfile from "@/src/assets/images/defaultProfile.jpg";
 import Fire from "@/src/assets/images/fire.png";
 import { buildAiInsight } from "../../lib/skinSummary";
+import ProgressSkeleton from "../../components/progress/ProgressSkeleton";
+import { useRefreshQueries } from "../../hooks/useRefreshQueries";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -394,24 +395,21 @@ function getTopImprovements(scores: SkinScore[]): { label: string; change: numbe
 
 export default function ProgressScreen() {
   const router = useRouter();
-  const { data: scores } = useSkinScores();
-  const { data: profile } = useSkinProfile();
+  const { data: scores, isLoading: scoresLoading } = useSkinScores();
+  const { data: profile, isLoading: profileLoading } = useSkinProfile();
   const { data: routines } = useRoutines();
   const { data: skinLogs } = useSkinLogs();
   const { data: user } = useProfile();
-  const { data: gamification } = useGamification();
+  const { data: gamification, isLoading: gamificationLoading } = useGamification();
   const { data: weeklyCompletions } = useWeeklyCompletions();
 
-  const queryClient = useQueryClient();
   const [scanRange, setScanRange] = useState<"5" | "10" | "all">("all");
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useRefreshQueries();
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await queryClient.invalidateQueries();
-    setRefreshing(false);
-  }, [queryClient]);
+  // The screen is almost entirely derived from these three; without them every
+  // card renders zeros and empty charts before snapping to real numbers.
+  const isLoading = scoresLoading || profileLoading || gamificationLoading;
 
   const INFO_DETAILS: Record<string, { title: string; description: string }> = {
     skinHealth: {
@@ -522,6 +520,11 @@ export default function ProgressScreen() {
     if (avgGain <= 0) return null;
     return Math.ceil((targetScore - latestScore) / avgGain);
   }, [scores, latestScore]);
+
+  // After every hook — the skeleton must not change the hook order.
+  if (isLoading) {
+    return <ProgressSkeleton />;
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F2F2F7" }} edges={["top"]}>

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable ,Image} from "react-native";
+import { View, Text, Pressable, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -14,9 +14,10 @@ import GoalChip from "../../components/routine/GoalChip";
 import SkinDiaryCard from "../../components/dashboard/SkinDiaryCard";
 import RoutineCompatibilityCard from "../../components/dashboard/RoutineCompatibilityCard";
 import HomeSkeleton from "../../components/dashboard/HomeSkeleton";
+import StreakCard from "../../components/dashboard/StreakCard";
 import GlassCard from "../../components/ui/GlassCard";
+import { useRefreshQueries } from "../../hooks/useRefreshQueries";
 import { COLORS } from "../../constants/theme";
-import Fire from '@/src/assets/images/fire.png';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -24,12 +25,17 @@ export default function HomeScreen() {
   const { data: routines, isLoading: routinesLoading } = useRoutines();
   const { data: skinProfile, isLoading: profileLoading } = useSkinProfile();
   const { data: latestScore, isLoading: scoreLoading } = useLatestScore();
-  const { data: gamification } = useGamification();
+  const { data: gamification, isLoading: gamificationLoading } = useGamification();
   const restoreStreak = useRestoreStreak();
+  const { refreshing, onRefresh } = useRefreshQueries();
 
   const {top} = useSafeAreaInsets();
 
-  const isLoading = routinesLoading || profileLoading || scoreLoading;
+  // Gamification is included so the skeleton (which draws a streak card) covers
+  // the wait — otherwise the real screen renders with the streak card missing
+  // and it pops in later, which reads as the card having vanished.
+  const isLoading =
+    routinesLoading || profileLoading || scoreLoading || gamificationLoading;
 
   const amSteps = routines?.find((r) => r.type === "AM")?.steps ?? [];
   const pmSteps = routines?.find((r) => r.type === "PM")?.steps ?? [];
@@ -57,13 +63,6 @@ export default function HomeScreen() {
     hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
   const firstName = user?.firstName;
 
-  const glowLevel = gamification?.glowLevel;
-  const xpProgress = glowLevel
-    ? glowLevel.levelMaxXp > glowLevel.levelMinXp
-      ? ((glowLevel.currentXp - glowLevel.levelMinXp) / (glowLevel.levelMaxXp - glowLevel.levelMinXp)) * 100
-      : 100
-    : 0;
-
   if (isLoading) {
     return <HomeSkeleton />;
   }
@@ -74,6 +73,13 @@ export default function HomeScreen() {
           className="flex-1"
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 ,paddingTop: top}}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={COLORS.primary}
+            />
+          }
         >
           {/* Greeting */}
           <View className="mt-2 mb-5">
@@ -126,93 +132,14 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* Streak & XP Card */}
-          {gamification && (
-            <GlassCard style={{ marginBottom: 16, flexDirection: "row", alignItems: "center", gap: 14 }}>
-              {/* Streak */}
-              <View style={{ alignItems: "center", paddingHorizontal: 4 }}>
-               <Image source={Fire} style={{ width: 30, height: 30 }} />
-                <Text
-                  style={{
-                    fontSize: 28,
-                    fontFamily: "SFProRounded_Bold",
-                    color: "#1C1C1E",
-                    lineHeight: 32,
-                  }}
-                >
-                  {gamification.currentStreak}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontFamily: "SFProRounded_Semibold",
-                    color: "#8E8E93",
-                  }}
-                >
-                  Day Streak
-                </Text>
-              </View>
-
-              {/* Divider */}
-              <View style={{ width: 1, height: 50, backgroundColor: "#F0F0F0" }} />
-
-              {/* XP + Glow Level */}
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontFamily: "SFProRounded_Medium",
-                    color: "#8E8E93",
-                  }}
-                >
-                  Glow Level
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 18,
-                    fontFamily: "SFProRounded_Bold",
-                    color: "#1C1C1E",
-                  }}
-                >
-                  {glowLevel?.label ?? "Seedling"}
-                </Text>
-                <View
-                  style={{
-                    height: 5,
-                    borderRadius: 3,
-                    backgroundColor: "#FFE0E6",
-                    overflow: "hidden",
-                    marginTop: 8,
-                  }}
-                >
-                  <View
-                    style={{
-                      height: "100%",
-                      width: `${Math.min(100, xpProgress)}%`,
-                      borderRadius: 3,
-                      backgroundColor: COLORS.primary,
-                    }}
-                  />
-                </View>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontFamily: "SFProRounded_Medium",
-                    color: "#AEAEB2",
-                    marginTop: 4,
-                  }}
-                >
-                  {gamification.totalXp.toLocaleString()} / {(glowLevel?.levelMaxXp ?? 500).toLocaleString()} XP
-                </Text>
-              </View>
-            </GlassCard>
-          )}
+          {/* Streak & XP Card — always mounted, skeletons in place of missing data */}
+          <StreakCard gamification={gamification} />
 
           {/* Streak Restore Banner */}
           {gamification?.canRestoreStreak && (
             <Pressable
               onPress={() => restoreStreak.mutate()}
-              disabled={restoreStreak.isPending}
+              disabled={restoreStreak.isLoading}
             >
               <GlassCard style={{
                 marginBottom: 16,

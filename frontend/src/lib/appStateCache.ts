@@ -31,6 +31,25 @@ export async function setAppState(state: Omit<CachedAppState, "cachedAt">): Prom
   } catch {}
 }
 
+/**
+ * Flips the cached `isOnboarded` flag once the user has actually onboarded.
+ *
+ * Without this the cache keeps whatever was true at sign-in — `false` for a new
+ * account — and the next cold start optimistically navigates to the quiz before
+ * the backend correction lands, which is the "onboarding flashes before home"
+ * bug. Deliberately a no-op when there's no record: the sign-in write in
+ * `AuthRouter` owns creating it.
+ */
+export async function markOnboarded(): Promise<void> {
+  const current = await getAppState();
+  if (!current || current.isOnboarded) return;
+  await setAppState({
+    isSignedIn: current.isSignedIn,
+    isOnboarded: true,
+    userId: current.userId,
+  });
+}
+
 export async function clearAppState(): Promise<void> {
   try {
     await AsyncStorage.removeItem(APP_STATE_KEY);

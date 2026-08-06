@@ -13,6 +13,8 @@ import { useUser } from '@clerk/clerk-expo';
 import { useRevenueCat, PAYWALL_RESULT } from '../../providers/RevenueCatProvider';
 import { uploadSkinPhoto } from '../../api/uploadPhoto';
 import { useGetToken } from '../../hooks/useApi';
+import { markOnboarded } from '../../lib/appStateCache';
+import { getErrorMessage } from '../../lib/errors';
 import CircularProgress from '../../components/ui/CircularProgress';
 import ScanMetricsCard from '../../components/results/ScanMetricsCard';
 import SkinVitalsCard, { type Vital } from '../../components/results/SkinVitalsCard';
@@ -309,8 +311,9 @@ export default function ResultsScreen() {
       }
       setUnlocked(true);
     } catch (err: any) {
-      const msg = err?.message || 'Something went wrong. Please try again.';
-      setUnlockError(msg);
+      // `getErrorMessage` turns the upload/analysis failure shapes into copy a
+      // user can act on ("No connection…") instead of "Network request failed".
+      setUnlockError(getErrorMessage(err));
       if (err?.type === 'SCAN_ERROR') setIsScanError(true);
     } finally {
       setUnlocking(false);
@@ -348,8 +351,7 @@ export default function ResultsScreen() {
       await analyze.mutateAsync({ buildRoutine: false });
       setUnlocked(true);
     } catch (err: any) {
-      const msg = err?.message || 'Something went wrong. Please try again.';
-      setUnlockError(msg);
+      setUnlockError(getErrorMessage(err));
     } finally {
       setUnlocking(false);
     }
@@ -590,13 +592,13 @@ export default function ResultsScreen() {
         {/* CTA */}
         <Animated.View entering={FadeInDown.delay(cardIndex * 120 + 200).duration(500)} className="px-5 pt-6">
           <Pressable
-            onPress={() =>
-              router.replace(
-                hasError
-                  ? '/(onboarding)/quiz'
-                  : '/(tabs)'
-              )
-            }
+            onPress={() => {
+              // Belt and braces alongside the write in `useSubmitQuiz` — anyone
+              // leaving onboarding through here is onboarded, and the cached
+              // flag drives the next cold start's first navigation.
+              if (!hasError) void markOnboarded();
+              router.replace(hasError ? '/(onboarding)/quiz' : '/(tabs)');
+            }}
             className="h-[56px] rounded-2xl bg-primary items-center justify-center"
             style={({ pressed }) => [pressed && { opacity: 0.85 }]}
           >

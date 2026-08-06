@@ -1,3 +1,5 @@
+import { getIsOnline } from './connectivity';
+
 type Listener = () => void;
 
 let listener: Listener | null = null;
@@ -13,6 +15,10 @@ const DEBOUNCE_MS = 5_000;
 
 export function emitSessionExpired() {
   if (suppressed || !authSettled) return;
+  // Final backstop: a session can only be *known* expired if we can reach the
+  // backend. Offline, Clerk can't refresh its token and everything looks like a
+  // dead session — signing the user out there is the bug we're guarding.
+  if (!getIsOnline()) return;
   // Collapse rapid duplicate emissions into one; the first fires after the
   // debounce window, and subsequent calls within the window are no-ops.
   if (debounceTimer) return;
