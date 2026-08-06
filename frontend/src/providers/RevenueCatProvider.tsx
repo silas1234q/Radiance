@@ -76,6 +76,19 @@ function hasPro(info: CustomerInfo | null): boolean {
  */
 export type OfferingsStatus = 'loading' | 'loaded' | 'error';
 
+/**
+ * Outcome of a restore.
+ *
+ * `nothing-to-restore` and `error` must stay distinct: the store failing and the
+ * customer genuinely having no purchase look identical from a boolean, and
+ * telling someone "we couldn't find a subscription for this account" when they
+ * were simply offline is worse than saying nothing.
+ */
+export type RestoreOutcome =
+  | { status: 'restored' }
+  | { status: 'nothing-to-restore' }
+  | { status: 'error'; message: string };
+
 /** Outcome of a consumable scan-credit purchase. */
 export type ScanCreditPurchaseOutcome = {
   /** Whether the purchase succeeded. */
@@ -120,8 +133,11 @@ interface RevenueCatContextValue {
   purchasePackage: (pkg: PurchasesPackage) => Promise<PaywallOutcome>;
   /** Purchase a single scan credit (consumable). */
   purchaseScanCredit: () => Promise<ScanCreditPurchaseOutcome>;
-  /** Restore previous purchases. Resolves `true` if Pro is now active. */
-  restore: () => Promise<boolean>;
+  /**
+   * Restore previous purchases. Resolves an outcome so callers can tell a real
+   * restore from "this account never bought anything" from a store failure.
+   */
+  restore: () => Promise<RestoreOutcome>;
   /** Present the RevenueCat Customer Center (manage/cancel/refund/support). */
   presentCustomerCenter: () => Promise<void>;
 }
@@ -423,14 +439,14 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     [configured, scanCreditPackage],
   );
 
-  const restore = useCallback(async () => {
+  const restore = useCallback(async (): Promise<RestoreOutcome> => {
     try {
       const info = await Purchases.restorePurchases();
       setCustomerInfo(info);
-      return hasPro(info);
+      return hasPro(info) ? { status: 'restored' } : { status: 'nothing-to-restore' };
     } catch (err) {
       console.warn('[RevenueCat] restore error', err);
-      return false;
+      return { status: 'error', message: friendlyPurchaseError(err) };
     }
   }, []);
 

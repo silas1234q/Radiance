@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { markOffline } from '../lib/connectivity';
+import { reportNetworkFailure } from '../lib/connectivity';
 import { getBaseUrl } from './baseUrl';
 
 async function readAsBase64(uri: string): Promise<string> {
@@ -23,7 +23,11 @@ async function postPhoto(path: string, uri: string, token: string): Promise<stri
   const photo = await readAsBase64(uri);
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, UPLOAD_TIMEOUT_MS);
 
   let response: Response;
   try {
@@ -37,8 +41,12 @@ async function postPhoto(path: string, uri: string, token: string): Promise<stri
       signal: controller.signal,
     });
   } catch {
-    markOffline();
-    throw { type: 'NETWORK_ERROR', message: 'Network request failed' };
+    // Same rule as `apiClient`: our own timeout isn't a connectivity signal.
+    if (!timedOut) reportNetworkFailure();
+    throw {
+      type: 'NETWORK_ERROR',
+      message: timedOut ? 'Upload timed out' : 'Network request failed',
+    };
   } finally {
     clearTimeout(timer);
   }

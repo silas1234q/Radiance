@@ -80,13 +80,23 @@ export default function AppSettingsScreen() {
     if (restoring) return;
     setRestoring(true);
     try {
-      const success = await restore();
-      Alert.alert(
-        success ? "Purchases Restored" : "Nothing to Restore",
-        success
-          ? "Your Radiance Pro subscription is active again."
-          : "We couldn't find an active subscription for this account.",
-      );
+      const outcome = await restore();
+      if (outcome.status === "restored") {
+        Alert.alert(
+          "Purchases Restored",
+          "Your Radiance Pro subscription is active again.",
+        );
+      } else if (outcome.status === "nothing-to-restore") {
+        Alert.alert(
+          "Nothing to Restore",
+          "We couldn't find an active subscription for this account.",
+        );
+      } else {
+        // Previously this said "no subscription found" for a store/network
+        // failure too, which reads as "your purchase is gone" when the user was
+        // just offline.
+        Alert.alert("Couldn't Restore", outcome.message);
+      }
     } finally {
       setRestoring(false);
     }

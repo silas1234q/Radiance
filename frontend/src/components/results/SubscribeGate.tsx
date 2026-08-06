@@ -8,6 +8,7 @@ import { PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases';
 import { COLORS, GRADIENTS } from '../../constants/theme';
 import { useRevenueCat } from '../../providers/RevenueCatProvider';
 import LegalModal, { type LegalDoc } from '../legal/LegalModal';
+import { toast } from '../../lib/toast';
 
 const BENEFITS: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -135,7 +136,17 @@ export default function SubscribeGate({
     if (restoring || loading) return;
     setRestoring(true);
     try {
-      await restore();
+      const outcome = await restore();
+      // On success we say nothing on purpose: `isPro` flips, the paywall is
+      // replaced by the unlocked results, and that *is* the feedback. An alert
+      // here would just be a tap in front of what they came for.
+      if (outcome.status === 'nothing-to-restore') {
+        toast.info('No previous purchase found for your App Store account.', {
+          title: 'Nothing to restore',
+        });
+      } else if (outcome.status === 'error') {
+        toast.error(outcome.message, { title: "Couldn't restore" });
+      }
     } finally {
       setRestoring(false);
     }

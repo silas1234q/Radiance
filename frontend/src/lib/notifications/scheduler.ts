@@ -63,7 +63,12 @@ async function schedule(
   trigger: NotificationsTypes.NotificationTriggerInput,
 ): Promise<void> {
   await Notifications!.scheduleNotificationAsync({
-    content,
+    // iOS only assigns a sound when the payload asks for one, so without this
+    // every local reminder arrives silently — including in the foreground,
+    // where the handler's `shouldPlaySound` has no sound to play. Android takes
+    // its sound from the `reminders` channel, so this is a no-op there.
+    // Spread after, so an individual reminder can still opt out.
+    content: { sound: 'default', ...content },
     trigger,
   });
 }

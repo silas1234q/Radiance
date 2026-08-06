@@ -58,11 +58,15 @@ function setReachability(next: Reachability): void {
 }
 
 /**
- * Synchronous pessimistic downgrade, called by `apiClient` when a request fails
- * at the transport layer. Kicks off a real check to work out *why*.
+ * Called by `apiClient` when a request fails at the transport layer. It only
+ * *triggers* a check — it deliberately does not flip the state itself.
+ *
+ * An earlier version downgraded to `no-backend` synchronously, which meant a
+ * single failed request (a backend restart, one flaky call) made every other
+ * request fail fast with NETWORK_ERROR until the probe caught up. One bad
+ * request must not take the whole app offline; only the probe decides.
  */
-export function markOffline(): void {
-  if (reachability === 'online') setReachability('no-backend');
+export function reportNetworkFailure(): void {
   void checkConnectivity();
 }
 
@@ -96,24 +100,37 @@ export function checkConnectivity(): Promise<Reachability> {
 }
 
 async function runCheck(): Promise<Reachability> {
-  let hasRadio = true;
+  let connected = true;
+  let internetReachable: boolean | undefined;
   try {
     const state = await Network.getNetworkStateAsync();
-    // `isInternetReachable` is meaningful on Android; on iOS it mirrors
-    // `isConnected`, so this is just a stricter read of the same signal.
-    hasRadio = state.isConnected !== false && state.isInternetReachable !== false;
+    connected = state.isConnected !== false;
+    internetReachable = state.isInternetReachable;
   } catch {
     // Couldn't read the radio state — fall through to the probe, which is the
-    // more authoritative signal anyway.
+    // authoritative signal anyway.
   }
 
-  if (!hasRadio) {
+  // No active connection at all: nothing to probe.
+  if (!connected) {
     setReachability('no-radio');
     return 'no-radio';
   }
 
+  // Otherwise always probe, even when the OS claims the internet is
+  // unreachable. On Android `isInternetReachable` reads false while the system
+  // is still validating a network, and treating that as offline would fail
+  // every request on a connection that actually works. If our backend answers,
+  // we're online — that's the only claim that matters.
   const reachable = await probeBackend();
-  const next: Reachability = reachable ? 'online' : 'no-backend';
+  if (reachable) {
+    setReachability('online');
+    return 'online';
+  }
+
+  // Probe failed. Use the radio hint only to word the failure: "turn on your
+  // data" vs "we can't reach the server".
+  const next: Reachability = internetReachable === false ? 'no-radio' : 'no-backend';
   setReachability(next);
   return next;
 }
