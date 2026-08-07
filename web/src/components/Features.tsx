@@ -1,86 +1,140 @@
-const features = [
+import { Plate, Pill } from './ui/Bits'
+import { Underline, Sparkle } from './ui/Ink'
+import Reveal from './ui/Reveal'
+
+/** Mini-UI: the analysis card the app shows after a scan. */
+function AnalysisMock() {
+  return (
+    <div className="rounded-2xl bg-page p-3.5">
+      <Pill tint="lilac" className="text-[0.62rem]">
+        Radiance AI
+      </Pill>
+      <p className="mt-2.5 text-[0.82rem] font-semibold">Glow score 8.6</p>
+      <p className="text-[0.7rem] text-faint">Based on 42 skin signals</p>
+      <div className="mt-3 flex gap-1.5">
+        <Plate className="h-14 flex-1 rounded-lg" from="#ffdfe8" to="#e8a9c2" />
+        <Plate className="h-14 flex-1 rounded-lg" from="#ffe8d6" to="#dbab9a" />
+        <Plate className="h-14 flex-1 rounded-lg" from="#e7dcff" to="#b39fee" />
+      </div>
+    </div>
+  )
+}
+
+/** Mini-UI: the assistant explaining today's change. */
+function RoutineMock() {
+  return (
+    <div className="rounded-2xl bg-page p-3.5">
+      <Pill tint="sky" className="text-[0.62rem]">
+        6 Aug
+      </Pill>
+      <div className="mt-2.5 flex items-center gap-2">
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-primary to-lilac">
+          <Sparkle className="h-3 w-3" color="#fff" />
+        </span>
+        <span className="text-[0.76rem] font-semibold">Radiance assistant</span>
+        <span className="ml-auto text-[0.64rem] text-faint">Now</span>
+      </div>
+      <p className="mt-2.5 rounded-2xl rounded-tl-md bg-white p-2.5 text-[0.73rem] leading-snug text-muted">
+        Swapped your exfoliant for a barrier cream — your skin read as sensitised this morning.
+      </p>
+      <div className="mt-2.5 flex items-center gap-2 rounded-full bg-white p-1 pl-3">
+        <span className="flex-1 truncate text-[0.7rem] text-faint">Ask about today&rsquo;s routine</span>
+        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary">
+          <svg viewBox="0 0 14 14" className="h-2.5 w-2.5 stroke-white" fill="none">
+            <path d="M2.5 7h9M7.5 3l4 4-4 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Mini-UI: today's completion feed. */
+function ProgressMock() {
+  const rows = [
+    { icon: '✓', tint: 'bg-tint-mint text-mint', title: 'Morning routine done', detail: 'Hydration + barrier logged', time: '30 min' },
+    { icon: '◐', tint: 'bg-tint-sky text-sky-600', title: 'Routine adjusted', detail: 'Optimised for today', time: 'just now' },
+    { icon: '☾', tint: 'bg-tint-lilac text-lilac', title: 'Evening check-in', detail: 'Scheduled for 9:00 pm', time: 'tonight' },
+  ]
+
+  return (
+    <div className="space-y-2 rounded-2xl bg-page p-3.5">
+      <Pill className="text-[0.62rem]">Daily progress</Pill>
+      {rows.map((r) => (
+        <div key={r.title} className="flex items-center gap-2.5 rounded-xl bg-white p-2.5">
+          <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[0.7rem] font-bold ${r.tint}`}>
+            {r.icon}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[0.74rem] font-semibold leading-tight">{r.title}</p>
+            <p className="truncate text-[0.68rem] leading-tight text-faint">{r.detail}</p>
+          </div>
+          <span className="shrink-0 text-[0.64rem] text-faint">{r.time}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const cards = [
   {
-    title: 'AI Skin Analysis',
-    description: 'Get a detailed skin score and personalized metrics powered by GPT-4o structured analysis.',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
-      </svg>
-    ),
+    dot: '#F06680',
+    title: 'Smart analysis',
+    body: 'Your scan becomes numbers you can act on — hydration, barrier, texture and tone, read in real time.',
+    mock: <AnalysisMock />,
   },
   {
-    title: 'Personalized Routines',
-    description: 'Receive custom AM and PM skincare routines tailored to your unique skin profile.',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
+    dot: '#9C8CF0',
+    title: 'Adaptive routine',
+    body: 'The AI learns your rhythm and rewrites the plan when your skin, weather or stress shifts.',
+    mock: <RoutineMock />,
   },
   {
-    title: 'Progress Tracking',
-    description: 'Monitor your skin health over time with scores, logs, and visual comparisons.',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Product Scanner',
-    description: 'Scan products to see AI-powered fit scores, ingredient analysis, and personalized pros/cons.',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Mood Logging',
-    description: 'Track how your mood and lifestyle factors affect your skin health day to day.',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Gamification',
-    description: 'Earn XP, maintain streaks, and unlock milestones as you build healthy skincare habits.',
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.996.178-1.768.901-1.768 1.764 0 .967.878 1.75 1.96 1.75.29 0 .57-.058.823-.163M18.75 4.236c.996.178 1.768.901 1.768 1.764 0 .967-.878 1.75-1.96 1.75-.29 0-.57-.058-.823-.163" />
-      </svg>
-    ),
+    dot: '#35B96A',
+    title: 'Progress tracking',
+    body: 'See small changes every day. Visual results and streaks keep you consistent without nagging.',
+    mock: <ProgressMock />,
   },
 ]
 
 export default function Features() {
   return (
-    <section id="features" className="py-20 md:py-28 bg-white">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-text">
-            Everything Your Skin Needs
-          </h2>
-          <p className="mt-4 text-text-secondary text-lg">
-            Radiance combines AI analysis, personalized routines, and habit tracking into one beautiful app.
-          </p>
-        </div>
+    <section id="features" className="px-6 py-20 md:py-24">
+      <div className="mx-auto max-w-6xl">
+        <Reveal>
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <h2 className="max-w-[13ch] font-display text-[2.1rem] font-semibold leading-[1.08] tracking-[-0.03em] text-balance md:text-[3rem]">
+              Personal care for your skin{' '}
+              <span className="relative inline-block whitespace-nowrap">
+                every day
+                <Underline delay={0.35} />
+              </span>
+              <Sparkle className="ml-1.5 inline-block h-5 w-5 align-super md:h-6 md:w-6" color="#9C8CF0" />
+            </h2>
+            <p className="max-w-xs text-[0.95rem] leading-relaxed text-muted md:text-right">
+              Track your natural glow with smart, adaptive insights that get sharper the longer you
+              use them.
+            </p>
+          </div>
+        </Reveal>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="group p-6 rounded-2xl border border-gray-100 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
-            >
-              <div className="w-12 h-12 rounded-xl bg-primary-light flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
-                {feature.icon}
+        <div className="mt-12 grid gap-4 md:grid-cols-3">
+          {cards.map((card, i) => (
+            <Reveal key={card.title} delay={80 * i}>
+              <div className="soft lift flex h-full flex-col p-6">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-[0.45rem] w-[0.45rem] rounded-full"
+                    style={{ backgroundColor: card.dot }}
+                  />
+                  <h3 className="font-display text-[1.15rem] font-semibold tracking-[-0.01em]">
+                    {card.title}
+                  </h3>
+                </div>
+                <p className="mt-2.5 text-[0.9rem] leading-relaxed text-muted">{card.body}</p>
+                <div className="mt-5">{card.mock}</div>
               </div>
-              <h3 className="text-lg font-semibold text-text mb-2">{feature.title}</h3>
-              <p className="text-text-secondary text-sm leading-relaxed">{feature.description}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>

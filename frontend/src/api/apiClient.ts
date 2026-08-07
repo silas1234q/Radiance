@@ -1,4 +1,5 @@
 import { reportNetworkFailure } from '../lib/connectivity';
+import { ERROR_TYPES } from '../lib/errors';
 import { getBaseUrl } from './baseUrl';
 
 export interface ApiError {
@@ -9,7 +10,7 @@ export interface ApiError {
 }
 
 export interface ApiCallOptions extends RequestInit {
-  /** Abort and fail as a NETWORK_ERROR after this long. */
+  /** Abort and fail as a TIMEOUT_ERROR after this long. */
   timeoutMs?: number;
 }
 
@@ -18,7 +19,13 @@ export interface ApiCallOptions extends RequestInit {
 // settle and screens sit on a skeleton indefinitely. These are backstops, not
 // latency budgets — they must sit comfortably above how long a healthy request
 // can legitimately take.
-const DEFAULT_TIMEOUT_MS = 30_000;
+//
+// 45s rather than 30s because a healthy request on EDGE/congested cellular can
+// genuinely run past 30s, and aborting it used to tell the user they had no
+// connection. Affordable because a timeout is terminal (no retries — see the
+// retry predicate in `app/_layout.tsx`), and a truly dead network fails in
+// milliseconds rather than waiting this out.
+const DEFAULT_TIMEOUT_MS = 45_000;
 
 // AI endpoints are in a different league: `openAIService.ts` allows 30s *per*
 // OpenAI call and several of these chain more than one (analyze also builds the
@@ -42,15 +49,22 @@ export async function apiCall<T = unknown>(url: string, options: ApiCallOptions)
 
   const controller = new AbortController();
   let timedOut = false;
+  let cancelled = false;
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort();
   }, timeoutMs);
-  // Honour a caller-supplied signal alongside the timeout.
-  const onExternalAbort = () => controller.abort();
+  // Honour a caller-supplied signal alongside the timeout. Tracked separately
+  // from `timedOut` so a deliberate cancellation isn't mistaken for a failure.
+  const onExternalAbort = () => {
+    cancelled = true;
+    controller.abort();
+  };
   if (signal) {
-    if (signal.aborted) controller.abort();
-    else signal.addEventListener?.('abort', onExternalAbort);
+    if (signal.aborted) {
+      cancelled = true;
+      controller.abort();
+    } else signal.addEventListener?.('abort', onExternalAbort);
   }
 
   let response: Response;
@@ -59,17 +73,17 @@ export async function apiCall<T = unknown>(url: string, options: ApiCallOptions)
   } catch {
     // `fetch` throws a raw `TypeError: Network request failed` when the request
     // can't reach the server (offline, DNS, backend down), and an AbortError
-    // when we abort it ourselves.
+    // when someone aborts it.
     //
-    // Only the former says anything about connectivity — an abort we initiated
-    // is evidence that *this* request was slow, nothing more. Reporting our own
-    // timeout as a network failure is what previously turned one slow AI call
-    // into app-wide NETWORK_ERRORs.
-    if (!timedOut) reportNetworkFailure();
-    throw {
-      type: 'NETWORK_ERROR',
-      message: timedOut ? 'Request timed out' : 'Network request failed',
-    };
+    // Only the first of these says anything about connectivity. An abort is
+    // evidence about *this* request and nothing more — reporting our own timeout
+    // as a network failure is what previously turned one slow AI call into
+    // app-wide NETWORK_ERRORs, and describing it as one is what told users on a
+    // merely slow connection that they were offline.
+    if (cancelled) throw { type: ERROR_TYPES.CANCELLED, message: 'Request cancelled' };
+    if (timedOut) throw { type: ERROR_TYPES.TIMEOUT, message: 'Request timed out' };
+    reportNetworkFailure();
+    throw { type: ERROR_TYPES.NETWORK, message: 'Network request failed' };
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener?.('abort', onExternalAbort);
@@ -84,7 +98,7 @@ export async function apiCall<T = unknown>(url: string, options: ApiCallOptions)
     // The server answered, so this isn't a connectivity problem — don't report
     // a network failure here, it's a bad payload.
     throw {
-      type: 'NETWORK_ERROR',
+      type: ERROR_TYPES.BAD_RESPONSE,
       message: 'Invalid server response',
     };
   }

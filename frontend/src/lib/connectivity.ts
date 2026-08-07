@@ -54,7 +54,44 @@ function setReachability(next: Reachability): void {
   // Safe with `networkMode: 'offlineFirst'`: the first attempt still runs, so
   // nothing gets stuck permanently paused.
   onlineManager.setOnline(next === 'online');
+  if (next === 'online') clearRecoveryPoll();
+  else scheduleRecoveryPoll();
   for (const l of listeners) l();
+}
+
+// Once we're offline, React Query pauses retries — so nothing will fail, and
+// therefore nothing will call `reportNetworkFailure()` to re-check. The radio
+// listener and the AppState listener are the only other triggers, and neither
+// fires when the *backend* was the problem and the user never leaves the app.
+// Without this poll a foregrounded app can sit in `no-backend` indefinitely
+// after the server comes back.
+const RECOVERY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000];
+let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+let recoveryIndex = 0;
+
+function clearRecoveryPoll(): void {
+  if (recoveryTimer) clearTimeout(recoveryTimer);
+  recoveryTimer = null;
+  recoveryIndex = 0;
+}
+
+function scheduleRecoveryPoll(): void {
+  if (recoveryTimer) return;
+  const delay = RECOVERY_DELAYS_MS[Math.min(recoveryIndex, RECOVERY_DELAYS_MS.length - 1)];
+  recoveryIndex += 1;
+  recoveryTimer = setTimeout(() => {
+    recoveryTimer = null;
+    if (reachability === 'online') return;
+    // Backgrounded: don't burn battery probing. The AppState 'active' listener
+    // below re-checks the moment we're back.
+    if (AppState.currentState !== 'active') {
+      scheduleRecoveryPoll();
+      return;
+    }
+    void checkConnectivity().then((state) => {
+      if (state !== 'online') scheduleRecoveryPoll();
+    });
+  }, delay);
 }
 
 /**
@@ -97,6 +134,21 @@ export function checkConnectivity(): Promise<Reachability> {
     inflightCheck = null;
   });
   return inflightCheck;
+}
+
+/**
+ * `checkConnectivity()` with a ceiling on how long the caller waits.
+ *
+ * Callers that are about to *say something to the user* need an answer promptly;
+ * a full probe can take the whole 6s timeout on a captive portal. Resolves
+ * `'unknown'` rather than guessing — the probe keeps running and will update the
+ * state regardless.
+ */
+export async function awaitReachability(maxWaitMs = 2_500): Promise<Reachability | 'unknown'> {
+  return Promise.race([
+    checkConnectivity(),
+    new Promise<'unknown'>((resolve) => setTimeout(() => resolve('unknown'), maxWaitMs)),
+  ]);
 }
 
 async function runCheck(): Promise<Reachability> {
@@ -157,6 +209,7 @@ export function startConnectivityWatch(): () => void {
   stopWatch = () => {
     netSub.remove();
     appSub.remove();
+    clearRecoveryPoll();
     stopWatch = null;
   };
   return stopWatch;

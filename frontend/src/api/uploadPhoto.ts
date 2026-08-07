@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { reportNetworkFailure } from '../lib/connectivity';
+import { ERROR_TYPES } from '../lib/errors';
 import { getBaseUrl } from './baseUrl';
 
 async function readAsBase64(uri: string): Promise<string> {
@@ -10,14 +11,14 @@ async function readAsBase64(uri: string): Promise<string> {
 }
 
 // Uploads are base64 JSON bodies and can be large, so they get a longer leash
-// than the 15s default in `apiClient`.
+// than the 45s default in `apiClient`.
 const UPLOAD_TIMEOUT_MS = 60_000;
 
 /**
  * Photo uploads don't go through `apiCall` (they build their own body), so they
- * need the same NETWORK_ERROR normalization — otherwise a failed upload while
- * offline throws a raw `TypeError` that `isNetworkError()` doesn't recognize and
- * the user gets "Network request failed" instead of "No connection".
+ * need the same error normalization — otherwise a failed upload while offline
+ * throws a raw `TypeError` that `isNetworkError()` doesn't recognize and the
+ * user gets "Network request failed" instead of "No connection".
  */
 async function postPhoto(path: string, uri: string, token: string): Promise<string> {
   const photo = await readAsBase64(uri);
@@ -41,12 +42,11 @@ async function postPhoto(path: string, uri: string, token: string): Promise<stri
       signal: controller.signal,
     });
   } catch {
-    // Same rule as `apiClient`: our own timeout isn't a connectivity signal.
-    if (!timedOut) reportNetworkFailure();
-    throw {
-      type: 'NETWORK_ERROR',
-      message: timedOut ? 'Upload timed out' : 'Network request failed',
-    };
+    // Same rule as `apiClient`: our own timeout isn't a connectivity signal, and
+    // shouldn't be described to the user as one either.
+    if (timedOut) throw { type: ERROR_TYPES.TIMEOUT, message: 'Upload timed out' };
+    reportNetworkFailure();
+    throw { type: ERROR_TYPES.NETWORK, message: 'Network request failed' };
   } finally {
     clearTimeout(timer);
   }

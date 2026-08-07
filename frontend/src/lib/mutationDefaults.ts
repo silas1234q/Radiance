@@ -19,7 +19,7 @@
  */
 import type { QueryClient } from '@tanstack/react-query';
 import { authedFetch } from '../api/authedFetch';
-import { isUnauthorizedError } from './errors';
+import { isBadResponseError, isCancelledError, isUnauthorizedError } from './errors';
 import type { MoodEntry, Routine, RoutineStep, SkinLog } from '../types/api';
 
 export const MUTATION_KEYS = {
@@ -58,8 +58,13 @@ export function now(): string {
 }
 
 // A queued write that fails on replay for a non-auth reason is worth one more
-// go; while offline these retries pause rather than burn attempts.
-const retry = (count: number, error: unknown) => !isUnauthorizedError(error) && count < 2;
+// go; while offline these retries pause rather than burn attempts. A cancelled
+// write or an unparseable response won't come out differently the second time.
+const retry = (count: number, error: unknown) =>
+  !isUnauthorizedError(error) &&
+  !isBadResponseError(error) &&
+  !isCancelledError(error) &&
+  count < 2;
 
 export function registerMutationDefaults(queryClient: QueryClient): void {
   const invalidateRoutineProgress = () => {

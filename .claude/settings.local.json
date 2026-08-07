@@ -206,7 +206,10 @@
       "Bash(ls -1 \"C:/Users/Silas/Documents/radiance/frontend/src/app/\\(screens\\)/\")",
       "Bash(cd \"C:/Users/Silas/Documents/radiance/frontend/src/app/\\(screens\\)\" && for f in *.tsx; do sed -i \"s|from '\\\\.\\\\./|from '../../|g; s|from \\\\\"\\\\.\\\\./|from \\\\\"../../|g\" \"$f\"; done)",
       "Bash(taskkill //F //IM node.exe 2>/dev/null; true)",
-      "Bash(ls -la \"C:/Users/Silas/Documents/radiance/frontend/src/app/\\(onboarding\\)/notifications.tsx\" 2>&1)"
+      "Bash(ls -la \"C:/Users/Silas/Documents/radiance/frontend/src/app/\\(onboarding\\)/notifications.tsx\" 2>&1)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code} bytes=%{size_download}\\\\n\" http://localhost:4319/)",
+      "Bash(curl -s http://localhost:4319/)"
     ]
   }
 }

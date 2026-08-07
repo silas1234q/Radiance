@@ -1,9 +1,11 @@
 import Toast from 'react-native-toast-message';
+import { awaitReachability } from './connectivity';
 import { getErrorMessage, isNetworkError } from './errors';
 
-// Many requests can fail at once when offline; only surface one network toast
-// per window so the screen isn't flooded with identical banners.
-const NETWORK_TOAST_THROTTLE_MS = 5000;
+// Many requests can fail at once when offline, and the state persists for as
+// long as the user has no signal — so one toast per window, and a window wide
+// enough that navigating around offline doesn't re-nag on every screen.
+const NETWORK_TOAST_THROTTLE_MS = 20_000;
 let lastNetworkToastAt = 0;
 
 interface ToastOptions {
@@ -46,15 +48,61 @@ export const toast = {
     });
   },
 
-  /** Primary call site for catch blocks and the global mutation error handler. */
+  /**
+   * Primary call site for catch blocks and the global mutation error handler.
+   *
+   * A failed request is not proof that the user is offline — a single dropped
+   * connection on a working network looks identical from here. So we ask the
+   * connectivity probe first and word the toast for what actually happened.
+   * Telling someone on a slow-but-working connection to "check your internet"
+   * is both wrong and the most annoying thing this app can say.
+   */
   fromError(err: unknown, opts: ToastOptions = {}) {
-    if (isNetworkError(err)) {
-      const now = Date.now();
-      if (now - lastNetworkToastAt < NETWORK_TOAST_THROTTLE_MS) return;
-      lastNetworkToastAt = now;
-      this.error(getErrorMessage(err), { title: 'No connection', ...opts });
+    if (!isNetworkError(err)) {
+      // Timeouts and bad payloads carry their own copy via `getErrorMessage`.
+      this.error(getErrorMessage(err), opts);
       return;
     }
-    this.error(getErrorMessage(err), opts);
+
+    const now = Date.now();
+    if (now - lastNetworkToastAt < NETWORK_TOAST_THROTTLE_MS) return;
+    // Claim the slot before awaiting, so a burst of concurrent failures can't
+    // all get through while the probe is still in flight.
+    lastNetworkToastAt = now;
+
+    void awaitReachability().then((state) => {
+      switch (state) {
+        case 'no-radio':
+          this.error('Check your mobile data or Wi-Fi and try again.', {
+            title: "You're offline",
+            ...opts,
+          });
+          break;
+        case 'no-backend':
+          // Our fault, not theirs — don't send them to fiddle with their router.
+          this.error("We're having trouble connecting. Please try again in a moment.", {
+            title: "Can't reach Radiance",
+            ...opts,
+          });
+          break;
+        case 'unknown':
+          // The probe hasn't answered either way within the wait. Something is
+          // slow; say that much and nothing more.
+          this.error('Your connection seems slow. Please try again.', {
+            title: 'Connection problem',
+            ...opts,
+          });
+          break;
+        case 'online':
+          // Confirmed reachable, so this one request just failed. This is the
+          // case that used to lie about the user's connection.
+          lastNetworkToastAt = 0; // a one-off shouldn't eat the whole window
+          this.error("That didn't go through. Please try again.", {
+            title: 'Something went wrong',
+            ...opts,
+          });
+          break;
+      }
+    });
   },
 };

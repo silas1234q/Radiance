@@ -29,7 +29,13 @@ import AnimatedSplash from "../components/splash/AnimatedSplash";
 import { setNavReady } from "../lib/splash/ready";
 import { toastConfig } from "../components/ui/toastConfig";
 import { toast } from "../lib/toast";
-import { isNetworkError, isUnauthorizedError } from "../lib/errors";
+import {
+  isBadResponseError,
+  isCancelledError,
+  isNetworkError,
+  isTimeoutError,
+  isUnauthorizedError,
+} from "../lib/errors";
 import { onSessionExpired, resetSessionExpiry, suppressSessionExpiry, isSessionExpirySuppressed, markAuthSettled } from "../lib/sessionExpiry";
 import { persister, persistOptions } from "../lib/queryPersister";
 import { registerMutationDefaults } from "../lib/mutationDefaults";
@@ -54,9 +60,22 @@ const queryClient = new QueryClient({
       cacheTime: 1000 * 60 * 60 * 24 * 7, // 7 days
       // Serve cache first, still attempt the network.
       networkMode: "offlineFirst",
-      // Fail fast on network errors — the cached data is already on screen, so
-      // there's no point retrying 3× before the "No connection" toast shows.
-      retry: (count, err) => !isNetworkError(err) && !isUnauthorizedError(err) && count < 2,
+      retry: (failureCount, err) => {
+        if (isUnauthorizedError(err)) return false; // re-auth is authedFetch's job
+        if (isCancelledError(err)) return false; // we asked for this
+        if (isBadResponseError(err)) return false; // deterministic — same bad body comes back
+        if (isTimeoutError(err)) return false; // we already waited the full budget
+        if (isNetworkError(err)) {
+          // A blip deserves another try; a confirmed outage does not. Wi-Fi/cell
+          // handoffs and single dropped connections are routine on mobile, and
+          // failing them instantly is what produced spurious "No connection"
+          // toasts. Once the probe confirms we're offline, fail fast instead so
+          // screens fall back to cached data.
+          if (!getIsOnline()) return false;
+          return failureCount < 2;
+        }
+        return failureCount < 2;
+      },
     },
     mutations: {
       // Fail fast rather than hang when offline. The handful of writes that are
@@ -79,9 +98,17 @@ const queryClient = new QueryClient({
   }),
   // Queries fail silently by default (screens render their own empty/error
   // states), but a network outage affects the whole app — surface a single
-  // throttled "No connection" toast so the user isn't left with a blank screen.
+  // throttled toast so the user isn't left staring at a blank screen. What that
+  // toast *says* is decided by `toast.fromError`, once the probe has confirmed
+  // whether we're actually offline.
   queryCache: new QueryCache({
-    onError: (err) => {
+    onError: (err, query) => {
+      if (isUnauthorizedError(err)) return;
+      if (query.meta?.suppressErrorToast) return;
+      // A background refresh that failed while the screen already shows data is
+      // a non-event — the user didn't ask for it and wouldn't have noticed.
+      if (query.state.data !== undefined) return;
+      if (query.getObserversCount() === 0) return; // nobody's looking at this
       if (isNetworkError(err)) toast.fromError(err);
     },
   }),
