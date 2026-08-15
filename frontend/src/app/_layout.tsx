@@ -24,6 +24,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { RevenueCatProvider } from "../providers/RevenueCatProvider";
 import { NotificationsProvider } from "../providers/NotificationsProvider";
+import { AnalyticsProvider } from "../providers/AnalyticsProvider";
+import AnalyticsTracker from "../components/analytics/AnalyticsTracker";
 import ErrorBoundary from "../components/ErrorBoundary";
 import AnimatedSplash from "../components/splash/AnimatedSplash";
 import { setNavReady } from "../lib/splash/ready";
@@ -42,6 +44,7 @@ import { registerMutationDefaults } from "../lib/mutationDefaults";
 import { checkConnectivity, getIsOnline, startConnectivityWatch } from "../lib/connectivity";
 import { setClerkAuth } from "../lib/authToken";
 import { useColdStartGate } from "../hooks/useColdStartGate";
+import { useReachability } from "../hooks/useReachability";
 import "../../global.css";
 
 // Tracks which Clerk user the persisted cache belongs to, so we only wipe it on
@@ -473,10 +476,31 @@ export default function RootLayout() {
   // finish loading, and `ClerkLoaded` would then never render `AuthRouter`. The
   // gate has to work regardless, so the user gets "turn on your data" instead of
   // a splash that fades into nothing.
+  //
+  // The gate goes first so its patient launch probe is the one in flight when
+  // the watcher mounts — the watcher then skips its own stricter check rather
+  // than racing it to a worse answer.
+  const startedOffline = useColdStartGate();
+  const reachability = useReachability();
   useEffect(() => {
     return startConnectivityWatch();
   }, []);
-  useColdStartGate();
+
+  // The gate lets a returning user in without a connection rather than blocking
+  // them, so this is where they're told. It waits for the splash because toasts
+  // render underneath that overlay, and it re-checks reachability because the
+  // connection often comes back during the splash — in which case there's
+  // nothing to report and saying so would just be wrong.
+  useEffect(() => {
+    if (!splashDone || !startedOffline) return;
+    if (reachability === 'online') return;
+    toast.error(
+      reachability === 'no-radio'
+        ? 'Showing your saved data. Check your mobile data or Wi-Fi.'
+        : "Showing your saved data. We'll refresh once we can reach Radiance.",
+      { title: "You're offline" },
+    );
+  }, [splashDone, startedOffline, reachability]);
 
   // Native splash stays up (preventAutoHideAsync) until fonts resolve and the
   // animated overlay mounts, so this early return shows no blank frame. Proceed
@@ -485,29 +509,40 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ErrorBoundary>
-        <BottomSheetModalProvider>
-          <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-            <ClerkLoaded>
-              <PersistQueryClientProvider
-                client={queryClient}
-                persistOptions={persistOptions}
-                // Writes queued in a previous session are restored paused; they
-                // only replay once something asks them to. (React Query resumes
-                // automatically when `onlineManager` flips online, but nothing
-                // flips on a launch that's already online.)
-                onSuccess={() => queryClient.resumePausedMutations()}
-              >
-                <RevenueCatProvider>
-                  <NotificationsProvider>
-                    <AuthRouter />
-                  </NotificationsProvider>
-                </RevenueCatProvider>
-              </PersistQueryClientProvider>
-            </ClerkLoaded>
-          </ClerkProvider>
-        </BottomSheetModalProvider>
-      </ErrorBoundary>
+      {/* Analytics sits above Clerk on purpose. It doesn't depend on Clerk, and
+          inside `ClerkLoaded` it never initialised on the offline cold start
+          handled below — losing `Application Opened` for precisely the sessions
+          worth investigating. Above the ErrorBoundary too, so a crash that
+          unmounts the tree still has a live client to report through. */}
+      <AnalyticsProvider>
+        <ErrorBoundary>
+          <BottomSheetModalProvider>
+            <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+              <ClerkLoaded>
+                <PersistQueryClientProvider
+                  client={queryClient}
+                  persistOptions={persistOptions}
+                  // Writes queued in a previous session are restored paused; they
+                  // only replay once something asks them to. (React Query resumes
+                  // automatically when `onlineManager` flips online, but nothing
+                  // flips on a launch that's already online.)
+                  onSuccess={() => queryClient.resumePausedMutations()}
+                >
+                  <RevenueCatProvider>
+                    <NotificationsProvider>
+                      {/* Renders nothing; needs Clerk's session and the router
+                          above it, so it sits with AuthRouter rather than in
+                          the provider stack. */}
+                      <AnalyticsTracker />
+                      <AuthRouter />
+                    </NotificationsProvider>
+                  </RevenueCatProvider>
+                </PersistQueryClientProvider>
+              </ClerkLoaded>
+            </ClerkProvider>
+          </BottomSheetModalProvider>
+        </ErrorBoundary>
+      </AnalyticsProvider>
       <Toast config={toastConfig} topOffset={60} />
       {!splashDone && <AnimatedSplash onFinish={() => setSplashDone(true)} />}
     </GestureHandlerRootView>

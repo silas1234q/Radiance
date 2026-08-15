@@ -1,10 +1,26 @@
-import { PhoneFrame, ScanScreen } from './ui/Phone'
+import { PhoneFrame, ScanResultShot } from './ui/Phone'
+import { skin1, skin2, skin3, skin4 } from '../assets/skins'
 import { Pill, Plate } from './ui/Bits'
-import { Sparkle, Flourish } from './ui/Ink'
+import { Flourish } from './ui/Ink'
+
+/** How long `rise` runs, in seconds — the drift waits this out before starting. */
+const RISE_DURATION = 0.8
 
 /**
  * Small glass card that orbits the phone. The reveal and the drift are kept on
  * separate elements — one element can only run one `animation` shorthand.
+ *
+ * Two things this deliberately does *not* do, both of which cost smoothness:
+ *
+ *  - No `backdrop-blur`. These cards sit directly over the hero's `blur-3xl`
+ *    halo, so a backdrop filter forces the compositor to re-read and re-blur
+ *    that region on every frame of the drift, for every card. At `bg-white/90`
+ *    the frosting is almost entirely hidden behind the fill anyway — it was
+ *    paying the page's largest per-frame cost for an effect you can't see.
+ *  - No overlap between the entry and the drift. `rise` moves the outer element
+ *    while `float` moves the inner one; running both at once compounds two
+ *    transforms and reads as a wobble. Both are identity at the handoff, so
+ *    starting the drift after the entry lands is seamless.
  */
 function FloatCard({
   children,
@@ -20,11 +36,18 @@ function FloatCard({
   return (
     <div
       className={`absolute hidden lg:block ${className}`}
-      style={{ opacity: 0, animation: `rise .8s cubic-bezier(.22,.85,.3,1) ${delay}s forwards` }}
+      style={{
+        opacity: 0,
+        animation: `rise ${RISE_DURATION}s cubic-bezier(.22,.85,.3,1) ${delay}s forwards`,
+      }}
     >
       <div
-        className={`rounded-2xl border border-white/80 bg-white/85 p-3 shadow-[0_16px_38px_-18px_rgb(46_24_60/0.4)] backdrop-blur-xl ${float}`}
-        style={{ animationDelay: `${delay}s` }}
+        className={`rounded-2xl border border-white/80 bg-white/90 p-3 shadow-[0_16px_38px_-18px_rgb(46_24_60/0.4)] ${float}`}
+        style={{
+          animationDelay: `${delay + RISE_DURATION}s`,
+          // Promote to its own layer so the drift never repaints the shadow.
+          willChange: 'transform',
+        }}
       >
         {children}
       </div>
@@ -52,11 +75,10 @@ export default function Hero() {
           className="relative mx-auto mt-7 max-w-[19ch] text-center font-display text-[2.6rem] font-semibold leading-[1.05] tracking-[-0.03em] text-balance sm:text-6xl md:text-[4.2rem]"
           style={{ opacity: 0, animation: 'rise .8s cubic-bezier(.22,.85,.3,1) .12s forwards' }}
         >
-          Your AI partner for{' '}
+          Scan your skin, get a routine that{' '}
           <span className="marker">
-            <span>modern</span>
-          </span>{' '}
-          skin &amp; wellness
+            <span>adapts</span>
+          </span>
           <Flourish className="absolute -right-2 -top-6 h-9 w-9 md:-right-8 md:top-0 md:h-12 md:w-12" delay={1} />
         </h1>
 
@@ -64,8 +86,9 @@ export default function Hero() {
           className="mx-auto mt-6 max-w-lg text-center text-[1.02rem] leading-relaxed text-muted text-pretty"
           style={{ opacity: 0, animation: 'rise .8s cubic-bezier(.22,.85,.3,1) .2s forwards' }}
         >
-          One scan reads hydration, barrier and texture. Radiance turns that into an AM and PM
-          routine that changes as your skin does.
+          One scan scores your hydration, oil balance, texture and even tone. Radiance turns that
+          into AM and PM routines that explain every step — and rewrite themselves as your skin
+          changes.
         </p>
         {/* phone + orbiting cards — held in a narrow band so the cards stay
             tucked against the phone rather than drifting to the page edges */}
@@ -75,7 +98,7 @@ export default function Hero() {
             style={{ opacity: 0, animation: 'rise 1s cubic-bezier(.22,.85,.3,1) .36s forwards' }}
           >
             <PhoneFrame>
-              <ScanScreen />
+              <ScanResultShot />
             </PhoneFrame>
           </div>
 
@@ -88,41 +111,35 @@ export default function Hero() {
               </span>
               <span className="text-[0.8rem] font-semibold">Analysis complete</span>
             </div>
+            <p className="mt-1.5 text-[0.72rem] leading-snug text-muted">
+              Hydration, oil, texture, tone, sensitivity.
+            </p>
           </FloatCard>
 
           <FloatCard className="-left-2 top-36 w-[13rem]" delay={0.78} float="animate-float-slow">
             <p className="text-[0.8rem] font-semibold leading-snug">
-              Generate your personalised care plan
+              Products matched to your skin
             </p>
             <div className="mt-2.5 flex gap-1.5">
-              <Plate className="h-12 flex-1 rounded-lg" from="#ffd9e5" to="#f3b7cd" />
-              <Plate className="h-12 flex-1 rounded-lg" from="#e6dcff" to="#bda8f0" />
-              <Plate className="h-12 flex-1 rounded-lg" from="#dfeaff" to="#adc4f0" />
+              <Plate className="h-12 flex-1 rounded-lg" src={skin1} from="#ffd9e5" to="#f3b7cd" />
+              <Plate className="h-12 flex-1 rounded-lg" src={skin2} from="#e6dcff" to="#bda8f0" />
+              <Plate className="h-12 flex-1 rounded-lg" src={skin3} from="#dfeaff" to="#adc4f0" />
             </div>
           </FloatCard>
 
           <FloatCard className="right-0 top-20 w-[13.5rem]" delay={0.68} float="animate-float-slow">
-            <p className="text-[0.82rem] font-semibold">Daily glow score: 8.6</p>
+            <p className="text-[0.82rem] font-semibold">Skin score 92</p>
             <p className="mt-1 text-[0.72rem] leading-snug text-muted">
-              Improving since your last analysis.
+              Up 6 points since your first scan.
             </p>
-            <div className="mt-2.5 flex h-6 items-end gap-1">
-              {[38, 52, 44, 66, 58, 80, 92].map((h, i) => (
-                <span
-                  key={i}
-                  className="flex-1 rounded-sm bg-primary/25 last:bg-primary"
-                  style={{ height: `${h}%` }}
-                />
-              ))}
-            </div>
           </FloatCard>
 
           <FloatCard className="-right-2 top-[17.5rem] w-[12.5rem]" delay={0.88}>
             <Pill tint="lilac" className="text-[0.62rem]">
-              Progress update
+              14-day streak
             </Pill>
-            <Plate className="mt-2 h-16 w-full rounded-xl" from="#ffe2d5" to="#d9b3c8" />
-            <p className="mt-2 text-[0.72rem] font-medium text-muted">2 weeks of daily care</p>
+            <Plate className="mt-2 h-16 w-full rounded-xl" src={skin4} from="#ffe2d5" to="#d9b3c8" />
+            <p className="mt-2 text-[0.72rem] font-medium text-muted">AM and PM, every day</p>
           </FloatCard>
         </div>
 

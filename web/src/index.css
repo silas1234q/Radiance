@@ -80,24 +80,17 @@
   }
 }
 
-/* Analysis line travelling down the face-scan viewfinder. */
-@keyframes scan {
-  0% {
-    transform: translateY(-3rem);
-    opacity: 0;
+/* Respect the OS setting: kill the looping ambient motion (drift, twinkle,
+   sweep) and let entrances resolve immediately rather than animate. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
-  12%,
-  76% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(17rem);
-    opacity: 0;
-  }
-}
-
-.scan-sweep {
-  animation: scan 3.6s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
 
 html {

@@ -8,7 +8,7 @@ import GlassCard from "../../components/ui/GlassCard";
 import CircleIconButton from "../../components/ui/CircleIconButton";
 import { COLORS } from "../../constants/theme";
 
-const SUPPORT_EMAIL = "support@radianceapp.com";
+const SUPPORT_EMAIL = "sarfosilas2003@gmail.com";
 
 const contactOptions: {
   label: string;

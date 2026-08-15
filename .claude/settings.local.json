@@ -209,7 +209,23 @@
       "Bash(ls -la \"C:/Users/Silas/Documents/radiance/frontend/src/app/\\(onboarding\\)/notifications.tsx\" 2>&1)",
       "Bash(npm run *)",
       "Bash(curl -s -o /dev/null -w \"status=%{http_code} bytes=%{size_download}\\\\n\" http://localhost:4319/)",
-      "Bash(curl -s http://localhost:4319/)"
+      "Bash(curl -s http://localhost:4319/)",
+      "Bash(npx eslint *)",
+      "Bash(npx vite *)",
+      "Bash(npx esbuild *)",
+      "Bash(python -c ' *)",
+      "Bash(timeout 120 npx -y @posthog/wizard@latest --help)",
+      "Bash(timeout 180 npx -y @posthog/wizard@latest --help)",
+      "WebFetch(domain:posthog.com)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(grep -A6 -E \"useTrack|analytics|onboarding\\\\\\\\\\\\\\\\results|onboarding\\\\\\\\\\\\\\\\quiz|onboarding\\\\\\\\\\\\\\\\face-scan|onboarding\\\\\\\\\\\\\\\\scan-processing|SubscribeGate|screens\\\\\\\\\\\\\\\\auth|_layout|useRoutines|useMoods|useSkinLogs|useUserProducts|useGamification|AnalyticsProvider\")",
+      "Bash(git rm *)",
+      "Bash(npx eas *)",
+      "Bash(python -c \"import PIL; print\\(PIL.__version__\\)\")",
+      "PowerShell(& \"C:\\\\Users\\\\Silas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Silas-Documents-radiance\\\\0c03273e-7809-41a3-a8a0-33f078dac876\\\\scratchpad\\\\resize-screenshots.ps1\")",
+      "Bash(xargs grep -ln \"Share\\\\b\")",
+      "Bash(echo \"--- tsc exit: $? ---\")",
+      "PowerShell(& \"C:\\\\Users\\\\Silas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Silas-Documents-radiance\\\\0c03273e-7809-41a3-a8a0-33f078dac876\\\\scratchpad\\\\convert-paywall.ps1\")"
     ]
   }
 }

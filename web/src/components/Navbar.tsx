@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { Sparkle } from './ui/Ink'
+import { Link } from 'react-router'
+import Logo from './ui/Logo'
 
+// Ordered to match the order the sections appear on the home page, so the nav
+// reads as a map of the page rather than an arbitrary list.
 const navLinks = [
-  { label: 'How it works', href: '#how-it-works' },
-  { label: 'Features', href: '#features' },
-  { label: 'Science', href: '#science' },
-  { label: 'Stories', href: '#stories' },
+  { label: 'At a glance', href: '/#overview' },
+  { label: 'Features', href: '/#features' },
+  { label: 'How it works', href: '/#how-it-works' },
+  { label: 'Stories', href: '/#stories' },
 ]
 
 export default function Navbar() {
@@ -14,10 +17,10 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 px-4 pt-4 md:px-8 md:pt-6">
       <nav className="mx-auto flex max-w-6xl items-center justify-between rounded-full border border-hair bg-white/80 px-4 py-2.5 backdrop-blur-xl md:px-5">
-        <a href="/" className="flex items-center gap-2 pl-1">
-          <Sparkle className="h-4 w-4" />
+        <Link to="/" className="flex items-center gap-1.5">
+          <Logo className="h-8 w-8" />
           <span className="font-display text-[1.05rem] font-bold tracking-tight">Radiance</span>
-        </a>
+        </Link>
 
         <div className="hidden items-center gap-7 md:flex">
           {navLinks.map((link) => (
@@ -33,7 +36,7 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2">
           <a
-            href="#get"
+            href="/#get"
             className="hidden rounded-full bg-ink px-5 py-2.5 text-[0.82rem] font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#2c2a34] sm:inline-flex"
           >
             Try Radiance AI
@@ -69,7 +72,7 @@ export default function Navbar() {
             </a>
           ))}
           <a
-            href="#get"
+            href="/#get"
             onClick={() => setOpen(false)}
             className="mt-1 block rounded-full bg-ink px-5 py-3 text-center text-[0.88rem] font-semibold text-white"
           >

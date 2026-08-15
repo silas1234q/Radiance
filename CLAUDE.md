@@ -25,6 +25,12 @@ Radiance is a full-stack AI-driven skincare app. Users complete a skin quiz, rec
 ### Frontend (`frontend/.env`)
 - `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk publishable key
 - `EXPO_PUBLIC_API_BASE_URL` — backend URL (e.g. `http://localhost:5000`)
+- `EXPO_PUBLIC_POSTHOG_API_KEY` — PostHog project key (optional; unset disables analytics entirely)
+- `EXPO_PUBLIC_POSTHOG_HOST` — PostHog host (default: `https://us.i.posthog.com`)
+
+### Landing site (`web/.env.local`, see `web/.env.example`)
+- `VITE_POSTHOG_PROJECT_TOKEN` — PostHog project token (optional; unset disables analytics)
+- `VITE_POSTHOG_HOST` — PostHog host (default: `https://us.i.posthog.com`)
 
 ## Commands
 
@@ -103,6 +109,11 @@ Route prefixes: `/auth`, `/users`, `/quiz`, `/skin-profile`, `/routines`, `/skin
 ### Push Notifications
 - **Frontend (local):** `NotificationsProvider` installs the notification handler, hydrates persisted settings, and reconciles locally-scheduled reminders (routine reminders, streak nudges) whenever routines/gamification data or app foreground state change. Settings persistence and scheduling logic live in `src/lib/notifications/` (modular: `settings.ts`, `scheduler.ts`, `handler.ts`, `store.ts`, `permissions.ts`, `push.ts`, `native.ts`). Phase 2 registers the Expo push token with the backend via `useRegisterPushToken`.
 - **Backend (server push):** `src/jobs/index.ts` runs `node-cron` scheduled tasks — weekly summary (hourly cron, fires at 18:00 local Sunday) and win-back (daily, for users inactive ≥ 3 days). Uses each user's stored IANA `timezone` and `luxon` for local-time checks. Push delivery via `expo-server-sdk` in `src/services/notificationService.ts`.
+
+### Analytics (PostHog)
+- **Frontend:** `AnalyticsProvider` (`src/providers/`) wraps the app inside `PersistQueryClientProvider`. With no `EXPO_PUBLIC_POSTHOG_API_KEY` it renders through, so `usePostHog()` returns undefined and everything no-ops. Screen autocapture is off — the library's version calls `@react-navigation` hooks that throw above the root Stack — so `AnalyticsTracker` (`src/components/analytics/`) reports screens from Expo Router's `usePathname`, and identifies/resets the person against the Clerk user id. Person profiles carry the user id only, no email.
+- **Landing site:** `web/src/lib/analytics.ts` initialises `posthog-js` when `VITE_POSTHOG_PROJECT_TOKEN` is set; `main.tsx` wraps the router in `@posthog/react`'s `PostHogProvider`.
+- Nothing is installed server-side — `posthog-node` requires Node `^20.20 || >=22.22`.
 
 ### Query Persistence
 React Query is configured with `@tanstack/query-async-storage-persister` + `@tanstack/react-query-persist-client` to persist the query cache to AsyncStorage for offline support.

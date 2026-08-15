@@ -1,77 +1,104 @@
+import { skin3 } from '../assets/skins'
 import { Plate, Pill } from './ui/Bits'
 import { Underline, Sparkle } from './ui/Ink'
 import Reveal from './ui/Reveal'
 
-/** Mini-UI: the analysis card the app shows after a scan. */
+/** Mini-UI: the metric readout the analysis produces from a scan. */
 function AnalysisMock() {
+  const metrics = [
+    { label: 'Hydration', value: 78, tone: 'bg-sky-400' },
+    { label: 'Oil balance', value: 64, tone: 'bg-primary' },
+    { label: 'Texture', value: 71, tone: 'bg-lilac' },
+    { label: 'Even tone', value: 83, tone: 'bg-mint' },
+  ]
+
   return (
     <div className="rounded-2xl bg-page p-3.5">
       <Pill tint="lilac" className="text-[0.62rem]">
         Radiance AI
       </Pill>
-      <p className="mt-2.5 text-[0.82rem] font-semibold">Glow score 8.6</p>
-      <p className="text-[0.7rem] text-faint">Based on 42 skin signals</p>
-      <div className="mt-3 flex gap-1.5">
-        <Plate className="h-14 flex-1 rounded-lg" from="#ffdfe8" to="#e8a9c2" />
-        <Plate className="h-14 flex-1 rounded-lg" from="#ffe8d6" to="#dbab9a" />
-        <Plate className="h-14 flex-1 rounded-lg" from="#e7dcff" to="#b39fee" />
+      <p className="mt-2.5 text-[0.82rem] font-semibold">Skin health score 72</p>
+      <p className="text-[0.7rem] text-faint">From your quiz and your last scan</p>
+      <div className="mt-3 space-y-1.5">
+        {metrics.map((m) => (
+          <div key={m.label} className="flex items-center gap-2">
+            <span className="w-[4.6rem] shrink-0 text-[0.66rem] text-muted">{m.label}</span>
+            <span className="h-1 flex-1 overflow-hidden rounded-full bg-hair">
+              <span
+                className={`block h-full rounded-full ${m.tone}`}
+                style={{ width: `${m.value}%` }}
+              />
+            </span>
+            <span className="w-4 shrink-0 text-right text-[0.66rem] font-semibold">{m.value}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-/** Mini-UI: the assistant explaining today's change. */
+/** Mini-UI: an AM routine step with the reason the AI attached to it. */
 function RoutineMock() {
   return (
     <div className="rounded-2xl bg-page p-3.5">
-      <Pill tint="sky" className="text-[0.62rem]">
-        6 Aug
-      </Pill>
-      <div className="mt-2.5 flex items-center gap-2">
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-primary to-lilac">
-          <Sparkle className="h-3 w-3" color="#fff" />
-        </span>
-        <span className="text-[0.76rem] font-semibold">Radiance assistant</span>
-        <span className="ml-auto text-[0.64rem] text-faint">Now</span>
+      <div className="flex items-center justify-between">
+        <Pill tint="sky" className="text-[0.62rem]">
+          AM routine
+        </Pill>
+        <span className="text-[0.64rem] font-semibold text-faint">Step 2 of 4</span>
       </div>
-      <p className="mt-2.5 rounded-2xl rounded-tl-md bg-white p-2.5 text-[0.73rem] leading-snug text-muted">
-        Swapped your exfoliant for a barrier cream — your skin read as sensitised this morning.
-      </p>
-      <div className="mt-2.5 flex items-center gap-2 rounded-full bg-white p-1 pl-3">
-        <span className="flex-1 truncate text-[0.7rem] text-faint">Ask about today&rsquo;s routine</span>
-        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary">
-          <svg viewBox="0 0 14 14" className="h-2.5 w-2.5 stroke-white" fill="none">
-            <path d="M2.5 7h9M7.5 3l4 4-4 4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
+
+      <div className="mt-2.5 rounded-xl bg-white p-2.5">
+        <div className="flex items-center gap-2">
+          <span className="h-7 w-5 shrink-0 rounded-md bg-gradient-to-b from-[#ffe6ee] to-[#f6bdd1]" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[0.75rem] font-semibold leading-tight">Niacinamide 5%</p>
+            <p className="truncate text-[0.66rem] leading-tight text-faint">
+              After cleansing, before SPF
+            </p>
+          </div>
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-hair">
+            <svg viewBox="0 0 12 12" className="h-2 w-2 stroke-faint" fill="none">
+              <path d="M2.5 6.2 5 8.5l4.5-5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </div>
+        <p className="mt-2 flex gap-1.5 border-t border-hair pt-2 text-[0.68rem] leading-snug text-muted">
+          <Sparkle className="mt-0.5 h-2.5 w-2.5 shrink-0" color="#9C8CF0" />
+          Chosen for the uneven tone you flagged — gentle enough for daily use.
+        </p>
       </div>
     </div>
   )
 }
 
-/** Mini-UI: today's completion feed. */
-function ProgressMock() {
-  const rows = [
-    { icon: '✓', tint: 'bg-tint-mint text-mint', title: 'Morning routine done', detail: 'Hydration + barrier logged', time: '30 min' },
-    { icon: '◐', tint: 'bg-tint-sky text-sky-600', title: 'Routine adjusted', detail: 'Optimised for today', time: 'just now' },
-    { icon: '☾', tint: 'bg-tint-lilac text-lilac', title: 'Evening check-in', detail: 'Scheduled for 9:00 pm', time: 'tonight' },
-  ]
-
+/** Mini-UI: a scanned product scored against the user's profile. */
+function ShelfMock() {
   return (
-    <div className="space-y-2 rounded-2xl bg-page p-3.5">
-      <Pill className="text-[0.62rem]">Daily progress</Pill>
-      {rows.map((r) => (
-        <div key={r.title} className="flex items-center gap-2.5 rounded-xl bg-white p-2.5">
-          <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[0.7rem] font-bold ${r.tint}`}>
-            {r.icon}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[0.74rem] font-semibold leading-tight">{r.title}</p>
-            <p className="truncate text-[0.68rem] leading-tight text-faint">{r.detail}</p>
-          </div>
-          <span className="shrink-0 text-[0.64rem] text-faint">{r.time}</span>
+    <div className="rounded-2xl bg-page p-3.5">
+      <Pill className="text-[0.62rem]">My shelf</Pill>
+
+      <div className="mt-2.5 flex items-center gap-2.5 rounded-xl bg-white p-2.5">
+        <Plate className="h-11 w-9 shrink-0 rounded-lg" src={skin3} from="#ffe8d6" to="#dbab9a" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[0.75rem] font-semibold leading-tight">Barrier repair cream</p>
+          <p className="mt-1 flex items-center gap-1.5">
+            <span className="h-1 w-12 overflow-hidden rounded-full bg-hair">
+              <span className="block h-full w-[88%] rounded-full bg-mint" />
+            </span>
+            <span className="text-[0.66rem] font-bold text-mint">88 fit</span>
+          </p>
         </div>
-      ))}
+      </div>
+
+      <div className="mt-2 space-y-1.5">
+        <p className="flex items-start gap-1.5 rounded-lg bg-tint-mint px-2 py-1.5 text-[0.66rem] leading-snug text-mint">
+          <span className="font-bold">+</span> Ceramides suit your recovering barrier
+        </p>
+        <p className="flex items-start gap-1.5 rounded-lg bg-tint-pink px-2 py-1.5 text-[0.66rem] leading-snug text-primary">
+          <span className="font-bold">!</span> Contains fragrance — you flagged this
+        </p>
+      </div>
     </div>
   )
 }
@@ -79,21 +106,21 @@ function ProgressMock() {
 const cards = [
   {
     dot: '#F06680',
-    title: 'Smart analysis',
-    body: 'Your scan becomes numbers you can act on — hydration, barrier, texture and tone, read in real time.',
+    title: 'Skin analysis',
+    body: 'Your quiz and your scan become a score you can act on — hydration, oil balance, texture and tone, each tracked separately.',
     mock: <AnalysisMock />,
   },
   {
     dot: '#9C8CF0',
-    title: 'Adaptive routine',
-    body: 'The AI learns your rhythm and rewrites the plan when your skin, weather or stress shifts.',
+    title: 'Routines with reasons',
+    body: 'AM and PM steps in the order they belong, each carrying the reason it was picked for your skin — and rewritten as your skin changes.',
     mock: <RoutineMock />,
   },
   {
     dot: '#35B96A',
-    title: 'Progress tracking',
-    body: 'See small changes every day. Visual results and streaks keep you consistent without nagging.',
-    mock: <ProgressMock />,
+    title: 'Products, checked',
+    body: 'Scan or search anything on your shelf and see how it fits your profile, down to the ingredients you asked Radiance to watch.',
+    mock: <ShelfMock />,
   },
 ]
 

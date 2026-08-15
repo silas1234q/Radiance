@@ -1,3 +1,4 @@
+import { skin1, skin2, skin3 } from '../assets/skins'
 import { Plate, Pill } from './ui/Bits'
 import { Sparkle } from './ui/Ink'
 import Reveal from './ui/Reveal'
@@ -8,6 +9,7 @@ const testimonials = [
       'The analysis called out my barrier damage before I noticed it. Three weeks later the redness around my nose is just gone.',
     name: 'Sarah M.',
     meta: 'Combination · 8 weeks in',
+    img: skin1,
     from: '#ffd9e6',
     to: '#e8a9c2',
     score: '+18',
@@ -17,6 +19,7 @@ const testimonials = [
       'I have never kept a routine past a fortnight. The streaks got me to ninety days without it feeling like homework.',
     name: 'James L.',
     meta: 'Oily · 12 weeks in',
+    img: skin2,
     from: '#dfe8ff',
     to: '#a9bcf0',
     score: '+22',
@@ -26,6 +29,7 @@ const testimonials = [
       'Scanning a product before I buy it has saved me a small fortune. It flagged two alcohols my skin hates.',
     name: 'Priya K.',
     meta: 'Sensitive · 5 weeks in',
+    img: skin3,
     from: '#e8ddff',
     to: '#bda8f0',
     score: '+11',
@@ -76,7 +80,12 @@ export default function Testimonials() {
                 </p>
 
                 <div className="mt-auto flex items-center gap-3 pt-6">
-                  <Plate className="h-9 w-9 shrink-0 rounded-full" from={t.from} to={t.to} />
+                  <Plate
+                    className="h-9 w-9 shrink-0 rounded-full"
+                    src={t.img}
+                    from={t.from}
+                    to={t.to}
+                  />
                   <div>
                     <p className="text-[0.85rem] font-semibold leading-tight">{t.name}</p>
                     <p className="text-[0.74rem] leading-tight text-faint">{t.meta}</p>

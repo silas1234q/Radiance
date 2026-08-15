@@ -27,6 +27,18 @@ export type Reachability = 'online' | 'no-radio' | 'no-backend';
 
 const PROBE_TIMEOUT_MS = 6_000;
 
+// The first request of a launch is the slowest one the app will ever make: cold
+// DNS, a fresh TLS handshake, a cellular radio coming out of power-save, and in
+// dev a LAN address competing with Metro serving the bundle over the same Wi-Fi.
+// The 6s reactive budget above is fine for a *re*-check on a warm path, but as
+// the basis for a launch-blocking verdict it reports healthy connections as
+// outages — the same mistake `apiClient.ts` documents in its own timeout comment
+// ("aborting it used to tell the user they had no connection"), which is why the
+// real request budget there is 45s.
+const COLD_START_PROBE_TIMEOUT_MS = 12_000;
+// Delay *before* each attempt, so the first one fires immediately.
+const COLD_START_BACKOFF_MS = [0, 1_000, 2_000];
+
 type Listener = () => void;
 
 // Optimistic until something tells us otherwise — the app must behave exactly
@@ -47,7 +59,19 @@ export function subscribeConnectivity(listener: Listener): () => void {
   return () => listeners.delete(listener);
 }
 
+// Set for the duration of `coldStartCheck()`. While it's set, the cold-start
+// check owns the verdict and nothing else may declare us offline.
+//
+// `startConnectivityWatch()` skips its own check when this is set, but the radio
+// and AppState listeners can still fire mid-launch. Without this guard a 6s
+// timeout on one of those would stamp `no-backend` — starting the recovery poll
+// and pausing React Query — before the patient check had finished its retries.
+// Upgrades to `online` still pass through: good news is good news whoever brings
+// it, and it lets the gate release early.
+let coldStartInFlight = false;
+
 function setReachability(next: Reachability): void {
+  if (coldStartInFlight && next !== 'online') return;
   if (next === reachability) return;
   reachability = next;
   // Lets React Query pause retries while we're offline and refetch on reconnect.
@@ -151,17 +175,71 @@ export async function awaitReachability(maxWaitMs = 2_500): Promise<Reachability
   ]);
 }
 
-async function runCheck(): Promise<Reachability> {
-  let connected = true;
-  let internetReachable: boolean | undefined;
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+interface RadioState {
+  connected: boolean;
+  internetReachable: boolean | undefined;
+}
+
+async function readRadio(): Promise<RadioState> {
   try {
     const state = await Network.getNetworkStateAsync();
-    connected = state.isConnected !== false;
-    internetReachable = state.isInternetReachable;
+    return { connected: state.isConnected !== false, internetReachable: state.isInternetReachable };
   } catch {
-    // Couldn't read the radio state — fall through to the probe, which is the
-    // authoritative signal anyway.
+    // Couldn't read the radio state — assume connected and fall through to the
+    // probe, which is the authoritative signal anyway.
+    return { connected: true, internetReachable: undefined };
   }
+}
+
+/**
+ * The launch-time check, behind the splash. Deliberately far more patient than
+ * `checkConnectivity()`: its answer decides whether we show the user a blocking
+ * "can't connect" screen, so it has to be *sure*. Several attempts on a generous
+ * timeout, and it only concludes `no-radio` after giving Android a second read.
+ *
+ * Callers get the verdict; the module state is updated once, at the end.
+ */
+export async function coldStartCheck(): Promise<Reachability> {
+  let verdict: Reachability;
+  coldStartInFlight = true;
+  try {
+    verdict = await resolveColdStart();
+  } finally {
+    // Cleared before publishing — `setReachability` ignores downgrades while
+    // this is set, which would otherwise swallow our own verdict.
+    coldStartInFlight = false;
+  }
+  setReachability(verdict);
+  return verdict;
+}
+
+async function resolveColdStart(): Promise<Reachability> {
+  let radio = await readRadio();
+
+  // Android reports `isConnected: false` while it's still validating a network
+  // at launch. Believing that first read is how working Wi-Fi gets reported as
+  // airplane mode, so give it a moment and ask again before ruling out a radio.
+  if (!radio.connected) {
+    await delay(1_000);
+    radio = await readRadio();
+  }
+
+  // Still no active connection: nothing to probe, and the copy is unambiguous.
+  if (!radio.connected) return 'no-radio';
+
+  for (const backoff of COLD_START_BACKOFF_MS) {
+    if (backoff) await delay(backoff);
+    if (await probeBackend(COLD_START_PROBE_TIMEOUT_MS)) return 'online';
+  }
+
+  // Never answered. The radio hint only decides the wording.
+  return radio.internetReachable === false ? 'no-radio' : 'no-backend';
+}
+
+async function runCheck(): Promise<Reachability> {
+  const { connected, internetReachable } = await readRadio();
 
   // No active connection at all: nothing to probe.
   if (!connected) {
@@ -197,7 +275,10 @@ let stopWatch: (() => void) | null = null;
 export function startConnectivityWatch(): () => void {
   if (stopWatch) return stopWatch;
 
-  void checkConnectivity();
+  // The cold-start gate is already probing, on a far more patient budget. Firing
+  // a second, stricter check alongside it just doubles the launch traffic to
+  // reach a worse answer.
+  if (!coldStartInFlight) void checkConnectivity();
 
   const netSub = Network.addNetworkStateListener(() => {
     void checkConnectivity();

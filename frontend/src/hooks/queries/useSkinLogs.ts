@@ -1,14 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../useApi';
+import { useTrack } from '../useTrack';
 import type { SkinLog } from '../../types/api';
 
 export function useCreateSkinLog() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const track = useTrack();
   return useMutation({
     mutationFn: (data: { lifestyleFactors: string[]; notes?: string; photoUrl?: string }) =>
       api.fetch<SkinLog>('/skin-logs', { method: 'POST', body: JSON.stringify(data) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['skinLogs'] }),
+    onSuccess: (_data, vars) => {
+      // Shape only. The lifestyle factors and notes are health data the user
+      // wrote about themselves; how *many* they picked tells us whether the
+      // form is worth its length, which is all analytics needs.
+      track('skin_log_created', {
+        factor_count: vars.lifestyleFactors.length,
+        has_notes: !!vars.notes?.trim(),
+        has_photo: !!vars.photoUrl,
+      });
+      queryClient.invalidateQueries({ queryKey: ['skinLogs'] });
+    },
   });
 }
 

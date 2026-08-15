@@ -30,7 +30,7 @@ export function useAnalyzeSkin() {
   const api = useApi();
   const queryClient = useQueryClient();
   return useMutation({
-    // analyzing.tsx / results.tsx render their own retry UI for analysis failures.
+    // results.tsx renders its own retry UI for analysis failures.
     meta: { suppressErrorToast: true },
     // `buildRoutine: false` runs the free quiz-only analysis without generating
     // a routine (the "risk it" path); omitted/true builds the routine.

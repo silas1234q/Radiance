@@ -13,6 +13,8 @@ import { useUser } from '@clerk/clerk-expo';
 import { useRevenueCat, PAYWALL_RESULT } from '../../providers/RevenueCatProvider';
 import { uploadSkinPhoto } from '../../api/uploadPhoto';
 import { useGetToken } from '../../hooks/useApi';
+import { useTrack } from '../../hooks/useTrack';
+import type { AnalysisTrigger } from '../../lib/analytics/events';
 import { markOnboarded } from '../../lib/appStateCache';
 import { getErrorMessage } from '../../lib/errors';
 import CircularProgress from '../../components/ui/CircularProgress';
@@ -276,6 +278,7 @@ export default function ResultsScreen() {
   const { data: profile, isLoading } = useSkinProfile();
 
   const getToken = useGetToken();
+  const track = useTrack();
   const { purchasePackage, isPro, isReady } = useRevenueCat();
   const analyze = useAnalyzeSkin();
   const analyzeWithScan = useAnalyzeSkinWithScan();
@@ -295,48 +298,85 @@ export default function ResultsScreen() {
   // run the YouCam scan analysis; without one (scan skipped) we fall back to the
   // OpenAI quiz-only analysis. Shared by the purchase flow and the auto-unlock
   // for already-subscribed customers.
-  const runAnalysisAndUnlock = useCallback(async () => {
-    setUnlockError(null);
-    setIsScanError(false);
-    setScanLoader(!!localPhoto); // scan animation when there's a photo to analyze
-    setUnlocking(true);
-    try {
-      if (localPhoto) {
-        const token = await getToken();
-        if (!token) { throw new Error('Could not authenticate. Please try again.'); }
-        const url = await uploadSkinPhoto(localPhoto, token);
-        await analyzeWithScan.mutateAsync(url);
-      } else {
-        await analyze.mutateAsync({ buildRoutine: true });
+  const runAnalysisAndUnlock = useCallback(
+    async (trigger: AnalysisTrigger = 'auto_unlock') => {
+      setUnlockError(null);
+      setIsScanError(false);
+      setScanLoader(!!localPhoto); // scan animation when there's a photo to analyze
+      setUnlocking(true);
+      // This is the slowest thing in onboarding (upload + AI) and the last step
+      // before the payoff, so its duration and failure rate are worth measuring
+      // directly rather than inferring from a gap between screens.
+      const source = localPhoto ? 'scan' : 'quiz_only';
+      const startedAt = Date.now();
+      track('onboarding_analysis_started', { source, trigger });
+      try {
+        if (localPhoto) {
+          const token = await getToken();
+          if (!token) { throw new Error('Could not authenticate. Please try again.'); }
+          const url = await uploadSkinPhoto(localPhoto, token);
+          await analyzeWithScan.mutateAsync(url);
+        } else {
+          await analyze.mutateAsync({ buildRoutine: true });
+        }
+        track('onboarding_analysis_succeeded', {
+          source,
+          trigger,
+          duration_ms: Date.now() - startedAt,
+        });
+        setUnlocked(true);
+      } catch (err: any) {
+        // `getErrorMessage` turns the upload/analysis failure shapes into copy a
+        // user can act on ("No connection…") instead of "Network request failed".
+        const message = getErrorMessage(err);
+        const isScan = err?.type === 'SCAN_ERROR';
+        track('onboarding_analysis_failed', {
+          source,
+          trigger,
+          duration_ms: Date.now() - startedAt,
+          message,
+          is_scan_error: isScan,
+        });
+        setUnlockError(message);
+        if (isScan) setIsScanError(true);
+      } finally {
+        setUnlocking(false);
       }
-      setUnlocked(true);
-    } catch (err: any) {
-      // `getErrorMessage` turns the upload/analysis failure shapes into copy a
-      // user can act on ("No connection…") instead of "Network request failed".
-      setUnlockError(getErrorMessage(err));
-      if (err?.type === 'SCAN_ERROR') setIsScanError(true);
-    } finally {
-      setUnlocking(false);
-    }
-  }, [localPhoto, getToken, analyzeWithScan, analyze]);
+    },
+    [localPhoto, getToken, analyzeWithScan, analyze, track],
+  );
 
   // "Get Radiance Pro": purchase the selected package (unless already Pro), then
   // run the analysis and unlock.
   const handleSubscribe = async (pkg: PurchasesPackage) => {
     if (unlocking || purchasing) return;
     setUnlockError(null);
+    const plan = pkg.product.identifier;
+    track('onboarding_paywall_subscribe_tapped', {
+      plan,
+      price: pkg.product.price,
+      currency: pkg.product.currencyCode,
+    });
     if (!isPro) {
       setPurchasing(true);
       const outcome = await purchasePackage(pkg);
       setPurchasing(false);
       if (!outcome.entitled) {
-        // Stay quiet if the customer simply cancelled the purchase sheet.
-        if (outcome.result !== PAYWALL_RESULT.CANCELLED)
-          setUnlockError(outcome.message ?? 'Something went wrong. Please try again.');
+        // Cancel vs. failure are separate events: a cancel is a pricing/intent
+        // signal, a failure is a bug or a store problem, and averaging them
+        // together hides both.
+        if (outcome.result === PAYWALL_RESULT.CANCELLED) {
+          track('onboarding_purchase_cancelled', { plan });
+        } else {
+          const message = outcome.message ?? 'Something went wrong. Please try again.';
+          track('onboarding_purchase_failed', { plan, message });
+          setUnlockError(message);
+        }
         return;
       }
+      track('onboarding_purchase_succeeded', { plan });
     }
-    await runAnalysisAndUnlock();
+    await runAnalysisAndUnlock('purchase');
   };
 
   // "Risk it": skip the (more accurate) YouCam scan analysis entirely and run
@@ -346,12 +386,30 @@ export default function ResultsScreen() {
     setUnlockError(null);
     setScanLoader(false); // quiz-only OpenAI analysis → simple loader
     setUnlocking(true);
+    track('onboarding_paywall_skipped');
+    // Always quiz-only here, even when a photo was captured — that's what
+    // "risk it" means — so the source is hard-coded rather than derived.
+    const startedAt = Date.now();
+    track('onboarding_analysis_started', { source: 'quiz_only', trigger: 'skip' });
     try {
       // Free path: quiz-only analysis, no routine (routines are Pro-only).
       await analyze.mutateAsync({ buildRoutine: false });
+      track('onboarding_analysis_succeeded', {
+        source: 'quiz_only',
+        trigger: 'skip',
+        duration_ms: Date.now() - startedAt,
+      });
       setUnlocked(true);
     } catch (err: any) {
-      setUnlockError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      track('onboarding_analysis_failed', {
+        source: 'quiz_only',
+        trigger: 'skip',
+        duration_ms: Date.now() - startedAt,
+        message,
+        is_scan_error: false,
+      });
+      setUnlockError(message);
     } finally {
       setUnlocking(false);
     }
@@ -363,9 +421,33 @@ export default function ResultsScreen() {
   useEffect(() => {
     if (locked === '1' && isReady && isPro && !unlocked && !autoUnlockRef.current) {
       autoUnlockRef.current = true;
-      runAnalysisAndUnlock();
+      runAnalysisAndUnlock('auto_unlock');
     }
   }, [locked, isReady, isPro, unlocked, runAnalysisAndUnlock]);
+
+  // Reaching the locked results is the step immediately before the paywall, so
+  // `locked_viewed` → `paywall_viewed` → `subscribe_tapped` isolates how much
+  // is lost to the sheet itself. Waits for `isReady` so `is_pro` is truthful.
+  const lockedViewTracked = useRef(false);
+  useEffect(() => {
+    if (!showLocked || !isReady || lockedViewTracked.current) return;
+    lockedViewTracked.current = true;
+    track('onboarding_results_locked_viewed', { has_photo: !!localPhoto, is_pro: isPro });
+  }, [showLocked, isReady, isPro, localPhoto, track]);
+
+  // The payoff. Fires once real profile data is on screen, whichever path got
+  // the user here (purchase, restore, or the free estimate).
+  const resultsViewTracked = useRef(false);
+  useEffect(() => {
+    if (showLocked || isLoading || !profile || resultsViewTracked.current) return;
+    resultsViewTracked.current = true;
+    track('onboarding_results_viewed', {
+      analysis_source: profile.analysisSource ?? 'unknown',
+      has_scan: !!(profile.scanData as { metrics?: unknown } | null)?.metrics,
+      skin_score: profile.skinScore ?? 0,
+      concern_count: ((profile.concerns as string[]) ?? []).length,
+    });
+  }, [showLocked, isLoading, profile, track]);
 
   if (showLocked) {
     // Wait until we know the entitlement state to avoid flashing the paywall.
@@ -383,7 +465,13 @@ export default function ResultsScreen() {
         <LockedResults
           photoUrl={localPhoto}
           hidePaywall
-          onRetry={isScanError ? () => router.replace('/(onboarding)/face-scan') : runAnalysisAndUnlock}
+          // Wrapped, not passed by reference: `onRetry` lands on a Pressable's
+          // onPress, which would hand the press event in as `trigger`.
+          onRetry={
+            isScanError
+              ? () => router.replace('/(onboarding)/face-scan')
+              : () => runAnalysisAndUnlock('auto_unlock')
+          }
           onSubscribe={handleSubscribe}
           onSkip={handleSkip}
           loading={!unlockError}
@@ -593,6 +681,10 @@ export default function ResultsScreen() {
         <Animated.View entering={FadeInDown.delay(cardIndex * 120 + 200).duration(500)} className="px-5 pt-6">
           <Pressable
             onPress={() => {
+              // Only for someone who wasn't already onboarded — an existing user
+              // who re-scanned also exits through this button, and counting them
+              // would inflate the funnel's final step.
+              if (!isOnboarded) track('onboarding_completed', { had_error: hasError });
               // Belt and braces alongside the write in `useSubmitQuiz` — anyone
               // leaving onboarding through here is onboarded, and the cached
               // flag drives the next cold start's first navigation.

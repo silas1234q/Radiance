@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +7,7 @@ import Animated, { SlideInDown } from 'react-native-reanimated';
 import { PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases';
 import { COLORS, GRADIENTS } from '../../constants/theme';
 import { useRevenueCat } from '../../providers/RevenueCatProvider';
+import { useTrack } from '../../hooks/useTrack';
 import LegalModal, { type LegalDoc } from '../legal/LegalModal';
 import { toast } from '../../lib/toast';
 
@@ -121,6 +122,7 @@ export default function SubscribeGate({
   loading: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const track = useTrack();
   const { offerings, offeringsStatus, refreshOfferings, restore } = useRevenueCat();
   const plans = useMemo(
     () => buildPlans(offerings?.current?.availablePackages ?? []),
@@ -132,11 +134,28 @@ export default function SubscribeGate({
   const [retrying, setRetrying] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
 
+  // Impression fires once the offering resolves, not on mount: the sheet renders
+  // first with zero plans and a "Loading plans…" CTA, and counting that as a
+  // paywall view would make the tap-through rate look far worse than it is.
+  // `plan_count: 0` with a settled status is the genuine "plans failed to load"
+  // case, which is worth seeing.
+  const viewTracked = useRef(false);
+  useEffect(() => {
+    if (viewTracked.current || offeringsStatus === 'loading') return;
+    viewTracked.current = true;
+    track('onboarding_paywall_viewed', {
+      plan_count: plans.length,
+      offerings_status: offeringsStatus,
+    });
+  }, [offeringsStatus, plans.length, track]);
+
   const handleRestore = async () => {
     if (restoring || loading) return;
     setRestoring(true);
+    track('onboarding_paywall_restore_tapped');
     try {
       const outcome = await restore();
+      track('onboarding_paywall_restore_completed', { status: outcome.status });
       // On success we say nothing on purpose: `isPro` flips, the paywall is
       // replaced by the unlocked results, and that *is* the feedback. An alert
       // here would just be a tap in front of what they came for.
@@ -155,6 +174,7 @@ export default function SubscribeGate({
   const handleRetry = async () => {
     if (retrying || loading) return;
     setRetrying(true);
+    track('onboarding_paywall_offerings_retried');
     try {
       await refreshOfferings();
     } finally {
@@ -220,7 +240,12 @@ export default function SubscribeGate({
           return (
             <Pressable
               key={p.id}
-              onPress={() => setSelected(p.id)}
+              onPress={() => {
+                // Which tile people land on before buying (or before leaving) is
+                // the pricing signal the purchase event alone can't give you.
+                track('onboarding_paywall_plan_selected', { plan: p.id });
+                setSelected(p.id);
+              }}
               style={[
                 styles.planTile,
                 isSelected ? styles.planTileActive : styles.planTileInactive,

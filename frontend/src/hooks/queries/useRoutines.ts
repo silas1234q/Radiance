@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, type MutateOptions } from '@tanstack/react-query';
 import { useApi } from '../useApi';
+import { useTrack } from '../useTrack';
 import {
   MUTATION_KEYS,
   now,
@@ -7,6 +8,17 @@ import {
   type ToggleStepVars,
 } from '../../lib/mutationDefaults';
 import type { Routine, RoutineStep, DetailedInsight } from '../../types/api';
+
+/**
+ * Feature-usage events live on the mutation hooks rather than the screens.
+ * Every routine action funnels through here, so instrumenting one layer covers
+ * every call site and can't be missed when a new screen reuses a hook.
+ *
+ * The two offline-queued mutations (complete, toggle) track at tap time, not on
+ * success: the tap is the usage, and a write that replays three hours later
+ * shouldn't be dated three hours later. PostHog queues its own events offline,
+ * so nothing is lost either way.
+ */
 
 /** Rollback context for the optimistic routine updates. */
 type RoutinesSnapshot = { previous?: Routine[] };
@@ -23,20 +35,26 @@ export function useRoutines() {
 export function useDeleteRoutine() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const track = useTrack();
   return useMutation({
     mutationFn: (routineId: string) =>
       api.fetch(`/routines/${routineId}`, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routines'] }),
+    onSuccess: (_data, routineId) => {
+      track('routine_deleted', { routine_id: routineId });
+      queryClient.invalidateQueries({ queryKey: ['routines'] });
+    },
   });
 }
 
 export function useDeleteStep() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const track = useTrack();
   return useMutation({
     mutationFn: ({ routineId, stepId }: { routineId: string; stepId: string }) =>
       api.fetch(`/routines/${routineId}/steps/${stepId}`, { method: 'DELETE' }),
-    onSuccess: () => {
+    onSuccess: (_data, { routineId }) => {
+      track('routine_step_deleted', { routine_id: routineId });
       queryClient.invalidateQueries({ queryKey: ['routines'] });
       queryClient.invalidateQueries({ queryKey: ['routine-insight-detailed'] });
     },
@@ -46,6 +64,7 @@ export function useDeleteStep() {
 export function useAddStep() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const track = useTrack();
   return useMutation({
     mutationFn: ({ routineId, name, description, productId }: {
       routineId: string; name: string; description?: string; productId?: string;
@@ -53,7 +72,10 @@ export function useAddStep() {
       method: 'POST',
       body: JSON.stringify({ name, description, productId }),
     }),
-    onSuccess: () => {
+    onSuccess: (_data, { routineId, productId }) => {
+      // Step names are user-authored free text — only whether a product was
+      // attached, which is the thing worth knowing about shelf adoption.
+      track('routine_step_added', { routine_id: routineId, has_product: !!productId });
       queryClient.invalidateQueries({ queryKey: ['routines'] });
       queryClient.invalidateQueries({ queryKey: ['routine-insight-detailed'] });
     },
@@ -69,19 +91,24 @@ export interface RoutineReminderInput {
 export function useCreateCustomRoutine() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const track = useTrack();
   return useMutation({
     mutationFn: ({ name, ...reminder }: { name: string } & RoutineReminderInput) =>
       api.fetch<Routine>('/routines/custom', {
         method: 'POST',
         body: JSON.stringify({ name, ...reminder }),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routines'] }),
+    onSuccess: (_data, vars) => {
+      track('routine_created', { has_reminder: !!vars.reminderEnabled });
+      queryClient.invalidateQueries({ queryKey: ['routines'] });
+    },
   });
 }
 
 export function useUpdateRoutine() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const track = useTrack();
   return useMutation({
     mutationFn: ({
       routineId,
@@ -94,13 +121,22 @@ export function useUpdateRoutine() {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['routines'] }),
+    onSuccess: (_data, { routineId, data }) => {
+      // Which fields were edited, never their values — routine names are free
+      // text. Sorted so the property groups cleanly in PostHog.
+      track('routine_updated', {
+        routine_id: routineId,
+        fields: Object.keys(data).sort().join(','),
+      });
+      queryClient.invalidateQueries({ queryKey: ['routines'] });
+    },
   });
 }
 
 export function useUpdateStep() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const track = useTrack();
   return useMutation({
     mutationFn: ({ routineId, stepId, data }: {
       routineId: string;
@@ -110,7 +146,8 @@ export function useUpdateStep() {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
-    onSuccess: () => {
+    onSuccess: (_data, { routineId }) => {
+      track('routine_step_updated', { routine_id: routineId });
       queryClient.invalidateQueries({ queryKey: ['routines'] });
       queryClient.invalidateQueries({ queryKey: ['routine-insight-detailed'] });
     },
@@ -119,12 +156,16 @@ export function useUpdateStep() {
 
 export function useReorderSteps() {
   const api = useApi();
+  const track = useTrack();
   return useMutation({
     mutationFn: ({ routineId, stepIds }: { routineId: string; stepIds: string[] }) =>
       api.fetch(`/routines/${routineId}/steps/reorder`, {
         method: 'PUT',
         body: JSON.stringify({ stepIds }),
       }),
+    onSuccess: (_data, { routineId, stepIds }) => {
+      track('routine_steps_reordered', { routine_id: routineId, step_count: stepIds.length });
+    },
   });
 }
 
@@ -149,6 +190,7 @@ export function useDetailedInsight(routineId?: string, enabled = true) {
  */
 export function useCompleteRoutine() {
   const queryClient = useQueryClient();
+  const track = useTrack();
   const mutation = useMutation<Routine, unknown, CompleteRoutineVars, RoutinesSnapshot>({
     mutationKey: MUTATION_KEYS.completeRoutine,
     onMutate: async ({ routineId }) => {
@@ -179,15 +221,20 @@ export function useCompleteRoutine() {
   // the queue needs for correct day attribution.
   return {
     ...mutation,
-    mutate: (routineId: string, options?: MutateOptions<Routine, unknown, CompleteRoutineVars>) =>
-      mutation.mutate({ routineId, occurredAt: now() }, options),
-    mutateAsync: (routineId: string) =>
-      mutation.mutateAsync({ routineId, occurredAt: now() }),
+    mutate: (routineId: string, options?: MutateOptions<Routine, unknown, CompleteRoutineVars>) => {
+      track('routine_completed', { routine_id: routineId });
+      return mutation.mutate({ routineId, occurredAt: now() }, options);
+    },
+    mutateAsync: (routineId: string) => {
+      track('routine_completed', { routine_id: routineId });
+      return mutation.mutateAsync({ routineId, occurredAt: now() });
+    },
   };
 }
 
 export function useToggleStep() {
   const queryClient = useQueryClient();
+  const track = useTrack();
   const mutation = useMutation<RoutineStep, unknown, ToggleStepVars, RoutinesSnapshot>({
     mutationKey: MUTATION_KEYS.toggleStep,
     onMutate: async ({ routineId, stepId }) => {
@@ -214,9 +261,13 @@ export function useToggleStep() {
 
   return {
     ...mutation,
-    mutate: (vars: { routineId: string; stepId: string }) =>
-      mutation.mutate({ ...vars, occurredAt: now() }),
-    mutateAsync: (vars: { routineId: string; stepId: string }) =>
-      mutation.mutateAsync({ ...vars, occurredAt: now() }),
+    mutate: (vars: { routineId: string; stepId: string }) => {
+      track('routine_step_toggled', { routine_id: vars.routineId });
+      return mutation.mutate({ ...vars, occurredAt: now() });
+    },
+    mutateAsync: (vars: { routineId: string; stepId: string }) => {
+      track('routine_step_toggled', { routine_id: vars.routineId });
+      return mutation.mutateAsync({ ...vars, occurredAt: now() });
+    },
   };
 }

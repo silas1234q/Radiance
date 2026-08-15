@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, Pressable, ActivityIndicator, Image } from "react-native";
 import { useSSO, useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
@@ -8,16 +8,27 @@ import Svg, { Path } from "react-native-svg";
 import GoogleLogo from '@/src/assets/images/googleimage.png'
 import { Ionicons } from "@expo/vector-icons";
 import LegalModal, { type LegalDoc } from "@/src/components/legal/LegalModal";
+import { useTrack } from "@/src/hooks/useTrack";
 
 export default function AuthScreen() {
   const { startSSOFlow } = useSSO();
   const { user } = useUser();
   const router = useRouter();
+  const track = useTrack();
   const [loading, setLoading] = useState<"apple" | "google" | null>(null);
   const [legalModal, setLegalModal] = useState<LegalDoc | null>(null);
 
+  // First step of the activation funnel: everyone who installs and opens the
+  // app lands here, so `Application Installed` → `auth_viewed` → `auth_succeeded`
+  // is the drop-off worth watching.
+  useEffect(() => {
+    track('auth_viewed');
+  }, [track]);
+
   const handleOAuth = async (strategy: "oauth_apple" | "oauth_google") => {
-    setLoading(strategy === "oauth_apple" ? "apple" : "google");
+    const provider = strategy === "oauth_apple" ? "apple" : "google";
+    setLoading(provider);
+    track('auth_started', { provider });
     try {
       const { createdSessionId, setActive, signIn, signUp } = await startSSOFlow({
         strategy,
@@ -36,14 +47,22 @@ export default function AuthScreen() {
           sessionId === signIn?.createdSessionId &&
           sessionId !== signUp?.createdSessionId;
         const isOnboarded = isReturning || !!user?.publicMetadata?.onboarded;
+        track('auth_succeeded', { provider, is_returning: isReturning });
         router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
       } else {
+        // No session and no throw: the provider sheet was closed. Tracked
+        // separately from a failure — this is the "changed their mind" cohort,
+        // and lumping it in with errors would make auth look broken.
+        track('auth_dismissed', { provider });
         setLoading(null);
       }
     } catch (err: unknown) {
       console.log("SSO Error:", JSON.stringify(err, null, 2));
       const clerkErr = err as { errors?: { code?: string; message?: string }[] };
-      if (clerkErr?.errors?.[0]?.code !== "session_exists") {
+      const code = clerkErr?.errors?.[0]?.code ?? 'unknown';
+      // Clerk's code, never the message — messages can carry the email address.
+      track('auth_failed', { provider, code });
+      if (code !== "session_exists") {
         toast.error(getErrorMessage(err, "Sign in failed"));
       }
       setLoading(null);
@@ -129,14 +148,20 @@ export default function AuthScreen() {
         <Text className="text-[13px] text-skin-text-tertiary font-poppins text-center leading-[18px]">
           By continuing, you agree to our{' '}
           <Text
-            onPress={() => setLegalModal('terms')}
+            onPress={() => {
+              track('auth_legal_opened', { doc: 'terms' });
+              setLegalModal('terms');
+            }}
             style={{ textDecorationLine: 'underline' }}
           >
             Terms of Use
           </Text>
           {' '}and{' '}
           <Text
-            onPress={() => setLegalModal('privacy')}
+            onPress={() => {
+              track('auth_legal_opened', { doc: 'privacy' });
+              setLegalModal('privacy');
+            }}
             style={{ textDecorationLine: 'underline' }}
           >
             Privacy Policy

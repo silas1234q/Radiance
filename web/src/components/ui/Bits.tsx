@@ -80,29 +80,55 @@ export function PillButton({
   )
 }
 
-/** Decorative gradient plate standing in for app photography. */
+/**
+ * Decorative photo plate.
+ *
+ * `from`/`to` are no longer the subject — they paint the box while the image is
+ * still loading, so a slow connection gets a tinted panel in the page's palette
+ * rather than a white hole. Callers keep passing the tint that suits their
+ * section; `src` is what actually shows.
+ */
 export function Plate({
   className = '',
+  src,
   from = '#ffd7e3',
   to = '#c9b6f2',
 }: {
   className?: string
+  src?: string
   from?: string
   to?: string
 }) {
   return (
     <div
-      className={`relative overflow-hidden ${className}`}
+      // Deliberately no `position` utility here. Callers supply their own, and
+      // the backdrop ones pass `absolute inset-0` — Tailwind emits `.relative`
+      // *after* `.absolute`, so a hardcoded `relative` wins the cascade no
+      // matter the class order, dropping the plate back into flow. With its
+      // contents absolutely positioned that left a zero-height box: the photo
+      // silently vanished. Children fill the box instead of pinning to it, so
+      // the plate needs no positioning context of its own.
+      className={`overflow-hidden ${className}`}
       style={{ background: `linear-gradient(150deg, ${from}, ${to})` }}
       aria-hidden="true"
     >
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(60% 45% at 50% 28%, rgb(255 255 255 / 0.6) 0%, transparent 70%)',
-        }}
-      />
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="block h-full w-full object-cover"
+        />
+      ) : (
+        <div
+          className="h-full w-full"
+          style={{
+            background:
+              'radial-gradient(60% 45% at 50% 28%, rgb(255 255 255 / 0.6) 0%, transparent 70%)',
+          }}
+        />
+      )}
     </div>
   )
 }

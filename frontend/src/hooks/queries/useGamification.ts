@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../useApi';
+import { useTrack } from '../useTrack';
 import type { GamificationSummary, DailyCompletionData, StreakRestoreResult, XpHistoryEntry } from '../../types/api';
 
 export function useGamification() {
@@ -32,10 +33,12 @@ export function useXpHistory(days: number = 30) {
 export function useRestoreStreak() {
   const api = useApi();
   const queryClient = useQueryClient();
+  const track = useTrack();
   return useMutation({
     mutationFn: () =>
       api.fetch<StreakRestoreResult>('/gamification/restore-streak', { method: 'POST' }),
     onSuccess: () => {
+      track('streak_restored');
       queryClient.invalidateQueries({ queryKey: ['gamification'] });
     },
   });

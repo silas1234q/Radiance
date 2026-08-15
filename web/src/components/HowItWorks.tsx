@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { PhoneFrame, ScanScreen, DashScreen } from './ui/Phone'
+import { PhoneFrame, ScanResultShot, AnalysisShot } from './ui/Phone'
+import { skin1, skin2, skin3 } from '../assets/skins'
 import { Pill, Check, PillButton, Plate } from './ui/Bits'
 import { Underline, Sparkle } from './ui/Ink'
 import Reveal from './ui/Reveal'
@@ -40,6 +41,7 @@ type Step = {
   body: string
   checks: string[]
   panel: ReactNode
+  img: string
   from: string
   to: string
   cta?: string
@@ -48,27 +50,37 @@ type Step = {
 const steps: Step[] = [
   {
     n: '01',
-    tag: 'Scan',
-    title: 'Analyse your glow',
-    body: 'Point the camera once. Radiance captures hydration, balance and stress signals from your skin — setting your care tone for the day.',
-    checks: ['Real-time skin scan results', 'Personalised hydration score', 'UV and humidity detection'],
-    panel: (
-      <div className="w-[11.5rem]">
-        <PhoneFrame>
-          <ScanScreen />
-        </PhoneFrame>
-      </div>
-    ),
+    tag: 'Quiz',
+    title: 'Answer a few questions',
+    body: 'Radiance starts with a ninety-second quiz — your skin type, what you want to fix, what irritates you, how you sleep. It becomes the profile every recommendation is measured against.',
+    checks: [
+      'About ninety seconds to finish',
+      'Sensitivities flagged before anything is suggested',
+      'Goals you can change any time',
+    ],
+    panel: <QuizPanel />,
+    img: skin2,
     from: '#ffd9e6',
     to: '#f7b8cf',
   },
   {
     n: '02',
-    tag: 'Understand',
-    title: 'Answer a few questions',
-    body: 'A ninety-second quiz fills in what a camera cannot see — lifestyle, sensitivity, sleep and the goals you actually care about.',
-    checks: ['Under two minutes to complete', 'Ingredient sensitivities flagged', 'Goals you can change any time'],
-    panel: <QuizPanel />,
+    tag: 'Scan',
+    title: 'Add a face scan',
+    body: 'Optional, and it takes one photo. Your phone checks the framing, the distance and that your eyes are open before the shot counts — then the analysis reads hydration, oil balance, texture and tone from it.',
+    checks: [
+      'Framing and lighting checked on your device',
+      'One photo from the front camera',
+      'Skip it and keep your quiz results',
+    ],
+    panel: (
+      <div className="w-[11.5rem]">
+        <PhoneFrame>
+          <ScanResultShot />
+        </PhoneFrame>
+      </div>
+    ),
+    img: skin1,
     from: '#e8ddff',
     to: '#c0abf0',
   },
@@ -76,18 +88,23 @@ const steps: Step[] = [
     n: '03',
     tag: 'Glow',
     title: 'Follow a routine that moves',
-    body: 'Your AM and PM steps arrive with the reasoning behind each one — and quietly rewrite themselves as your skin changes.',
-    checks: ['AM and PM routines with rationale', 'Streaks and XP that keep you going', 'Progress you can actually see'],
+    body: 'Your AM and PM steps arrive with the reasoning behind each one — and quietly rewrite themselves as your skin changes. Every scan is plotted, so the progress is something you can point at.',
+    checks: [
+      'AM and PM steps, each with a reason',
+      'Streaks and XP for showing up',
+      'Every scan plotted over time',
+    ],
     panel: (
       <div className="w-[11.5rem]">
         <PhoneFrame>
-          <DashScreen />
+          <AnalysisShot />
         </PhoneFrame>
       </div>
     ),
+    img: skin3,
     from: '#d8ecff',
     to: '#a9c6f0',
-    cta: 'Start your free scan',
+    cta: 'Start with the quiz',
   },
 ]
 
@@ -120,7 +137,7 @@ export default function HowItWorks() {
                     i % 2 ? 'md:order-2' : ''
                   }`}
                 >
-                  <Plate className="absolute inset-0" from={step.from} to={step.to} />
+                  <Plate className="absolute inset-0" src={step.img} from={step.from} to={step.to} />
                   <span className="absolute left-5 top-4 font-display text-[3.4rem] font-bold leading-none text-white/45">
                     {step.n}
                   </span>

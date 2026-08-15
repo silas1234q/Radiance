@@ -1,9 +1,36 @@
-import { Sparkle } from './ui/Ink'
+import { Link } from 'react-router'
+import Logo from './ui/Logo'
+import { SUPPORT_EMAIL } from '../content/legal'
 
-const footerLinks = [
-  { heading: 'Product', links: ['Face scan', 'Routines', 'Product scanner', 'Pricing'] },
-  { heading: 'Company', links: ['About', 'Journal', 'Careers', 'Press'] },
-  { heading: 'Support', links: ['Help centre', 'Contact', 'Privacy', 'Terms'] },
+type FooterLink = { label: string; href: string }
+
+const footerLinks: { heading: string; links: FooterLink[] }[] = [
+  {
+    heading: 'Product',
+    links: [
+      { label: 'Face scan', href: '/face-scan' },
+      { label: 'Routines', href: '/routines' },
+      { label: 'Product scanner', href: '/product-scanner' },
+      { label: 'Pricing', href: '/pricing' },
+    ],
+  },
+  {
+    // Journal, Careers and Press were dropped — there is nothing real behind
+    // them yet, and a live link to invented content is worse than no link.
+    heading: 'Company',
+    links: [
+      { label: 'About', href: '/about' },
+      { label: 'Contact', href: `mailto:${SUPPORT_EMAIL}` },
+    ],
+  },
+  {
+    heading: 'Support',
+    links: [
+      { label: 'Help centre', href: '/help' },
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
+    ],
+  },
 ]
 
 const socials = [
@@ -30,10 +57,10 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl border-t border-hair pt-12">
         <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
-            <a href="/" className="flex items-center gap-2">
-              <Sparkle className="h-4 w-4" />
+            <Link to="/" className="flex items-center gap-1.5">
+              <Logo className="h-9 w-9" />
               <span className="font-display text-[1.15rem] font-bold tracking-tight">Radiance</span>
-            </a>
+            </Link>
             <p className="mt-3 max-w-[28ch] text-[0.88rem] leading-relaxed text-muted">
               AI skincare that reads your skin, not the trend cycle.
             </p>
@@ -59,16 +86,23 @@ export default function Footer() {
                 {col.heading}
               </h4>
               <ul className="mt-4 space-y-2.5">
-                {col.links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#"
-                      className="text-[0.88rem] text-muted transition-colors hover:text-primary"
-                    >
-                      {link}
-                    </a>
-                  </li>
-                ))}
+                {col.links.map((link) => {
+                  const className =
+                    'text-[0.88rem] text-muted transition-colors hover:text-primary'
+                  return (
+                    <li key={link.label}>
+                      {link.href.startsWith('/') ? (
+                        <Link to={link.href} className={className}>
+                          {link.label}
+                        </Link>
+                      ) : (
+                        <a href={link.href} className={className}>
+                          {link.label}
+                        </a>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           ))}

@@ -20,6 +20,7 @@ import {
 import { validateFaceScan } from '../../lib/faceValidation';
 import { useScanCredits, useVerifyScanPurchase } from '../../hooks/queries/useScanCredits';
 import { useRevenueCat } from '../../providers/RevenueCatProvider';
+import { useTrack } from '../../hooks/useTrack';
 import { COLORS } from '../../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -101,6 +102,7 @@ function FaceScanInner() {
   const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
   const isOnboarding = onboarding === '1';
   const detector = useFaceDetection();
+  const track = useTrack();
   const [permission, requestPermission] = useCameraPermissions();
 
   const { top } = useSafeAreaInsets();
@@ -139,6 +141,25 @@ function FaceScanInner() {
     }
   }, [permission, requestPermission]);
 
+  // Fires once the permission state resolves (it's null on first render), so
+  // `permission_granted` reflects reality rather than "not asked yet".
+  const scanViewTracked = useRef(false);
+  useEffect(() => {
+    if (!permission || scanViewTracked.current) return;
+    scanViewTracked.current = true;
+    track('scan_viewed', { permission_granted: permission.granted, is_onboarding: isOnboarding });
+  }, [permission, track, isOnboarding]);
+
+  // Camera denial is a hard stop for the scan path — worth its own event rather
+  // than inferring it from the absence of a capture.
+  const denialTracked = useRef(false);
+  useEffect(() => {
+    if (!permission || permission.granted || denialTracked.current) return;
+    if (permission.canAskAgain) return; // still pending a decision
+    denialTracked.current = true;
+    track('scan_permission_denied', { can_ask_again: false, is_onboarding: isOnboarding });
+  }, [permission, track, isOnboarding]);
+
   const onCameraReady = useCallback(async () => {
     setCameraReady(true);
     try {
@@ -156,12 +177,17 @@ function FaceScanInner() {
     if (purchasing) return; // prevent double-tap
     setPurchaseError(null);
     setPurchasing(true);
+    track('scan_credit_purchase_started');
     try {
       const outcome = await purchaseScanCredit();
       if (!outcome.purchased) {
-        if (outcome.message) setPurchaseError(outcome.message);
+        if (outcome.message) {
+          setPurchaseError(outcome.message);
+          track('scan_credit_purchase_failed', { message: outcome.message });
+        }
         return;
       }
+      track('scan_credit_purchased');
       // Apple payment succeeded — verify on backend to credit the user
       if (outcome.transactionId) {
         try {
@@ -176,10 +202,11 @@ function FaceScanInner() {
       setShowCreditPrompt(false);
     } catch {
       setPurchaseError('Something went wrong. Please try again.');
+      track('scan_credit_purchase_failed', { message: 'unexpected_error' });
     } finally {
       setPurchasing(false);
     }
-  }, [purchasing, purchaseScanCredit, verifyScanPurchase, refetchScanCredits]);
+  }, [purchasing, purchaseScanCredit, verifyScanPurchase, refetchScanCredits, track]);
 
   const capture = useCallback(async () => {
     if (phase !== 'preview' || !cameraRef.current || !cameraReady) return;
@@ -189,6 +216,12 @@ function FaceScanInner() {
     if (scanCreditsData) {
       const { freeScansRemaining, availableCredits } = scanCreditsData;
       if (freeScansRemaining <= 0 && availableCredits <= 0) {
+        track('scan_credit_prompt_viewed', {
+          free_scans_remaining: freeScansRemaining,
+          available_credits: availableCredits,
+          has_credit_package: !!scanCreditPackage,
+          is_onboarding: isOnboarding,
+        });
         setShowCreditPrompt(true);
         return;
       }
@@ -196,12 +229,17 @@ function FaceScanInner() {
 
     let prevBrightness: number | null = null;
     const fail = (reason: string) => {
+      // One event for every way a capture can end badly — validation rejections
+      // and thrown errors alike — with the reason as the breakdown dimension.
+      // These reasons are a closed set from `validateFaceScan`, so they group.
+      track('scan_capture_failed', { reason, flash_on: flashOn, is_onboarding: isOnboarding });
       setError(reason);
       setPhase('preview');
     };
 
     try {
       setPhase('capturing');
+      track('scan_capture_started', { flash_on: flashOn, is_onboarding: isOnboarding });
 
       if (flashOn) {
         // Screen flash: crank the display to full white/brightness and hold it
@@ -248,6 +286,10 @@ function FaceScanInner() {
         return;
       }
 
+      // Photo taken AND passed validation — the step that actually advances the
+      // funnel. Never carries the uri.
+      track('scan_captured', { flash_on: flashOn, is_onboarding: isOnboarding });
+
       // Hand the captured photo off to the processing screen, which uploads it,
       // runs the scan analysis, and routes to results.
       router.replace(`/(onboarding)/scan-processing?uri=${encodeURIComponent(photo.uri)}`);
@@ -258,7 +300,18 @@ function FaceScanInner() {
       }
       fail('Something went wrong. Please try again.');
     }
-  }, [phase, cameraReady, detector, router, flash, flashOn, scanCreditsData]);
+  }, [
+    phase,
+    cameraReady,
+    detector,
+    router,
+    flash,
+    flashOn,
+    scanCreditsData,
+    scanCreditPackage,
+    track,
+    isOnboarding,
+  ]);
 
   // --- Permission states ---
   if (!permission) {
@@ -313,9 +366,11 @@ function FaceScanInner() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() =>
-            isOnboarding ? router.replace('/(onboarding)/results?locked=1') : router.back()
-          }
+          onPress={() => {
+            track('scan_skipped', { is_onboarding: isOnboarding });
+            if (isOnboarding) router.replace('/(onboarding)/results?locked=1');
+            else router.back();
+          }}
           className="mt-4 py-2"
         >
           <Text className="text-[14px] font-poppins-medium text-skin-text-tertiary">Not now</Text>

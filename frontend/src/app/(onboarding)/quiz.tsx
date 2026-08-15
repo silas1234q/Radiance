@@ -26,6 +26,8 @@ import QuestionCard from '../../components/quiz/QuestionCard';
 import ToneSwatches from '../../components/quiz/ToneSwatches';
 import Button from '../../components/ui/Button';
 import { useSubmitQuiz } from '../../hooks/queries/useQuiz';
+import { useTrack } from '../../hooks/useTrack';
+import { getErrorMessage } from '../../lib/errors';
 import { Entypo } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -33,6 +35,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function QuizScreen() {
   const router = useRouter();
+  const track = useTrack();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [animKey, setAnimKey] = useState(0);
@@ -76,6 +79,25 @@ export default function QuizScreen() {
     headerTranslateY.value = withTiming(0, { duration: 450, easing: Easing.out(Easing.cubic) });
     setAnimKey((k) => k + 1);
   }, [safeIndex]);
+
+  // Funnel entry. `total_questions` is the count as of the first render; the
+  // list shrinks or grows as branching answers come in, which is why every
+  // `question_viewed` below carries its own total rather than trusting this one.
+  useEffect(() => {
+    track('onboarding_quiz_started', { total_questions: filteredQuestions.length });
+  }, [track]);
+
+  // Per-question drop-off — the whole point of instrumenting the quiz. Keyed on
+  // the question id as well as the index, because branching can swap which
+  // question sits at a given index.
+  useEffect(() => {
+    track('onboarding_quiz_question_viewed', {
+      question_id: question.id,
+      question_index: safeIndex,
+      total_questions: filteredQuestions.length,
+      question_type: question.type,
+    });
+  }, [track, question.id, question.type, safeIndex, filteredQuestions.length]);
 
   const headerAnimStyle = useAnimatedStyle(() => ({
     opacity: headerOpacity.value,
@@ -211,10 +233,17 @@ export default function QuizScreen() {
       questionId: parseInt(id),
       answer,
     }));
+    // Count only — the answers themselves are health-adjacent and never leave
+    // the device (see the PII note in lib/analytics/events.ts).
+    track('onboarding_quiz_submitted', {
+      answered_count: formatted.length,
+      total_questions: filteredQuestions.length,
+    });
     submitQuiz.mutate(formatted, {
       onSuccess: () =>
         router.replace({ pathname: '/(onboarding)/face-scan', params: { onboarding: '1' } }),
-      onError: () => {
+      onError: (err) => {
+        track('onboarding_quiz_submit_failed', { message: getErrorMessage(err) });
         resetExpandAnimation();
       },
     });
@@ -231,6 +260,10 @@ export default function QuizScreen() {
 
   const handleSkip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    track('onboarding_quiz_question_skipped', {
+      question_id: question.id,
+      question_index: safeIndex,
+    });
     if (!isLastQuestion) {
       setCurrentIndex(safeIndex + 1);
     } else {
