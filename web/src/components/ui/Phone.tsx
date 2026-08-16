@@ -36,9 +36,11 @@ export function PhoneFrame({
  * than a drawn approximation.
  *
  * The aspect ratio is the image's own (852×1846) so nothing is cropped, and no
- * status bar is drawn — the screenshot already includes one. The frame's
- * dynamic island lands in the gap between its clock and its battery, which is
- * where a real device would put it.
+ * status bar is drawn. The capture originally carried a real iOS status bar
+ * (clock pill, LTE, battery); it has been painted out of the asset — rows 0-71,
+ * backfilled by extending the backdrop's gradient upward, which is why nothing
+ * below shifted. That leaves the strip empty for the frame's dynamic island,
+ * which is where a real device would put it.
  *
  * Rendered twice (hero, and the scan step of How It Works). It's the same URL,
  * so the second instance costs no extra request.

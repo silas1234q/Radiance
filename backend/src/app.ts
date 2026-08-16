@@ -9,7 +9,9 @@ import { globalErrorHandler } from "./middleware/globalErrorHandler";
 const app = express();
 
 app.use(cors());
-app.use(morgan("dev"));
+// Skip the keep-alive self-ping (see jobs/keepAlive.ts) — logging it would add
+// ~4k lines/month of noise to Render's log retention.
+app.use(morgan("dev", { skip: (req) => req.headers["user-agent"] === "radiance-keepalive" }));
 
 // Webhook route must be before express.json() - needs raw body
 app.use("/api/webhooks", webhookRoutes);

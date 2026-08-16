@@ -225,7 +225,13 @@
       "PowerShell(& \"C:\\\\Users\\\\Silas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Silas-Documents-radiance\\\\0c03273e-7809-41a3-a8a0-33f078dac876\\\\scratchpad\\\\resize-screenshots.ps1\")",
       "Bash(xargs grep -ln \"Share\\\\b\")",
       "Bash(echo \"--- tsc exit: $? ---\")",
-      "PowerShell(& \"C:\\\\Users\\\\Silas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Silas-Documents-radiance\\\\0c03273e-7809-41a3-a8a0-33f078dac876\\\\scratchpad\\\\convert-paywall.ps1\")"
+      "PowerShell(& \"C:\\\\Users\\\\Silas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Silas-Documents-radiance\\\\0c03273e-7809-41a3-a8a0-33f078dac876\\\\scratchpad\\\\convert-paywall.ps1\")",
+      "PowerShell(cd C:\\\\Users\\\\Silas\\\\Documents\\\\radiance\\\\web; if \\(Test-Path node_modules/sharp\\) { \"sharp: yes\" } else { \"sharp: no\" }; try { $v = python -c \"import PIL, sys; print\\('pillow', PIL.__version__\\)\" 2>$null; $v } catch { \"python/pillow: no\" }; try { \\(Get-Command magick -ErrorAction Stop\\).Source } catch { \"imagemagick: no\" })",
+      "PowerShell(& \"C:\\\\Users\\\\Silas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Silas-Documents-radiance\\\\c2b9e943-0818-4d2e-86cd-668b9f59e1a1\\\\scratchpad\\\\strip-status-bar.ps1\")",
+      "PowerShell(cd C:\\\\Users\\\\Silas\\\\Documents\\\\radiance; $f = Get-Item \"web\\\\src\\\\assets\\\\scanned result img.png\"; \"current: {0:N0} KB\" -f \\($f.Length/1KB\\); $orig = git show \"HEAD:web/src/assets/scanned result img.png\" | Out-String; \"\";  git cat-file -s \\(git rev-parse \"HEAD:web/src/assets/scanned result img.png\"\\))",
+      "PowerShell(git checkout *)",
+      "PowerShell(cd C:\\\\Users\\\\Silas\\\\Documents\\\\radiance\\\\web\\\\src\\\\assets; Get-ChildItem -File | Select-Object Name, @{n='KB';e={[math]::Round\\($_.Length/1KB\\)}} | Format-Table -AutoSize)",
+      "PowerShell(& \"C:\\\\Users\\\\Silas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Silas-Documents-radiance\\\\c2b9e943-0818-4d2e-86cd-668b9f59e1a1\\\\scratchpad\\\\strip-status-bar-analysis.ps1\"; \"{0:N0} KB now\" -f \\(\\(Get-Item \"C:\\\\Users\\\\Silas\\\\Documents\\\\radiance\\\\web\\\\src\\\\assets\\\\analysis screen.jpeg\"\\).Length/1KB\\))"
     ]
   }
 }

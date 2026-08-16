@@ -21,6 +21,10 @@ Radiance is a full-stack AI-driven skincare app. Users complete a skin quiz, rec
 - `OPENAI_TEMPERATURE` — temperature (default: `0.3`)
 - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` — Cloudinary credentials for photo uploads
 - `PORT` — server port (default: `5000`)
+- `KEEPALIVE_URL` — public origin the keep-alive job pings (falls back to `RENDER_EXTERNAL_URL`, which Render injects automatically; unset in local dev disables the job)
+- `KEEPALIVE_TZ` — IANA zone the ping window is evaluated in (default: `UTC`)
+- `KEEPALIVE_WINDOW` — `startHour-endHour`, half-open (default: `6-24`; `0-24` for 24/7)
+- `DISABLE_KEEPALIVE` — set to `1` to turn the keep-alive job off
 
 ### Frontend (`frontend/.env`)
 - `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk publishable key
@@ -109,6 +113,9 @@ Route prefixes: `/auth`, `/users`, `/quiz`, `/skin-profile`, `/routines`, `/skin
 ### Push Notifications
 - **Frontend (local):** `NotificationsProvider` installs the notification handler, hydrates persisted settings, and reconciles locally-scheduled reminders (routine reminders, streak nudges) whenever routines/gamification data or app foreground state change. Settings persistence and scheduling logic live in `src/lib/notifications/` (modular: `settings.ts`, `scheduler.ts`, `handler.ts`, `store.ts`, `permissions.ts`, `push.ts`, `native.ts`). Phase 2 registers the Expo push token with the backend via `useRegisterPushToken`.
 - **Backend (server push):** `src/jobs/index.ts` runs `node-cron` scheduled tasks — weekly summary (hourly cron, fires at 18:00 local Sunday) and win-back (daily, for users inactive ≥ 3 days). Uses each user's stored IANA `timezone` and `luxon` for local-time checks. Push delivery via `expo-server-sdk` in `src/services/notificationService.ts`.
+
+### Keep-Alive (Render free tier)
+`src/jobs/keepAlive.ts` runs a `node-cron` self-ping every 10 minutes against the service's own public `/api/health`, so Render's free tier never hits its 15-minute idle spin-down (a cold start takes 30–60s, long enough for the app's launch connectivity probe to give up). It must ping the public origin — localhost traffic doesn't reset the idle timer — and `/api/health` must stay DB-free, since keeping Neon awake round-the-clock would exhaust its free compute hours. Confined to a daytime window to stay under the 750 instance-hours/month allowance. A self-ping can't wake an already-slept instance, so an external uptime pinger backs it up.
 
 ### Analytics (PostHog)
 - **Frontend:** `AnalyticsProvider` (`src/providers/`) wraps the app inside `PersistQueryClientProvider`. With no `EXPO_PUBLIC_POSTHOG_API_KEY` it renders through, so `usePostHog()` returns undefined and everything no-ops. Screen autocapture is off — the library's version calls `@react-navigation` hooks that throw above the root Stack — so `AnalyticsTracker` (`src/components/analytics/`) reports screens from Expo Router's `usePathname`, and identifies/resets the person against the Clerk user id. Person profiles carry the user id only, no email.
