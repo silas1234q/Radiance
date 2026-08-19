@@ -40,6 +40,12 @@ export type AnalyticsEventProps = {
   /** The SSO sheet closed without producing a session — usually a user cancel. */
   auth_dismissed: { provider: 'apple' | 'google' };
   auth_failed: { provider: 'apple' | 'google'; code: string };
+  /**
+   * Native Sign in with Apple failed and we retried through the web SSO flow.
+   * Should be ~zero — a steady trickle means this build's bundle ID isn't
+   * registered on Clerk's Native applications page.
+   */
+  auth_fallback_used: { provider: 'apple' | 'google' };
   auth_legal_opened: { doc: string };
 
   // ===== Onboarding: quiz =====

@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, Image } from "react-native";
-import { useSSO, useUser } from "@clerk/clerk-expo";
+import { View, Text, Pressable, ActivityIndicator, Image, Platform } from "react-native";
+import {
+  useSSO,
+  useUser,
+  useSignInWithApple,
+  type StartAppleAuthenticationFlowReturnType,
+} from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { toast } from "@/src/lib/toast";
 import { getErrorMessage } from "@/src/lib/errors";
@@ -12,6 +17,7 @@ import { useTrack } from "@/src/hooks/useTrack";
 
 export default function AuthScreen() {
   const { startSSOFlow } = useSSO();
+  const { startAppleAuthenticationFlow } = useSignInWithApple();
   const { user } = useUser();
   const router = useRouter();
   const track = useTrack();
@@ -25,46 +31,95 @@ export default function AuthScreen() {
     track('auth_viewed');
   }, [track]);
 
+  // The native Apple sheet and the web SSO flow resolve to the same shape, so
+  // session activation and routing live here rather than being duplicated.
+  const completeSignIn = async (
+    result: StartAppleAuthenticationFlowReturnType,
+    provider: "apple" | "google",
+  ) => {
+    const { createdSessionId, setActive, signIn, signUp } = result;
+
+    const sessionId =
+      createdSessionId ?? signIn?.createdSessionId ?? signUp?.createdSessionId;
+
+    if (!sessionId || !setActive) {
+      // No session and no throw: the provider sheet was closed. Tracked
+      // separately from a failure — this is the "changed their mind" cohort,
+      // and lumping it in with errors would make auth look broken.
+      track('auth_dismissed', { provider });
+      return;
+    }
+
+    await setActive({ session: sessionId });
+
+    // Route immediately — returning users (signIn) go to tabs,
+    // new users (signUp) go to quiz. AuthRouter will correct if needed.
+    const isReturning =
+      sessionId === signIn?.createdSessionId &&
+      sessionId !== signUp?.createdSessionId;
+    const isOnboarded = isReturning || !!user?.publicMetadata?.onboarded;
+    track('auth_succeeded', { provider, is_returning: isReturning });
+    router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+  };
+
+  const reportFailure = (err: unknown, provider: "apple" | "google") => {
+    console.log("SSO Error:", JSON.stringify(err, null, 2));
+    const clerkErr = err as { errors?: { code?: string; message?: string }[] };
+    const code = clerkErr?.errors?.[0]?.code ?? 'unknown';
+    // Clerk's code, never the message — messages can carry the email address.
+    track('auth_failed', { provider, code });
+    if (code !== "session_exists") {
+      toast.error(getErrorMessage(err, "Sign in failed"));
+    }
+  };
+
   const handleOAuth = async (strategy: "oauth_apple" | "oauth_google") => {
     const provider = strategy === "oauth_apple" ? "apple" : "google";
     setLoading(provider);
     track('auth_started', { provider });
     try {
-      const { createdSessionId, setActive, signIn, signUp } = await startSSOFlow({
-        strategy,
-      });
-
-      const sessionId =
-        createdSessionId ?? signIn?.createdSessionId ?? signUp?.createdSessionId;
-
-      if (sessionId && setActive) {
-        await setActive({ session: sessionId });
-        setLoading(null);
-
-        // Route immediately — returning users (signIn) go to tabs,
-        // new users (signUp) go to quiz. AuthRouter will correct if needed.
-        const isReturning =
-          sessionId === signIn?.createdSessionId &&
-          sessionId !== signUp?.createdSessionId;
-        const isOnboarded = isReturning || !!user?.publicMetadata?.onboarded;
-        track('auth_succeeded', { provider, is_returning: isReturning });
-        router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
-      } else {
-        // No session and no throw: the provider sheet was closed. Tracked
-        // separately from a failure — this is the "changed their mind" cohort,
-        // and lumping it in with errors would make auth look broken.
-        track('auth_dismissed', { provider });
-        setLoading(null);
-      }
+      await completeSignIn(await startSSOFlow({ strategy }), provider);
     } catch (err: unknown) {
-      console.log("SSO Error:", JSON.stringify(err, null, 2));
-      const clerkErr = err as { errors?: { code?: string; message?: string }[] };
-      const code = clerkErr?.errors?.[0]?.code ?? 'unknown';
-      // Clerk's code, never the message — messages can carry the email address.
-      track('auth_failed', { provider, code });
-      if (code !== "session_exists") {
-        toast.error(getErrorMessage(err, "Sign in failed"));
+      reportFailure(err, provider);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // iOS goes through the native Sign in with Apple sheet, not Clerk's browser
+  // SSO. The web flow quietly leans on Safari's cookie jar — it completes in a
+  // blink on a device already signed in to appleid.apple.com, but on a cold
+  // device (an App Review machine) it demands an Apple ID, password and 2FA
+  // inside a webview. That's what got build 1.0 (19) rejected under Guideline
+  // 2.1(a) as "Sign in with Apple button does not work".
+  const handleApple = async () => {
+    setLoading("apple");
+    track('auth_started', { provider: 'apple' });
+    try {
+      await completeSignIn(await startAppleAuthenticationFlow(), "apple");
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code === "ERR_REQUEST_CANCELED") {
+        // Clerk's hook normally swallows a cancel and hands back a null
+        // session, but handle the throw too — backing out isn't a failure.
+        track('auth_dismissed', { provider: 'apple' });
+        return;
       }
+      // Native failed for a real reason — most likely this bundle isn't
+      // registered on Clerk's Native applications page, which is what
+      // `oauth_token_apple` validates the identity token against. Don't
+      // dead-end the user: retry through the browser flow. Degraded, but it
+      // signs them in, and `auth_fallback_used` makes the misconfiguration
+      // visible instead of silent.
+      track('auth_fallback_used', { provider: 'apple' });
+      try {
+        await completeSignIn(
+          await startSSOFlow({ strategy: "oauth_apple" }),
+          "apple",
+        );
+      } catch (fallbackErr: unknown) {
+        reportFailure(fallbackErr, "apple");
+      }
+    } finally {
       setLoading(null);
     }
   };
@@ -109,23 +164,28 @@ export default function AuthScreen() {
       </View>
 
       <View className="items-center gap-4">
-        <Pressable
-          className="w-full h-[54px] rounded-xl bg-black flex-row items-center justify-center gap-2.5"
-          style={loading ? { opacity: 0.6 } : undefined}
-          disabled={!!loading}
-          onPress={() => handleOAuth("oauth_apple")}
-        >
-          {loading === "apple" ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Ionicons  name={'logo-apple'} color="white" size={18}/>
-              <Text className="text-base font-poppins-semibold text-white">
-                Continue with Apple
-              </Text>
-            </>
-          )}
-        </Pressable>
+        {/* iOS only — native Sign in with Apple has no Android equivalent, and
+            Clerk's `useSignInWithApple` throws off-iOS. Android users sign in
+            with Google. */}
+        {Platform.OS === "ios" && (
+          <Pressable
+            className="w-full h-[54px] rounded-xl bg-black flex-row items-center justify-center gap-2.5"
+            style={loading ? { opacity: 0.6 } : undefined}
+            disabled={!!loading}
+            onPress={handleApple}
+          >
+            {loading === "apple" ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons  name={'logo-apple'} color="white" size={18}/>
+                <Text className="text-base font-poppins-semibold text-white">
+                  Continue with Apple
+                </Text>
+              </>
+            )}
+          </Pressable>
+        )}
 
         <Pressable
           className="w-full h-[54px] rounded-xl bg-white border-[1.5px] border-skin-border flex-row items-center justify-center gap-2.5"
