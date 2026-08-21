@@ -7,6 +7,7 @@ import {
   type StartAppleAuthenticationFlowReturnType,
 } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
+import * as AuthSession from "expo-auth-session";
 import { toast } from "@/src/lib/toast";
 import { getErrorMessage } from "@/src/lib/errors";
 import Svg, { Path } from "react-native-svg";
@@ -14,6 +15,26 @@ import GoogleLogo from '@/src/assets/images/googleimage.png'
 import { Ionicons } from "@expo/vector-icons";
 import LegalModal, { type LegalDoc } from "@/src/components/legal/LegalModal";
 import { useTrack } from "@/src/hooks/useTrack";
+
+// Pinned rather than left to the SDK to infer. Clerk's production instance only
+// hands back an authorization URL when the redirect is on its Native applications
+// allowlist — an unlisted one comes back null, which is what surfaced as
+// "Missing external verification redirect URL for SSO flow" in the App Store build.
+// The scheme is passed explicitly so this reads as one fixed value rather than
+// something resolved from app config at runtime: it has to match the allowlist
+// entry exactly, so it should be greppable from here.
+const SSO_REDIRECT_URL = AuthSession.makeRedirectUri({
+  scheme: 'radiance',
+  path: 'sso-callback',
+});
+
+// This exact string has to exist in Clerk Dashboard → Native applications →
+// "Allowlist for mobile SSO redirect", or Clerk returns a null authorization
+// URL and the flow dies before the browser ever opens. Logged in dev so the
+// two can be checked against each other without guessing.
+if (__DEV__) {
+  console.log('[auth] SSO redirect URL:', SSO_REDIRECT_URL);
+}
 
 export default function AuthScreen() {
   const { startSSOFlow } = useSSO();
@@ -65,12 +86,24 @@ export default function AuthScreen() {
   const reportFailure = (err: unknown, provider: "apple" | "google") => {
     console.log("SSO Error:", JSON.stringify(err, null, 2));
     const clerkErr = err as { errors?: { code?: string; message?: string }[] };
-    const code = clerkErr?.errors?.[0]?.code ?? 'unknown';
+    const apiCode = clerkErr?.errors?.[0]?.code;
+    // A Clerk *API* error carries `errors[]`. The SDK's own guard rails throw a
+    // plain Error instead, which used to land here as `unknown` — the bucket that
+    // told us nothing when production SSO broke. `sdk_error` separates "the flow
+    // never reached Clerk" (almost always a dashboard misconfiguration) from a
+    // real rejection, so the next one is visible in PostHog rather than anonymous.
+    const code = apiCode ?? (err instanceof Error ? 'sdk_error' : 'unknown');
     // Clerk's code, never the message — messages can carry the email address.
     track('auth_failed', { provider, code });
-    if (code !== "session_exists") {
-      toast.error(getErrorMessage(err, "Sign in failed"));
-    }
+    if (code === "session_exists") return;
+    // Only an API error has copy fit for a user. Anything else is SDK internals
+    // ("Missing external verification redirect URL for SSO flow"), which
+    // `getErrorMessage` would otherwise pass through via its Error.message fallback.
+    toast.error(
+      apiCode
+        ? getErrorMessage(err, "Sign in failed")
+        : "Sign in failed. Please try again.",
+    );
   };
 
   const handleOAuth = async (strategy: "oauth_apple" | "oauth_google") => {
@@ -78,7 +111,10 @@ export default function AuthScreen() {
     setLoading(provider);
     track('auth_started', { provider });
     try {
-      await completeSignIn(await startSSOFlow({ strategy }), provider);
+      await completeSignIn(
+        await startSSOFlow({ strategy, redirectUrl: SSO_REDIRECT_URL }),
+        provider,
+      );
     } catch (err: unknown) {
       reportFailure(err, provider);
     } finally {
@@ -113,7 +149,10 @@ export default function AuthScreen() {
       track('auth_fallback_used', { provider: 'apple' });
       try {
         await completeSignIn(
-          await startSSOFlow({ strategy: "oauth_apple" }),
+          await startSSOFlow({
+            strategy: "oauth_apple",
+            redirectUrl: SSO_REDIRECT_URL,
+          }),
           "apple",
         );
       } catch (fallbackErr: unknown) {

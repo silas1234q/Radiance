@@ -16,6 +16,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
+import * as WebBrowser from "expo-web-browser";
 import Toast from "react-native-toast-message";
 import { tokenCache } from "../lib/clerk";
 import { apiCall, authHeaders } from "../api/apiClient";
@@ -46,6 +47,11 @@ import { setClerkAuth } from "../lib/authToken";
 import { useColdStartGate } from "../hooks/useColdStartGate";
 import { useReachability } from "../hooks/useReachability";
 import "../../global.css";
+
+// Dismisses any auth browser session still open when the SSO redirect brings the
+// app back to the foreground. Clerk drives the browser itself inside `useSSO`, so
+// this is belt-and-braces — without it the tab can linger after the redirect.
+WebBrowser.maybeCompleteAuthSession();
 
 // Tracks which Clerk user the persisted cache belongs to, so we only wipe it on
 // an actual account change (not on every cold start for the same user).
