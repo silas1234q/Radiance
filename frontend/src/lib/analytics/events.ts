@@ -41,6 +41,13 @@ export type AnalyticsEventProps = {
   auth_dismissed: { provider: 'apple' | 'google' };
   auth_failed: { provider: 'apple' | 'google'; code: string };
   /**
+   * The provider authenticated the user but Clerk couldn't finish the sign-up —
+   * `status` is `missing_requirements` and `missing` names the fields. Distinct
+   * from `auth_dismissed`: the user did everything right and still got nowhere,
+   * so any volume here is a Clerk instance requirement the provider can't meet.
+   */
+  auth_incomplete: { provider: 'apple' | 'google'; status: string; missing: string };
+  /**
    * Native Sign in with Apple failed and we retried through the web SSO flow.
    * Should be ~zero — a steady trickle means this build's bundle ID isn't
    * registered on Clerk's Native applications page.

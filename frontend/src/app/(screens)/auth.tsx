@@ -64,7 +64,31 @@ export default function AuthScreen() {
       createdSessionId ?? signIn?.createdSessionId ?? signUp?.createdSessionId;
 
     if (!sessionId || !setActive) {
-      // No session and no throw: the provider sheet was closed. Tracked
+      // A transfer sign-up Clerk couldn't finish yields no session — exactly
+      // what a dismissal looks like from here. Treating them alike strands the
+      // user on an unchanged auth screen with no toast and no navigation, and
+      // files it under 'changed their mind' in PostHog. `status` tells them
+      // apart: a dismissal never created a SignUp at all.
+      const status = signUp?.status;
+      if (status && status !== 'complete') {
+        // Usually the Clerk instance requires a field Apple didn't supply.
+        // Apple releases name and email only on the *first* authorization, so a
+        // repeat sign-up after the account was deleted arrives with neither.
+        console.log('SSO incomplete sign-up:', {
+          provider,
+          status,
+          missingFields: signUp?.missingFields,
+          unverifiedFields: signUp?.unverifiedFields,
+        });
+        track('auth_incomplete', {
+          provider,
+          status,
+          missing: signUp?.missingFields?.join(',') ?? '',
+        });
+        toast.error("We couldn't finish creating your account. Please try again.");
+        return;
+      }
+      // No session and no SignUp: the provider sheet was closed. Tracked
       // separately from a failure — this is the "changed their mind" cohort,
       // and lumping it in with errors would make auth look broken.
       track('auth_dismissed', { provider });
@@ -84,9 +108,20 @@ export default function AuthScreen() {
   };
 
   const reportFailure = (err: unknown, provider: "apple" | "google") => {
-    console.log("SSO Error:", JSON.stringify(err, null, 2));
-    const clerkErr = err as { errors?: { code?: string; message?: string }[] };
+    const clerkErr = err as {
+      errors?: { code?: string; message?: string; longMessage?: string }[];
+    };
     const apiCode = clerkErr?.errors?.[0]?.code;
+    // Not `JSON.stringify(err)`: on an Error that yields "{}", because `message`
+    // and `stack` are non-enumerable. Every SDK-level failure here — the ones
+    // that throw a plain Error rather than a Clerk API error — logged as an empty
+    // object, which is worse than no log at all. Pull the fields out by hand.
+    console.log("SSO Error:", {
+      provider,
+      name: err instanceof Error ? err.name : typeof err,
+      message: err instanceof Error ? err.message : String(err),
+      clerkErrors: clerkErr?.errors,
+    });
     // A Clerk *API* error carries `errors[]`. The SDK's own guard rails throw a
     // plain Error instead, which used to land here as `unknown` — the bucket that
     // told us nothing when production SSO broke. `sdk_error` separates "the flow
