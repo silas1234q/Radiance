@@ -60,6 +60,16 @@ async function postPhoto(path: string, uri: string, token: string): Promise<stri
   }
 
   const data = await response.json();
+
+  // The capture sits in the app's cache directory and nothing else cleans it
+  // up, so a face photo would otherwise linger on-device long after it's been
+  // uploaded. Best-effort: a cleanup failure must not fail a successful upload.
+  try {
+    await FileSystem.deleteAsync(uri, { idempotent: true });
+  } catch {
+    // The OS reclaims the cache directory on its own schedule regardless.
+  }
+
   return data.url;
 }
 

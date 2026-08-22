@@ -4,6 +4,7 @@ import { getAuth, clerkClient } from '@clerk/express';
 import { invalidateUserCache } from '../middleware/syncUser';
 import { Expo } from 'expo-server-sdk';
 import { sendPushToUsers } from '../services/notificationService';
+import { deleteFromCloudinary } from '../services/uploadService';
 
 export const getMe = catchAsync(async (req, res) => {
   const user = await prisma.user.findUnique({
@@ -100,6 +101,27 @@ export const deleteMe = catchAsync(async (req, res) => {
   const userId = req.user!.id;
   const auth = getAuth(req);
 
+  // Collect stored image URLs before the rows go away. Cloudinary assets live
+  // outside the database, so nothing cascades to them — without this the face
+  // photos would outlive the account, which is exactly what the privacy policy
+  // promises won't happen.
+  const [dbUser, skinProfile, skinLogs] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } }),
+    prisma.skinProfile.findUnique({
+      where: { userId },
+      select: { photoUrl: true, baselinePhotoUrl: true },
+    }),
+    prisma.skinLog.findMany({ where: { userId }, select: { photoUrl: true } }),
+  ]);
+  const storedPhotos = [
+    skinProfile?.photoUrl,
+    skinProfile?.baselinePhotoUrl,
+    ...skinLogs.map((log) => log.photoUrl),
+    // Avatars are user-uploaded face photos too. Clerk-hosted defaults are
+    // filtered out downstream — only our own Cloudinary assets are deleted.
+    dbUser?.avatarUrl,
+  ];
+
   // Remove the DB user and everything owned by them. Most relations cascade
   // from User, but RoutineInsightCache is keyed by userId without an FK
   // relation, so it must be deleted explicitly.
@@ -121,6 +143,10 @@ export const deleteMe = catchAsync(async (req, res) => {
       console.warn('[deleteMe] Failed to delete Clerk user:', err);
     }
   }
+
+  // Same best-effort rule as the Clerk deletion above: the account is already
+  // gone, so a storage outage must not fail the request.
+  await deleteFromCloudinary(storedPhotos);
 
   res.status(204).send();
 });

@@ -7,6 +7,7 @@ import { analyzeSkin, analyzeSkinWithScan } from '../services/skinAnalysisServic
 import { generateRoutines } from '../services/routineService';
 import { generateWeeklyPlan, getOrGenerateWeeklyPlan } from '../services/weeklyPlanService';
 import * as revenueCatService from '../services/revenueCatService';
+import { deleteFromCloudinary } from '../services/uploadService';
 import type { Request } from 'express';
 
 function getWeekNumber(): number {
@@ -161,6 +162,18 @@ export const analyzeWithScan = catchAsync(async (req, res) => {
       faceScanCountThisWeek,
     },
   });
+
+  // Retention: keep the baseline ("before") photo and the current scan, nothing
+  // else. Each scan uploads a fresh asset, so without this the superseded ones
+  // would pile up in Cloudinary indefinitely.
+  const supersededPhoto = existingProfile?.photoUrl;
+  if (
+    supersededPhoto &&
+    supersededPhoto !== photoUrl &&
+    supersededPhoto !== profile.baselinePhotoUrl
+  ) {
+    await deleteFromCloudinary([supersededPhoto]);
+  }
 
   await upsertSkinScore(userId, analysis);
 

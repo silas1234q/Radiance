@@ -260,10 +260,12 @@ function FaceScanInner() {
         );
       }
 
+      // No `exif`: nothing reads it, and the file uploads byte-for-byte, so
+      // asking for it would ship device model, timestamp and any GPS tag off to
+      // our storage and analysis providers for no reason.
       const photo = await cameraRef.current.takePictureAsync({
         quality: 1,
         skipProcessing: true,
-        exif: true,
       });
 
       if (flashOn) {
@@ -290,8 +292,9 @@ function FaceScanInner() {
       // funnel. Never carries the uri.
       track('scan_captured', { flash_on: flashOn, is_onboarding: isOnboarding });
 
-      // Hand the captured photo off to the processing screen, which uploads it,
-      // runs the scan analysis, and routes to results.
+      // Hand the captured photo off to the processing screen. Nothing is
+      // uploaded yet — the photo stays on-device until the user unlocks their
+      // results, and `results.tsx` is what actually uploads and analyses it.
       router.replace(`/(onboarding)/scan-processing?uri=${encodeURIComponent(photo.uri)}`);
     } catch (e) {
       flash.value = withTiming(0, { duration: 150 });

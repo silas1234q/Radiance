@@ -41,7 +41,7 @@ export const privacyPolicy: LegalDocument = {
       title: 'Information We Collect',
       body: [
         'Account information: When you create an account, we collect your name, email address, and authentication credentials via our authentication provider (Clerk).',
-        'Skin data: We collect the information you provide through our skin quiz (skin type, concerns, sensitivities) and, if you opt in, facial photos for skin analysis. Photos are processed to generate your skin score and metrics, then stored securely.',
+        'Skin data: We collect the information you provide through our skin quiz (skin type, concerns, sensitivities) and, if you opt in to a face scan, a photograph of your face. Face data is covered in detail in the Face Data section below.',
         'Usage data: We collect information about how you interact with the app, including routine completions, mood logs, and skin log entries, to personalise your experience and track your progress.',
       ],
     },
@@ -52,15 +52,22 @@ export const privacyPolicy: LegalDocument = {
       ],
     },
     {
-      title: 'Photo Storage & Processing',
+      title: 'Face Data',
       body: [
-        'Facial photos you capture are uploaded securely to our cloud storage provider (Cloudinary) and processed by our skin analysis service. Photos are used solely for your skin analysis and are never shared with other users or third parties for marketing purposes.',
+        'What we collect: if you choose to do a face scan, Radiance captures a single still photograph of your face, taken only at the moment you tap the capture button. We do not record video and we do not access your camera in the background. The face scan is optional — if you skip it, Radiance analyses your quiz answers alone.',
+        'On-device quality check: before a photo is accepted, an on-device face detector confirms it shows one well-lit, centred, front-facing face. It measures only where your face sits in the frame, the angle of your head, and whether your eyes are open. These measurements never leave your device and are discarded immediately. Radiance does not create a faceprint, face template, face embedding, or any other biometric identifier, and never uses face data to identify, recognise, or authenticate you.',
+        'How we use it: your photo is used solely to generate your own skin metrics and score, and to show you a before-and-after comparison of your own progress. We never use face data for advertising, never use it to train AI models, never share it with other users, and never sell it.',
+        'Where it is stored and who receives it: the photo is sent over an encrypted connection to our authenticated backend and stored by Cloudinary, our image storage provider. It is then sent to Perfect Corp (the YouCam Skin Analysis API) for the sole purpose of computing your skin metrics, which are returned to us as numbers. Both act as processors on our instructions. No one else receives the image — in particular, your photo is never sent to OpenAI, which receives only the resulting numeric scores and your quiz answers as text. No face data is sent to our analytics or subscription providers. The photo is never saved to your device\'s photo library, and the temporary capture file is deleted from your device once the upload completes.',
+        'How long we keep it: we retain your first scan (your "before" photo) and your most recent scan. When a newer scan replaces an older one, the superseded photo is deleted automatically. Both are kept only for as long as your account exists.',
+        'Deleting it: deleting your account from the Profile screen permanently removes your photos from our database and from Cloudinary storage. You can also email ' +
+          SUPPORT_EMAIL +
+          ' at any time to request deletion of your face data.',
       ],
     },
     {
       title: 'Third-Party Services',
       body: [
-        'We use the following third-party services: Clerk for authentication, Cloudinary for secure photo storage, OpenAI for AI-powered skin analysis, RevenueCat for subscription management, Expo for push notifications, and PostHog for product analytics. Each service processes data in accordance with their own privacy policies.',
+        'We use the following third-party services: Clerk for authentication, Cloudinary for secure photo storage, Perfect Corp (YouCam) for face-scan skin analysis, OpenAI for AI-powered recommendations, RevenueCat for subscription management, Expo for push notifications, and PostHog for product analytics. Each service processes data in accordance with their own privacy policies. Of these, only Cloudinary and Perfect Corp ever receive your face photo — see the Face Data section above.',
         'Product information shown in the app is sourced in part from Open Beauty Facts, an open database of cosmetic products. We do not share your personal data with Open Beauty Facts.',
       ],
     },
@@ -74,7 +81,7 @@ export const privacyPolicy: LegalDocument = {
     {
       title: 'Data Retention & Deletion',
       body: [
-        'You can delete your account and all associated data at any time from the Profile screen in the app. When you delete your account, all your personal data, skin profiles, photos, logs, and routines are permanently removed from our systems.',
+        'You can delete your account and all associated data at any time from the Profile screen in the app. When you delete your account, all your personal data, skin profiles, logs, and routines are permanently removed from our database, and your face-scan and skin-log photos are permanently deleted from our image storage provider.',
       ],
     },
     {
