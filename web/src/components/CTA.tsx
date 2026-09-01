@@ -6,7 +6,7 @@ import Reveal from './ui/Reveal'
 function AppStoreButton() {
   return (
     <a
-      href="#"
+      href="https://apps.apple.com/us/app/radiance-skin-care/id6794619381"
       className="inline-flex items-center gap-2.5 rounded-2xl bg-ink px-5 py-3 text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#2c2a34]"
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
