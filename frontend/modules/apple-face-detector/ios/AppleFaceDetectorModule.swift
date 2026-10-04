@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import Vision
 import UIKit
+import ImageIO
 
 extension CGImagePropertyOrientation {
   init(_ o: UIImage.Orientation) {
@@ -23,35 +24,39 @@ public class AppleFaceDetectorModule: Module {
     Name("AppleFaceDetector")
 
     AsyncFunction("detectFaces") { (uri: String) -> [String: Any] in
-      guard let url = URL(string: uri),
-            let data = try? Data(contentsOf: url),
-            let image = UIImage(data: data),
-            let cg = image.cgImage else {
-        return ["width": 0, "height": 0, "faces": []]
-      }
+  guard let url = URL(string: uri),
+        let data = try? Data(contentsOf: url),
+        let image = UIImage(data: data),
+        let cg = image.cgImage else {
+    return ["width": 0, "height": 0, "faces": [] as [[String: Double]]]
+  }
 
-      // UIImage.size is already orientation-adjusted
-      let w = Double(image.size.width * image.scale)
-      let h = Double(image.size.height * image.scale)
+  let w = Double(image.size.width * image.scale)
+  let h = Double(image.size.height * image.scale)
 
-      let request = VNDetectFaceRectanglesRequest()
-      let handler = VNImageRequestHandler(
-        cgImage: cg,
-        orientation: CGImagePropertyOrientation(image.imageOrientation),
-        options: [:]
-      )
-      try handler.perform([request])
+  let request = VNDetectFaceRectanglesRequest()
+  let handler = VNImageRequestHandler(
+    cgImage: cg,
+    orientation: CGImagePropertyOrientation(image.imageOrientation),
+    options: [:]
+  )
 
-      let faces: [[String: Double]] = (request.results ?? []).map { f in
-        let bb = f.boundingBox // normalized, origin bottom-left
-        return [
-          "x": bb.minX * w,
-          "y": (1 - bb.maxY) * h, // convert to top-left origin
-          "width": bb.width * w,
-          "height": bb.height * h,
-        ]
-      }
-      return ["width": w, "height": h, "faces": faces]
-    }
+  do {
+    try handler.perform([request])
+  } catch {
+    return ["width": w, "height": h, "faces": [] as [[String: Double]]]
+  }
+
+  let faces: [[String: Double]] = (request.results ?? []).map { f in
+    let bb = f.boundingBox
+    return [
+      "x": Double(bb.minX) * w,
+      "y": (1.0 - Double(bb.maxY)) * h,
+      "width": Double(bb.width) * w,
+      "height": Double(bb.height) * h,
+    ]
+  }
+  return ["width": w, "height": h, "faces": faces]
+}
   }
 }
