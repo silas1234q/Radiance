@@ -1,39 +1,57 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Dimensions, InteractionManager, Linking, StyleSheet } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import * as Brightness from 'expo-brightness';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  Dimensions,
+  InteractionManager,
+  Linking,
+  StyleSheet,
+  Platform,
+} from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import * as Brightness from "expo-brightness";
 import Animated, {
   FadeIn,
   useSharedValue,
   useAnimatedStyle,
   withSequence,
   withTiming,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 import {
   FaceDetectionProvider,
   useFaceDetection,
   type RNMLKitFaceDetectorOptions,
-} from '@infinitered/react-native-mlkit-face-detection';
-import { validateFaceScan } from '../../lib/faceValidation';
-import { useScanCredits, useVerifyScanPurchase } from '../../hooks/queries/useScanCredits';
-import { useRevenueCat } from '../../providers/RevenueCatProvider';
-import { useTrack } from '../../hooks/useTrack';
-import { COLORS } from '../../constants/theme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+} from "@infinitered/react-native-mlkit-face-detection";
+import { validateFaceScan } from "../../lib/faceValidation";
+import {
+  useScanCredits,
+  useVerifyScanPurchase,
+} from "../../hooks/queries/useScanCredits";
+import { useRevenueCat } from "../../providers/RevenueCatProvider";
+import { useTrack } from "../../hooks/useTrack";
+import { COLORS } from "../../constants/theme";
+import { usePostHog } from "posthog-react-native";
+import * as ImageManipulator from "expo-image-manipulator";
+import { detectFacesApple } from "../../../modules/apple-face-detector";
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GUIDE_SIZE = SCREEN_WIDTH * 0.72;
 const GUIDE_HEIGHT = GUIDE_SIZE * 1.25;
 
 const G_BRACKET = 34;
 const G_BW = 2.5;
-const G_WHITE = 'rgba(255,255,255,0.92)';
+const G_WHITE = "rgba(255,255,255,0.92)";
 const G_EDGE_INSET = 34;
 const guide = StyleSheet.create({
   edge: {
-    position: 'absolute',
+    position: "absolute",
     left: G_EDGE_INSET,
     right: G_EDGE_INSET,
     height: G_BW,
@@ -43,25 +61,56 @@ const guide = StyleSheet.create({
   topEdge: { top: 0 },
   bottomEdge: { bottom: 0 },
   edgeError: { backgroundColor: COLORS.primary },
-  bracket: { position: 'absolute', width: G_BRACKET, height: G_BRACKET, borderColor: G_WHITE },
+  bracket: {
+    position: "absolute",
+    width: G_BRACKET,
+    height: G_BRACKET,
+    borderColor: G_WHITE,
+  },
   bracketError: { borderColor: COLORS.primary },
-  tl: { top: 0, left: 0, borderLeftWidth: G_BW, borderTopWidth: G_BW, borderTopLeftRadius: 24 },
-  tr: { top: 0, right: 0, borderRightWidth: G_BW, borderTopWidth: G_BW, borderTopRightRadius: 24 },
-  bl: { bottom: 0, left: 0, borderLeftWidth: G_BW, borderBottomWidth: G_BW, borderBottomLeftRadius: 24 },
-  br: { bottom: 0, right: 0, borderRightWidth: G_BW, borderBottomWidth: G_BW, borderBottomRightRadius: 24 },
+  tl: {
+    top: 0,
+    left: 0,
+    borderLeftWidth: G_BW,
+    borderTopWidth: G_BW,
+    borderTopLeftRadius: 24,
+  },
+  tr: {
+    top: 0,
+    right: 0,
+    borderRightWidth: G_BW,
+    borderTopWidth: G_BW,
+    borderTopRightRadius: 24,
+  },
+  bl: {
+    bottom: 0,
+    left: 0,
+    borderLeftWidth: G_BW,
+    borderBottomWidth: G_BW,
+    borderBottomLeftRadius: 24,
+  },
+  br: {
+    bottom: 0,
+    right: 0,
+    borderRightWidth: G_BW,
+    borderBottomWidth: G_BW,
+    borderBottomRightRadius: 24,
+  },
 });
 
 // Landmarks + classification (eyes open) power the validation checks; contours
 // are unnecessary and slower. "accurate" mode maximizes detection reliability
 // for a single deliberate capture.
 const DETECTOR_OPTIONS: RNMLKitFaceDetectorOptions = {
-  performanceMode: 'accurate',
-  landmarkMode: true,
-  classificationMode: true,
+  performanceMode: "accurate",
+  landmarkMode: false,
+  classificationMode: false,
   contourMode: false,
+  minFaceSize: 0.15,
+  isTrackingEnabled: false,
 };
 
-type Phase = 'preview' | 'capturing' | 'validating';
+type Phase = "preview" | "capturing" | "validating";
 
 /**
  * From the camera's supported still sizes, pick the highest-resolution option.
@@ -70,7 +119,7 @@ type Phase = 'preview' | 'capturing' | 'validating';
  */
 function pickBestPictureSize(sizes: string[]): string | undefined {
   // 'photo' uses the full native sensor resolution — always prefer it.
-  if (sizes.includes('photo')) return 'photo';
+  if (sizes.includes("photo")) return "photo";
   let best: string | undefined;
   let bestArea = 0;
   for (const s of sizes) {
@@ -84,6 +133,34 @@ function pickBestPictureSize(sizes: string[]): string | undefined {
     }
   }
   return best;
+}
+
+async function normalizeForDetection(uri: string, width: number) {
+  return ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: Math.min(width, 1280) } }], // bakes in orientation + shrinks
+    { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG },
+  );
+}
+// ML Kit can throw on some images; treat that as "no faces" so the
+// fallback stages still run.
+async function safeDetect(
+  detector: { detectFaces: (uri: string) => Promise<any> },
+  uri: string,
+) {
+  try {
+    return await detector.detectFaces(uri);
+  } catch {
+    return null;
+  }
+}
+
+// Tolerates either `{ faces: [...] }` or a bare array, since I haven't
+// seen the exact return shape of the ML Kit wrapper.
+function hasFaces(result: any): boolean {
+  if (!result) return false;
+  if (Array.isArray(result)) return result.length > 0;
+  return Array.isArray(result.faces) && result.faces.length > 0;
 }
 
 export default function FaceScanScreen() {
@@ -100,14 +177,16 @@ function FaceScanInner() {
   // scan is a required step, so no close button. Everywhere else (dashboard,
   // routine, comparison) it's optional and gets a close button.
   const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
-  const isOnboarding = onboarding === '1';
+  const isOnboarding = onboarding === "1";
   const detector = useFaceDetection();
   const track = useTrack();
+  const posthog = usePostHog();
   const [permission, requestPermission] = useCameraPermissions();
 
   const { top } = useSafeAreaInsets();
 
-  const { data: scanCreditsData, refetch: refetchScanCredits } = useScanCredits();
+  const { data: scanCreditsData, refetch: refetchScanCredits } =
+    useScanCredits();
   const { purchaseScanCredit, scanCreditPackage } = useRevenueCat();
   const verifyScanPurchase = useVerifyScanPurchase();
   const [showCreditPrompt, setShowCreditPrompt] = useState(false);
@@ -117,7 +196,7 @@ function FaceScanInner() {
   const cameraRef = useRef<CameraView>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
-  const [phase, setPhase] = useState<Phase>('preview');
+  const [phase, setPhase] = useState<Phase>("preview");
   const [error, setError] = useState<string | null>(null);
   // Front camera has no hardware flash; when on, we light the face with a
   // bright white screen right before capture (like the iOS Retina Flash).
@@ -131,7 +210,9 @@ function FaceScanInner() {
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }));
 
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => setInteractionsDone(true));
+    const task = InteractionManager.runAfterInteractions(() =>
+      setInteractionsDone(true),
+    );
     return () => task.cancel();
   }, []);
 
@@ -147,7 +228,10 @@ function FaceScanInner() {
   useEffect(() => {
     if (!permission || scanViewTracked.current) return;
     scanViewTracked.current = true;
-    track('scan_viewed', { permission_granted: permission.granted, is_onboarding: isOnboarding });
+    track("scan_viewed", {
+      permission_granted: permission.granted,
+      is_onboarding: isOnboarding,
+    });
   }, [permission, track, isOnboarding]);
 
   // Camera denial is a hard stop for the scan path — worth its own event rather
@@ -157,7 +241,10 @@ function FaceScanInner() {
     if (!permission || permission.granted || denialTracked.current) return;
     if (permission.canAskAgain) return; // still pending a decision
     denialTracked.current = true;
-    track('scan_permission_denied', { can_ask_again: false, is_onboarding: isOnboarding });
+    track("scan_permission_denied", {
+      can_ask_again: false,
+      is_onboarding: isOnboarding,
+    });
   }, [permission, track, isOnboarding]);
 
   const onCameraReady = useCallback(async () => {
@@ -177,23 +264,26 @@ function FaceScanInner() {
     if (purchasing) return; // prevent double-tap
     setPurchaseError(null);
     setPurchasing(true);
-    track('scan_credit_purchase_started');
+    track("scan_credit_purchase_started");
     try {
       const outcome = await purchaseScanCredit();
       if (!outcome.purchased) {
         if (outcome.message) {
           setPurchaseError(outcome.message);
-          track('scan_credit_purchase_failed', { message: outcome.message });
+          track("scan_credit_purchase_failed", { message: outcome.message });
         }
         return;
       }
-      track('scan_credit_purchased');
+      track("scan_credit_purchased");
       // Apple payment succeeded — verify on backend to credit the user
       if (outcome.transactionId) {
         try {
           await verifyScanPurchase.mutateAsync(outcome.transactionId);
         } catch (verifyErr) {
-          console.warn('[ScanCredit] Backend verify failed, will retry on scan', verifyErr);
+          console.warn(
+            "[ScanCredit] Backend verify failed, will retry on scan",
+            verifyErr,
+          );
         }
       }
       // Refetch credit balance and close prompt regardless of verify outcome —
@@ -201,22 +291,28 @@ function FaceScanInner() {
       await refetchScanCredits();
       setShowCreditPrompt(false);
     } catch {
-      setPurchaseError('Something went wrong. Please try again.');
-      track('scan_credit_purchase_failed', { message: 'unexpected_error' });
+      setPurchaseError("Something went wrong. Please try again.");
+      track("scan_credit_purchase_failed", { message: "unexpected_error" });
     } finally {
       setPurchasing(false);
     }
-  }, [purchasing, purchaseScanCredit, verifyScanPurchase, refetchScanCredits, track]);
+  }, [
+    purchasing,
+    purchaseScanCredit,
+    verifyScanPurchase,
+    refetchScanCredits,
+    track,
+  ]);
 
   const capture = useCallback(async () => {
-    if (phase !== 'preview' || !cameraRef.current || !cameraReady) return;
+    if (phase !== "preview" || !cameraRef.current || !cameraReady) return;
     setError(null);
 
     // Check if the user has free scans or credits available
     if (scanCreditsData) {
       const { freeScansRemaining, availableCredits } = scanCreditsData;
       if (freeScansRemaining <= 0 && availableCredits <= 0) {
-        track('scan_credit_prompt_viewed', {
+        track("scan_credit_prompt_viewed", {
           free_scans_remaining: freeScansRemaining,
           available_credits: availableCredits,
           has_credit_package: !!scanCreditPackage,
@@ -232,14 +328,21 @@ function FaceScanInner() {
       // One event for every way a capture can end badly — validation rejections
       // and thrown errors alike — with the reason as the breakdown dimension.
       // These reasons are a closed set from `validateFaceScan`, so they group.
-      track('scan_capture_failed', { reason, flash_on: flashOn, is_onboarding: isOnboarding });
+      track("scan_capture_failed", {
+        reason,
+        flash_on: flashOn,
+        is_onboarding: isOnboarding,
+      });
       setError(reason);
-      setPhase('preview');
+      setPhase("preview");
     };
 
     try {
-      setPhase('capturing');
-      track('scan_capture_started', { flash_on: flashOn, is_onboarding: isOnboarding });
+      setPhase("capturing");
+      track("scan_capture_started", {
+        flash_on: flashOn,
+        is_onboarding: isOnboarding,
+      });
 
       if (flashOn) {
         // Screen flash: crank the display to full white/brightness and hold it
@@ -265,7 +368,11 @@ function FaceScanInner() {
       // our storage and analysis providers for no reason.
       const photo = await cameraRef.current.takePictureAsync({
         quality: 1,
-        skipProcessing: true,
+      });
+      posthog.capture("face_scan_photo_captured", {
+        width: photo.width,
+        height: photo.height,
+        uri: photo.uri ? "present" : "missing",
       });
 
       if (flashOn) {
@@ -276,32 +383,104 @@ function FaceScanInner() {
       }
 
       if (!photo?.uri) {
-        fail('Something went wrong. Please try again.');
+        fail("Something went wrong. Please try again.");
         return;
       }
 
-      setPhase('validating');
-      const result = await detector.detectFaces(photo.uri);
-      const validation = validateFaceScan(result, photo.width, photo.height);
-      if (!validation.ok) {
-        fail(validation.reason);
+      setPhase("validating");
+
+      // Original photo is what gets uploaded; the normalized copy is only
+      // used for detection so we don't ship a downscaled image.
+      const photoUri = photo.uri;
+      let detectedBy: "mlkit" | "mlkit_normalized" | "apple_vision" | null =
+        null;
+
+      // Stage 1: ML Kit on the original photo
+      let result = await safeDetect(detector, photoUri);
+      let valW = photo.width;
+      let valH = photo.height;
+
+      if (hasFaces(result)) {
+        detectedBy = "mlkit";
+      } else {
+        // Stage 2: ML Kit on a normalized (orientation baked in, downscaled) copy
+        try {
+          const norm = await normalizeForDetection(photoUri, photo.width);
+          const retry = await safeDetect(detector, norm.uri);
+          if (hasFaces(retry)) {
+            result = retry;
+            valW = norm.width;
+            valH = norm.height;
+            detectedBy = "mlkit_normalized";
+          }
+        } catch {
+          // fall through to Apple Vision
+        }
+      }
+
+      if (detectedBy) {
+        // ML Kit found a face: run your existing validation
+        const validation = validateFaceScan(result, valW, valH);
+        if (!validation.ok) {
+          fail(validation.reason);
+          return;
+        }
+      } else if (Platform.OS === "ios") {
+        // Stage 3: Apple Vision fallback
+        let apple;
+        try {
+          apple = await detectFacesApple(photoUri);
+        } catch {
+          apple = null;
+        }
+
+        if (!apple || apple.faces.length === 0) {
+          fail(
+            "We couldn't detect your face. Try better lighting and face the camera.",
+          );
+          return;
+        }
+        if (apple.faces.length > 1) {
+          fail("Make sure only one face is in the frame.");
+          return;
+        }
+
+        const f = apple.faces[0];
+        const areaRatio = (f.width * f.height) / (apple.width * apple.height);
+        const cx = (f.x + f.width / 2) / apple.width;
+        const cy = (f.y + f.height / 2) / apple.height;
+        // Tune to mirror what validateFaceScan enforces
+        const ok =
+          areaRatio > 0.06 && cx > 0.25 && cx < 0.75 && cy > 0.2 && cy < 0.8;
+        if (!ok) {
+          fail("Center your face in the frame and move a bit closer.");
+          return;
+        }
+        detectedBy = "apple_vision";
+      } else {
+        fail(
+          "We couldn't detect your face. Try better lighting and face the camera.",
+        );
         return;
       }
 
-      // Photo taken AND passed validation — the step that actually advances the
-      // funnel. Never carries the uri.
-      track('scan_captured', { flash_on: flashOn, is_onboarding: isOnboarding });
+      // Photo taken AND passed validation. Never carries the uri.
+      track("scan_captured", {
+        flash_on: flashOn,
+        is_onboarding: isOnboarding,
+        detected_by: detectedBy,
+      } as any);
 
-      // Hand the captured photo off to the processing screen. Nothing is
-      // uploaded yet — the photo stays on-device until the user unlocks their
-      // results, and `results.tsx` is what actually uploads and analyses it.
-      router.replace(`/(onboarding)/scan-processing?uri=${encodeURIComponent(photo.uri)}`);
+      router.replace(
+        `/(onboarding)/scan-processing?uri=${encodeURIComponent(photoUri)}`,
+      );
     } catch (e) {
       flash.value = withTiming(0, { duration: 150 });
       if (prevBrightness != null) {
         Brightness.setBrightnessAsync(prevBrightness).catch(() => {});
       }
-      fail('Something went wrong. Please try again.');
+
+      fail("Something went wrong. Please try again.");
     }
   }, [
     phase,
@@ -333,15 +512,15 @@ function FaceScanInner() {
             onPress={() => router.back()}
             hitSlop={12}
             style={{
-              position: 'absolute',
+              position: "absolute",
               top: 50,
               right: 20,
               width: 44,
               height: 44,
               borderRadius: 22,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0,0,0,0.06)',
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0,0,0,0.06)",
             }}
           >
             <Ionicons name="close" size={24} color={COLORS.text} />
@@ -351,7 +530,8 @@ function FaceScanInner() {
           Camera access needed
         </Text>
         <Text className="text-[14px] font-poppins-regular text-skin-text-secondary text-center mb-6">
-          We use your front camera to scan your skin. Your photo is only used for your analysis.
+          We use your front camera to scan your skin. Your photo is only used
+          for your analysis.
         </Text>
         <Pressable
           onPress={() => {
@@ -365,24 +545,26 @@ function FaceScanInner() {
           style={({ pressed }) => [pressed && { opacity: 0.7 }]}
         >
           <Text className="text-[14px] font-poppins-semibold text-white">
-            {permission.canAskAgain ? 'Enable Camera' : 'Open Settings'}
+            {permission.canAskAgain ? "Enable Camera" : "Open Settings"}
           </Text>
         </Pressable>
         <Pressable
           onPress={() => {
-            track('scan_skipped', { is_onboarding: isOnboarding });
-            if (isOnboarding) router.replace('/(onboarding)/results?locked=1');
+            track("scan_skipped", { is_onboarding: isOnboarding });
+            if (isOnboarding) router.replace("/(onboarding)/results?locked=1");
             else router.back();
           }}
           className="mt-4 py-2"
         >
-          <Text className="text-[14px] font-poppins-medium text-skin-text-tertiary">Not now</Text>
+          <Text className="text-[14px] font-poppins-medium text-skin-text-tertiary">
+            Not now
+          </Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
-  const busy = phase !== 'preview';
+  const busy = phase !== "preview";
 
   return (
     <View className="flex-1 bg-black">
@@ -391,7 +573,6 @@ function FaceScanInner() {
           ref={cameraRef}
           style={{ flex: 1 }}
           facing="front"
-          pictureSize={pictureSize}
           onCameraReady={onCameraReady}
         />
       )}
@@ -400,14 +581,29 @@ function FaceScanInner() {
       {!busy && (
         <>
           {/* Face guide frame (matches the scanning overlay) */}
-          <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+          <View
+            className="absolute inset-0 items-center justify-center"
+            pointerEvents="none"
+          >
             <View style={{ width: GUIDE_SIZE, height: GUIDE_HEIGHT }}>
-              <View style={[guide.edge, guide.topEdge, error && guide.edgeError]} />
-              <View style={[guide.edge, guide.bottomEdge, error && guide.edgeError]} />
-              <View style={[guide.bracket, guide.tl, error && guide.bracketError]} />
-              <View style={[guide.bracket, guide.tr, error && guide.bracketError]} />
-              <View style={[guide.bracket, guide.bl, error && guide.bracketError]} />
-              <View style={[guide.bracket, guide.br, error && guide.bracketError]} />
+              <View
+                style={[guide.edge, guide.topEdge, error && guide.edgeError]}
+              />
+              <View
+                style={[guide.edge, guide.bottomEdge, error && guide.edgeError]}
+              />
+              <View
+                style={[guide.bracket, guide.tl, error && guide.bracketError]}
+              />
+              <View
+                style={[guide.bracket, guide.tr, error && guide.bracketError]}
+              />
+              <View
+                style={[guide.bracket, guide.bl, error && guide.bracketError]}
+              />
+              <View
+                style={[guide.bracket, guide.br, error && guide.bracketError]}
+              />
             </View>
           </View>
 
@@ -417,18 +613,22 @@ function FaceScanInner() {
               onPress={() => setFlashOn((v) => !v)}
               hitSlop={12}
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top: 50,
                 left: 20,
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: flashOn ? COLORS.primary : 'rgba(0,0,0,0.45)',
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: flashOn ? COLORS.primary : "rgba(0,0,0,0.45)",
               }}
             >
-              <Ionicons name={flashOn ? 'flash' : 'flash-off'} size={22} color="#fff" />
+              <Ionicons
+                name={flashOn ? "flash" : "flash-off"}
+                size={22}
+                color="#fff"
+              />
             </Pressable>
 
             {/* Close (hidden during onboarding, where the scan is required) */}
@@ -437,15 +637,15 @@ function FaceScanInner() {
                 onPress={() => router.back()}
                 hitSlop={12}
                 style={{
-                  position: 'absolute',
+                  position: "absolute",
                   top: 50,
                   right: 20,
                   width: 44,
                   height: 44,
                   borderRadius: 22,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'rgba(0,0,0,0.45)',
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "rgba(0,0,0,0.45)",
                 }}
               >
                 <Ionicons name="close" size={24} color="#fff" />
@@ -458,21 +658,29 @@ function FaceScanInner() {
                 <Animated.View
                   entering={FadeIn.duration(250)}
                   className="px-4 py-2.5 rounded-2xl"
-                  style={{ backgroundColor: 'rgba(240,102,128,0.92)' }}
+                  style={{ backgroundColor: "rgba(240,102,128,0.92)" }}
                 >
-                  <Text className="text-[14px] font-poppins-semibold text-white text-center">{error}</Text>
+                  <Text className="text-[14px] font-poppins-semibold text-white text-center">
+                    {error}
+                  </Text>
                 </Animated.View>
               ) : (
-                <View className="px-4 py-2.5 rounded-2xl" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+                <View
+                  className="px-4 py-2.5 rounded-2xl"
+                  style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+                >
                   <Text className="text-[14px] font-poppins-medium text-white text-center">
-                    Position your face in the circle
+                    Position your face in the space below
                   </Text>
                 </View>
               )}
             </View>
 
             {/* Bottom controls */}
-            <View className="mt-auto items-center pb-8" pointerEvents="box-none">
+            <View
+              className="mt-auto items-center pb-8"
+              pointerEvents="box-none"
+            >
               <Pressable
                 onPress={capture}
                 disabled={!cameraReady}
@@ -482,14 +690,19 @@ function FaceScanInner() {
                   height: 76,
                   borderRadius: 38,
                   borderWidth: 5,
-                  borderColor: 'rgba(255,255,255,0.9)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  borderColor: "rgba(255,255,255,0.9)",
+                  alignItems: "center",
+                  justifyContent: "center",
                   opacity: cameraReady ? (pressed ? 0.7 : 1) : 0.4,
                 })}
               >
                 <View
-                  style={{ width: 58, height: 58, borderRadius: 29, backgroundColor: COLORS.primary }}
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 29,
+                    backgroundColor: COLORS.primary,
+                  }}
                 />
               </Pressable>
             </View>
@@ -501,9 +714,9 @@ function FaceScanInner() {
       {showCreditPrompt && (
         <Animated.View
           entering={FadeIn.duration(200)}
-          style={[StyleSheet.absoluteFill, { backgroundColor: '#fff'}]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }]}
         >
-          <View className="flex-1" style={{ paddingTop: top + 5}}>
+          <View className="flex-1" style={{ paddingTop: top + 5 }}>
             {/* Close button */}
             <Pressable
               onPress={() => {
@@ -512,16 +725,16 @@ function FaceScanInner() {
               }}
               hitSlop={12}
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top,
                 right: 16,
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#fff',
-                shadowColor: '#000',
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#fff",
+                shadowColor: "#000",
                 shadowOpacity: 0.08,
                 shadowRadius: 8,
                 shadowOffset: { width: 0, height: 2 },
@@ -539,13 +752,17 @@ function FaceScanInner() {
                   width: 80,
                   height: 80,
                   borderRadius: 40,
-                  backgroundColor: 'rgba(240,102,128,0.1)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  backgroundColor: "rgba(240,102,128,0.1)",
+                  alignItems: "center",
+                  justifyContent: "center",
                   marginBottom: 24,
                 }}
               >
-                <Ionicons name="scan-outline" size={40} color={COLORS.primary} />
+                <Ionicons
+                  name="scan-outline"
+                  size={40}
+                  color={COLORS.primary}
+                />
               </View>
               <Text className="text-[24px] font-poppins-semibold text-skin-text text-center mb-3">
                 No scans remaining
@@ -553,8 +770,8 @@ function FaceScanInner() {
               <Text className="text-[15px] font-poppins-regular text-skin-text-secondary text-center leading-[22px]">
                 You&apos;ve used your 2 free scans this week.
                 {scanCreditPackage
-                  ? ' Unlock an extra scan to keep tracking your skin progress.'
-                  : ' Try again next week.'}
+                  ? " Unlock an extra scan to keep tracking your skin progress."
+                  : " Try again next week."}
               </Text>
             </View>
 
@@ -563,7 +780,7 @@ function FaceScanInner() {
               {purchaseError && (
                 <View
                   className="mb-3 px-4 py-2.5 rounded-2xl"
-                  style={{ backgroundColor: 'rgba(240,102,128,0.08)' }}
+                  style={{ backgroundColor: "rgba(240,102,128,0.08)" }}
                 >
                   <Text className="text-[13px] font-poppins-medium text-primary text-center">
                     {purchaseError}
@@ -593,7 +810,9 @@ function FaceScanInner() {
                 }}
                 className="h-[48px] items-center justify-center"
               >
-                <Text className="text-[15px] font-poppins-medium text-skin-text-tertiary">Not now</Text>
+                <Text className="text-[15px] font-poppins-medium text-skin-text-tertiary">
+                  Not now
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -603,7 +822,11 @@ function FaceScanInner() {
       {/* Capture flash */}
       <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: '#fff' }, flashStyle]}
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: "#fff" },
+          flashStyle,
+        ]}
       />
     </View>
   );

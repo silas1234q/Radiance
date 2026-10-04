@@ -24,7 +24,7 @@ export default function CTA() {
   return (
     <section id="get" className="px-6 pb-20 pt-4 md:pb-24">
       <Reveal>
-        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] px-6 py-16 text-center md:py-20">
+        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-4xl px-6 py-16 text-center md:py-20">
           {/* aurora, echoing the page's backdrop */}
           <div
             className="absolute inset-0"

@@ -7,14 +7,14 @@ import type {
  * Thresholds for accepting a face-scan photo. Tuned for a front-camera selfie
  * held at arm's length in portrait orientation.
  */
-const FACE_MIN_WIDTH_RATIO = 0.22; // face must fill at least this fraction of image width
+const FACE_MIN_WIDTH_RATIO = 0.18; // face must fill at least this fraction of image width
 const FACE_MAX_WIDTH_RATIO = 0.9; // ...and no more than this (too close)
-const CENTER_MAX_DX = 0.18; // max |center - 0.5| horizontally
-const CENTER_MAX_DY = 0.2; // max |center - 0.5| vertically
-const MAX_YAW_DEG = 16; // headEulerAngleY — turning left/right
-const MAX_PITCH_DEG = 16; // headEulerAngleX — nodding up/down
-const MAX_ROLL_DEG = 14; // headEulerAngleZ — tilting head sideways
-const MIN_EYE_OPEN_PROB = 0.35;
+const CENTER_MAX_DX = 0.22; // max |center - 0.5| horizontally
+const CENTER_MAX_DY = 0.25; // max |center - 0.5| vertically
+const MAX_YAW_DEG = 20; // headEulerAngleY — turning left/right
+const MAX_PITCH_DEG = 20; // headEulerAngleX — nodding up/down
+const MAX_ROLL_DEG = 18; // headEulerAngleZ — tilting head sideways
+const MIN_EYE_OPEN_PROB = 0.2;
 
 export type FaceValidation = { ok: true; face: RNMLKitFace } | { ok: false; reason: string };
 
@@ -35,7 +35,7 @@ export function validateFaceScan(
 
   const faces = result.faces;
   if (faces.length === 0) {
-    return { ok: false, reason: 'No face detected. Center your face in the circle.' };
+    return { ok: false, reason: 'No face detected. Center your face in the space below.' };
   }
   if (faces.length > 1) {
     return { ok: false, reason: 'Multiple faces detected. Make sure only you are in frame.' };

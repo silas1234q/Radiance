@@ -134,6 +134,8 @@ export default function SubscribeGate({
   const [retrying, setRetrying] = useState(false);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
 
+  const top = insets.top;
+
   // Impression fires once the offering resolves, not on mount: the sheet renders
   // first with zero plans and a "Loading plans…" CTA, and counting that as a
   // paywall view would make the tap-through rate look far worse than it is.
@@ -193,7 +195,7 @@ export default function SubscribeGate({
   return (
     <Animated.View
       entering={SlideInDown.duration(320)}
-      style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}
+      style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 ,paddingTop : top + 10,}]}
     >
       <ScrollView
         bounces={false}
