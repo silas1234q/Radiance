@@ -132,10 +132,10 @@ export default function EditRoutineScreen() {
             <View style={{ position: 'relative', marginBottom: 12 }}>
               <RoutineStepCard
                 name={item.name}
-                description={item.description}
+                description={item.description ?? undefined}
                 productName={item.product?.name}
                 isCompleted={item.isCompleted}
-                productImageUrl={item.product?.imageUrl}
+                productImageUrl={item.product?.imageUrl ?? undefined}
                 onImagePress={() => handleImagePress(item.id)}
                 onToggle={() => {}}
               />

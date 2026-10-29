@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../useApi';
+import { useAuth } from '@clerk/clerk-expo';
 
 interface ScanCreditsResponse {
   availableCredits: number;
@@ -9,9 +10,11 @@ interface ScanCreditsResponse {
 
 export function useScanCredits() {
   const api = useApi();
+    const { isSignedIn } = useAuth()
   return useQuery({
     queryKey: ['scanCredits'],
     queryFn: () => api.fetch<ScanCreditsResponse>('/scan-credits'),
+    enabled:!!isSignedIn
   });
 }
 

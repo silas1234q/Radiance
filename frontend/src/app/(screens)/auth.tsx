@@ -1,20 +1,26 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, Image, Platform } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  Image,
+  Platform,
+} from "react-native";
 import {
   useSSO,
-  useUser,
   useSignInWithApple,
   type StartAppleAuthenticationFlowReturnType,
 } from "@clerk/clerk-expo";
-import { useRouter } from "expo-router";
 import * as AuthSession from "expo-auth-session";
 import { toast } from "@/src/lib/toast";
 import { getErrorMessage } from "@/src/lib/errors";
 import Svg, { Path } from "react-native-svg";
-import GoogleLogo from '@/src/assets/images/googleimage.png'
+import GoogleLogo from "@/src/assets/images/googleimage.png";
 import { Ionicons } from "@expo/vector-icons";
 import LegalModal, { type LegalDoc } from "@/src/components/legal/LegalModal";
 import { useTrack } from "@/src/hooks/useTrack";
+import Logo from "@/src/assets/images/icon.png";
 
 // Pinned rather than left to the SDK to infer. Clerk's production instance only
 // hands back an authorization URL when the redirect is on its Native applications
@@ -24,8 +30,8 @@ import { useTrack } from "@/src/hooks/useTrack";
 // something resolved from app config at runtime: it has to match the allowlist
 // entry exactly, so it should be greppable from here.
 const SSO_REDIRECT_URL = AuthSession.makeRedirectUri({
-  scheme: 'radiance',
-  path: 'sso-callback',
+  scheme: "radiance",
+  path: "sso-callback",
 });
 
 // This exact string has to exist in Clerk Dashboard → Native applications →
@@ -33,31 +39,53 @@ const SSO_REDIRECT_URL = AuthSession.makeRedirectUri({
 // URL and the flow dies before the browser ever opens. Logged in dev so the
 // two can be checked against each other without guessing.
 if (__DEV__) {
-  console.log('[auth] SSO redirect URL:', SSO_REDIRECT_URL);
+  console.log("[auth] SSO redirect URL:", SSO_REDIRECT_URL);
 }
+
+// After a successful sign-in the spinner keeps spinning until AuthRouter routes
+// us away (this screen unmounts). This is only a safety net in case routing
+// never happens. Keep it longer than sync + its retry.
+const ROUTING_FALLBACK_MS = 20_000;
 
 export default function AuthScreen() {
   const { startSSOFlow } = useSSO();
   const { startAppleAuthenticationFlow } = useSignInWithApple();
-  const { user } = useUser();
-  const router = useRouter();
   const track = useTrack();
   const [loading, setLoading] = useState<"apple" | "google" | null>(null);
   const [legalModal, setLegalModal] = useState<LegalDoc | null>(null);
+  const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // First step of the activation funnel: everyone who installs and opens the
   // app lands here, so `Application Installed` → `auth_viewed` → `auth_succeeded`
   // is the drop-off worth watching.
   useEffect(() => {
-    track('auth_viewed');
+    track("auth_viewed");
   }, [track]);
 
+  useEffect(() => {
+    return () => {
+      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+    };
+  }, []);
+
+  const holdSpinnerUntilRouted = () => {
+    if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+    fallbackTimer.current = setTimeout(
+      () => setLoading(null),
+      ROUTING_FALLBACK_MS,
+    );
+  };
+
   // The native Apple sheet and the web SSO flow resolve to the same shape, so
-  // session activation and routing live here rather than being duplicated.
+  // session activation lives here rather than being duplicated. Routing is not
+  // done here — AuthRouter in the root layout owns it.
+  //
+  // Returns true only when a session was activated, so callers know whether to
+  // keep the spinner up (waiting for routing) or clear it.
   const completeSignIn = async (
     result: StartAppleAuthenticationFlowReturnType,
     provider: "apple" | "google",
-  ) => {
+  ): Promise<boolean> => {
     const { createdSessionId, setActive, signIn, signUp } = result;
 
     const sessionId =
@@ -70,41 +98,36 @@ export default function AuthScreen() {
       // files it under 'changed their mind' in PostHog. `status` tells them
       // apart: a dismissal never created a SignUp at all.
       const status = signUp?.status;
-      if (status && status !== 'complete') {
+      if (status && status !== "complete") {
         // Usually the Clerk instance requires a field Apple didn't supply.
         // Apple releases name and email only on the *first* authorization, so a
         // repeat sign-up after the account was deleted arrives with neither.
-        console.log('SSO incomplete sign-up:', {
+        track("auth_incomplete", {
           provider,
           status,
-          missingFields: signUp?.missingFields,
-          unverifiedFields: signUp?.unverifiedFields,
+          missing: signUp?.missingFields?.join(",") ?? "",
         });
-        track('auth_incomplete', {
-          provider,
-          status,
-          missing: signUp?.missingFields?.join(',') ?? '',
-        });
-        toast.error("We couldn't finish creating your account. Please try again.");
-        return;
+        toast.error(
+          "We couldn't finish creating your account. Please try again.",
+        );
+        return false;
       }
       // No session and no SignUp: the provider sheet was closed. Tracked
       // separately from a failure — this is the "changed their mind" cohort,
       // and lumping it in with errors would make auth look broken.
-      track('auth_dismissed', { provider });
-      return;
+      track("auth_dismissed", { provider });
+      return false;
     }
 
     await setActive({ session: sessionId });
 
-    // Route immediately — returning users (signIn) go to tabs,
-    // new users (signUp) go to quiz. AuthRouter will correct if needed.
     const isReturning =
       sessionId === signIn?.createdSessionId &&
       sessionId !== signUp?.createdSessionId;
-    const isOnboarded = isReturning || !!user?.publicMetadata?.onboarded;
-    track('auth_succeeded', { provider, is_returning: isReturning });
-    router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+
+    track("auth_succeeded", { provider, is_returning: isReturning });
+    holdSpinnerUntilRouted();
+    return true;
   };
 
   const reportFailure = (err: unknown, provider: "apple" | "google") => {
@@ -127,9 +150,9 @@ export default function AuthScreen() {
     // told us nothing when production SSO broke. `sdk_error` separates "the flow
     // never reached Clerk" (almost always a dashboard misconfiguration) from a
     // real rejection, so the next one is visible in PostHog rather than anonymous.
-    const code = apiCode ?? (err instanceof Error ? 'sdk_error' : 'unknown');
+    const code = apiCode ?? (err instanceof Error ? "sdk_error" : "unknown");
     // Clerk's code, never the message — messages can carry the email address.
-    track('auth_failed', { provider, code });
+    track("auth_failed", { provider, code });
     if (code === "session_exists") return;
     // Only an API error has copy fit for a user. Anything else is SDK internals
     // ("Missing external verification redirect URL for SSO flow"), which
@@ -144,16 +167,18 @@ export default function AuthScreen() {
   const handleOAuth = async (strategy: "oauth_apple" | "oauth_google") => {
     const provider = strategy === "oauth_apple" ? "apple" : "google";
     setLoading(provider);
-    track('auth_started', { provider });
+    track("auth_started", { provider });
+    let signedIn = false;
     try {
-      await completeSignIn(
+      signedIn = await completeSignIn(
         await startSSOFlow({ strategy, redirectUrl: SSO_REDIRECT_URL }),
         provider,
       );
     } catch (err: unknown) {
       reportFailure(err, provider);
     } finally {
-      setLoading(null);
+      // On success keep spinning; AuthRouter will route and unmount this screen.
+      if (!signedIn) setLoading(null);
     }
   };
 
@@ -165,14 +190,18 @@ export default function AuthScreen() {
   // 2.1(a) as "Sign in with Apple button does not work".
   const handleApple = async () => {
     setLoading("apple");
-    track('auth_started', { provider: 'apple' });
+    track("auth_started", { provider: "apple" });
+    let signedIn = false;
     try {
-      await completeSignIn(await startAppleAuthenticationFlow(), "apple");
+      signedIn = await completeSignIn(
+        await startAppleAuthenticationFlow(),
+        "apple",
+      );
     } catch (err: unknown) {
       if ((err as { code?: string })?.code === "ERR_REQUEST_CANCELED") {
         // Clerk's hook normally swallows a cancel and hands back a null
         // session, but handle the throw too — backing out isn't a failure.
-        track('auth_dismissed', { provider: 'apple' });
+        track("auth_dismissed", { provider: "apple" });
         return;
       }
       // Native failed for a real reason — most likely this bundle isn't
@@ -181,9 +210,9 @@ export default function AuthScreen() {
       // dead-end the user: retry through the browser flow. Degraded, but it
       // signs them in, and `auth_fallback_used` makes the misconfiguration
       // visible instead of silent.
-      track('auth_fallback_used', { provider: 'apple' });
+      track("auth_fallback_used", { provider: "apple" });
       try {
-        await completeSignIn(
+        signedIn = await completeSignIn(
           await startSSOFlow({
             strategy: "oauth_apple",
             redirectUrl: SSO_REDIRECT_URL,
@@ -194,7 +223,7 @@ export default function AuthScreen() {
         reportFailure(fallbackErr, "apple");
       }
     } finally {
-      setLoading(null);
+      if (!signedIn) setLoading(null);
     }
   };
 
@@ -204,36 +233,28 @@ export default function AuthScreen() {
 
       <View className="items-center">
         <View
-          className="w-24 h-24 rounded-[30px] bg-primary items-center justify-center mb-[30px] shadow-primary"
+          className="w-24 h-24 rounded-[20px]items-center justify-center mb-[30px] shadow-primary"
           style={{
-            shadowColor: '#F06680',
-            shadowOffset: { width: 0, height: 18 }, 
+            shadowColor: "#F06680",
+            shadowOffset: { width: 0, height: 18 },
             shadowOpacity: 0.55,
             shadowRadius: 40,
             elevation: 12,
           }}
         >
-          <Svg width={46} height={46} viewBox="0 0 24 24" fill="none">
-            <Path
-              d="M12 2.5c3.2 4.2 6.2 7.2 6.2 11.1A6.2 6.2 0 0 1 12 19.8a6.2 6.2 0 0 1-6.2-6.2C5.8 9.7 8.8 6.7 12 2.5z"
-              fill="#fff"
-            />
-            <Path
-              d="M9.4 13.6a2.6 2.6 0 0 0 2.6 2.6"
-              stroke="#FF5A5F"
-              strokeWidth={1.6}
-              strokeLinecap="round"
-            />
-          </Svg>
+          <Image
+            source={Logo}
+            style={{ width: "100%", height: "100%", borderRadius: 20 }}
+          />
         </View>
         <Text className="text-[52px] font-poppins-extrabold tracking-[-2px] text-skin-text">
           Radiance
         </Text>
         <Text className="text-[21px] font-poppins-semibold text-skin-text mt-[18px] max-w-[260px] text-center leading-[27px]">
-          Skincare that actually understands your skin
+          Sign in or create your account
         </Text>
         <Text className="text-base text-skin-text-secondary mt-3 max-w-[250px] text-center leading-[22px]">
-          Answer a few questions and we'll build a routine around you.
+          New or returning, it only takes a moment.
         </Text>
       </View>
 
@@ -252,7 +273,7 @@ export default function AuthScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Ionicons  name={'logo-apple'} color="white" size={18}/>
+                <Ionicons name={"logo-apple"} color="white" size={18} />
                 <Text className="text-base font-poppins-semibold text-white">
                   Continue with Apple
                 </Text>
@@ -271,7 +292,7 @@ export default function AuthScreen() {
             <ActivityIndicator color="#1C1C1E" />
           ) : (
             <>
-               <Image source={GoogleLogo} className="w-6 h-6"/>
+              <Image source={GoogleLogo} className="w-6 h-6" />
               <Text className="text-base font-poppins-semibold text-skin-text">
                 Continue with Google
               </Text>
@@ -280,23 +301,23 @@ export default function AuthScreen() {
         </Pressable>
 
         <Text className="text-[13px] text-skin-text-tertiary font-poppins text-center leading-[18px]">
-          By continuing, you agree to our{' '}
+          By continuing, you agree to our{" "}
           <Text
             onPress={() => {
-              track('auth_legal_opened', { doc: 'terms' });
-              setLegalModal('terms');
+              track("auth_legal_opened", { doc: "terms" });
+              setLegalModal("terms");
             }}
-            style={{ textDecorationLine: 'underline' }}
+            style={{ textDecorationLine: "underline" }}
           >
             Terms of Use
-          </Text>
-          {' '}and{' '}
+          </Text>{" "}
+          and{" "}
           <Text
             onPress={() => {
-              track('auth_legal_opened', { doc: 'privacy' });
-              setLegalModal('privacy');
+              track("auth_legal_opened", { doc: "privacy" });
+              setLegalModal("privacy");
             }}
-            style={{ textDecorationLine: 'underline' }}
+            style={{ textDecorationLine: "underline" }}
           >
             Privacy Policy
           </Text>

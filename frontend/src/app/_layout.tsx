@@ -7,11 +7,7 @@ import {
   useUser,
   useClerk,
 } from "@clerk/clerk-expo";
-import {
-  QueryClient,
-  MutationCache,
-  QueryCache,
-} from "@tanstack/react-query";
+import { QueryClient, MutationCache, QueryCache } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
@@ -39,47 +35,51 @@ import {
   isTimeoutError,
   isUnauthorizedError,
 } from "../lib/errors";
-import { onSessionExpired, resetSessionExpiry, suppressSessionExpiry, isSessionExpirySuppressed, markAuthSettled } from "../lib/sessionExpiry";
+import {
+  onSessionExpired,
+  resetSessionExpiry,
+  suppressSessionExpiry,
+  isSessionExpirySuppressed,
+  markAuthSettled,
+} from "../lib/sessionExpiry";
 import { persister, persistOptions } from "../lib/queryPersister";
 import { registerMutationDefaults } from "../lib/mutationDefaults";
-import { checkConnectivity, getIsOnline, startConnectivityWatch } from "../lib/connectivity";
-import { setClerkAuth } from "../lib/authToken";
+import {
+  checkConnectivity,
+  getIsOnline,
+  startConnectivityWatch,
+} from "../lib/connectivity";
+import {
+  setClerkAuth,
+  markBackendReady,
+  resetBackendReady,
+} from "../lib/authToken";
 import { useColdStartGate } from "../hooks/useColdStartGate";
 import { useReachability } from "../hooks/useReachability";
+import { useSubmitQuiz } from "../hooks/queries/useQuiz";
 import "../../global.css";
+import { hasSeenWelcome } from "../lib/welcomeCache";
+import { clearOnboardingData, getOnboardingData } from "../lib/onboardingCache";
 
-// Dismisses any auth browser session still open when the SSO redirect brings the
-// app back to the foreground. Clerk drives the browser itself inside `useSSO`, so
-// this is belt-and-braces — without it the tab can linger after the redirect.
 WebBrowser.maybeCompleteAuthSession();
 
-// Tracks which Clerk user the persisted cache belongs to, so we only wipe it on
-// an actual account change (not on every cold start for the same user).
 const LAST_USER_KEY = "radiance:last-user-id";
 
-// Hold the native splash until our JS overlay has painted, then cross-fade.
 SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 300, fade: true });
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Keep cached entries long enough to persist and rehydrate offline. Must
-      // be >= the persister's maxAge (see lib/queryPersister.ts).
-      cacheTime: 1000 * 60 * 60 * 24 * 7, // 7 days
-      // Serve cache first, still attempt the network.
+      // NOTE: on React Query v5 this option is `gcTime`.
+      cacheTime: 1000 * 60 * 60 * 24 * 7,
       networkMode: "offlineFirst",
       retry: (failureCount, err) => {
-        if (isUnauthorizedError(err)) return false; // re-auth is authedFetch's job
-        if (isCancelledError(err)) return false; // we asked for this
-        if (isBadResponseError(err)) return false; // deterministic — same bad body comes back
-        if (isTimeoutError(err)) return false; // we already waited the full budget
+        if (isUnauthorizedError(err)) return false;
+        if (isCancelledError(err)) return false;
+        if (isBadResponseError(err)) return false;
+        if (isTimeoutError(err)) return false;
         if (isNetworkError(err)) {
-          // A blip deserves another try; a confirmed outage does not. Wi-Fi/cell
-          // handoffs and single dropped connections are routine on mobile, and
-          // failing them instantly is what produced spurious "No connection"
-          // toasts. Once the probe confirms we're offline, fail fast instead so
-          // screens fall back to cached data.
           if (!getIsOnline()) return false;
           return failureCount < 2;
         }
@@ -87,45 +87,31 @@ const queryClient = new QueryClient({
       },
     },
     mutations: {
-      // Fail fast rather than hang when offline. The handful of writes that are
-      // *meant* to survive an outage opt into `networkMode: 'online'` (which
-      // pauses + queues them) in lib/mutationDefaults.ts.
       networkMode: "offlineFirst",
     },
   },
-  // Failed mutations toast by default. Opt out per-mutation with
-  // `meta: { suppressErrorToast: true }` when a screen renders its own error UI.
   mutationCache: new MutationCache({
     onError: (err, _vars, _ctx, mutation) => {
       if (mutation.meta?.suppressErrorToast) return;
       if (isUnauthorizedError(err)) return;
-      // A queued write that's simply waiting for a connection hasn't failed —
-      // don't nag about it.
       if (mutation.state.isPaused) return;
       toast.fromError(err);
     },
   }),
-  // Queries fail silently by default (screens render their own empty/error
-  // states), but a network outage affects the whole app — surface a single
-  // throttled toast so the user isn't left staring at a blank screen. What that
-  // toast *says* is decided by `toast.fromError`, once the probe has confirmed
-  // whether we're actually offline.
   queryCache: new QueryCache({
     onError: (err, query) => {
+      if (__DEV__ && (err as { type?: string })?.type === "CANCELLED") {
+        console.log("[signed-out query]", JSON.stringify(query.queryKey));
+      }
       if (isUnauthorizedError(err)) return;
       if (query.meta?.suppressErrorToast) return;
-      // A background refresh that failed while the screen already shows data is
-      // a non-event — the user didn't ask for it and wouldn't have noticed.
       if (query.state.data !== undefined) return;
-      if (query.getObserversCount() === 0) return; // nobody's looking at this
+      if (query.getObserversCount() === 0) return;
       if (isNetworkError(err)) toast.fromError(err);
     },
   }),
 });
 
-// Must run before anything can enqueue a write, and before the persister
-// restores queued writes from a previous launch — a restored mutation finds its
-// `mutationFn` only through these defaults.
 registerMutationDefaults(queryClient);
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -134,6 +120,7 @@ if (!publishableKey) {
   throw new Error("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set");
 }
 
+/** Returns isOnboarded, or null if the backend couldn't be reached / rejected us. */
 async function syncUserWithBackend(
   getToken: () => Promise<string | null>,
 ): Promise<boolean | null> {
@@ -146,7 +133,8 @@ async function syncUserWithBackend(
       headers: authHeaders(token),
     });
     return !!data?.isOnboarded;
-  } catch {
+  } catch (e) {
+    console.warn("[auth/sync] failed", e);
     return null;
   }
 }
@@ -157,74 +145,93 @@ function AuthRouter() {
   const { signOut } = useClerk();
   const router = useRouter();
   const segments = useSegments();
+  const { mutateAsync: submitQuiz } = useSubmitQuiz();
+
   const navigatedForSignIn = useRef(false);
   const cachedNavDone = useRef(false);
-  const cachedNavState = useRef<{ isSignedIn: boolean; isOnboarded: boolean } | null>(null);
+  const phase1 = useRef<Promise<void>>(Promise.resolve());
+  const cachedNavState = useRef<{
+    isSignedIn: boolean;
+    isOnboarded: boolean;
+  } | null>(null);
   const hasEverBeenSignedIn = useRef(false);
   const coldStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep the module-level token registry current so the offline write queue can
-  // authenticate replays from outside React.
+  // Refs so effects always see current values without re-running.
+  const isSignedInRef = useRef(false);
+  isSignedInRef.current = !!isSignedIn;
+  const segmentsRef = useRef(segments);
+  segmentsRef.current = segments;
+  const submitQuizRef = useRef(submitQuiz);
+  submitQuizRef.current = submitQuiz;
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
   useEffect(() => {
     setClerkAuth(getToken, isSignedIn);
   }, [getToken, isSignedIn]);
 
+  // Don't leave the cold-start timer running after unmount.
+  useEffect(() => {
+    return () => {
+      if (coldStartTimer.current) clearTimeout(coldStartTimer.current);
+    };
+  }, []);
+
   // Auto sign-out when the backend returns 401 (session expired)
   useEffect(() => {
     return onSessionExpired(() => {
+      if (!isSignedInRef.current) return;
       if (isSessionExpirySuppressed()) return;
-      // Never sign anyone out over a connectivity blip — offline, Clerk can't
-      // refresh its token and every request looks like a dead session.
       if (!getIsOnline()) return;
+      console.log("[session] expired → signing out");
       suppressSessionExpiry();
-      toast.error('Your session expired. Please sign in again.');
+      resetBackendReady();
+      toast.error("Your session expired. Please sign in again.");
       queryClient.cancelQueries();
       queryClient.clear();
       signOut();
     });
   }, [signOut]);
 
-  // Phase 1: Optimistic navigation from cache (runs once, before Clerk loads)
+  // Phase 1: optimistic navigation from cache (runs once). Phase 2 awaits it.
   useEffect(() => {
     if (cachedNavDone.current) return;
     cachedNavDone.current = true;
 
-    (async () => {
+    phase1.current = (async () => {
       const cached = await getAppState();
-      if (!cached) return; // no cache — fall through to blocking flow
+      if (!cached) return;
 
-      cachedNavState.current = { isSignedIn: cached.isSignedIn, isOnboarded: cached.isOnboarded };
+      cachedNavState.current = {
+        isSignedIn: cached.isSignedIn,
+        isOnboarded: cached.isOnboarded,
+      };
 
       if (cached.isSignedIn && cached.isOnboarded) {
         router.replace("/(tabs)");
       } else if (cached.isSignedIn && !cached.isOnboarded) {
-        // Deliberately no setNavReady() here. "Signed in but not onboarded" is
-        // the one prediction that's routinely stale — it's what a brand-new
-        // account cached at sign-up — so we keep the splash up and let Phase 2
-        // confirm. Dropping the splash now is what showed users the quiz for a
-        // second before bouncing them to the home screen.
+        // No setNavReady(): this prediction is often stale, so Phase 2 confirms.
         router.replace("/(onboarding)/quiz");
         return;
       } else {
         router.replace("/auth");
       }
       setNavReady();
-    })();
+    })().catch(() => {});
   }, []);
 
-  // Phase 2: Backend confirmation (still runs the same logic, corrects if needed)
+  // Phase 2: backend confirmation
   useEffect(() => {
     if (!isLoaded) return;
-    // During sign-up, `isSignedIn` can flip to `true` before the `user` object
-    // is hydrated. Wait for both so the else (signed-out) branch doesn't race
-    // the sign-in navigation with cache wipes and a redirect back to /auth.
     if (isSignedIn && !user) return;
+
+    let stale = false;
 
     if (isSignedIn && user) {
       hasEverBeenSignedIn.current = true;
       markAuthSettled();
       resetSessionExpiry();
-      // Cancel any pending cold-start sign-out timer.
       if (coldStartTimer.current) {
         clearTimeout(coldStartTimer.current);
         coldStartTimer.current = null;
@@ -232,123 +239,187 @@ function AuthRouter() {
       if (navigatedForSignIn.current) return;
       navigatedForSignIn.current = true;
 
+      // NOTE: deliberately not cancelled by `stale` — once started, this flow
+      // must finish even if `user` changes identity mid-way.
       (async () => {
+        const t0 = Date.now();
+        const lap = (label: string) =>
+          console.log(`[auth-flow] ${label} +${Date.now() - t0}ms`);
+
         try {
-          // Only wipe the (persisted) cache when a DIFFERENT user signs in — for
-          // the same user resuming, keep it so their data is available offline on
-          // cold start; a background refetch updates it when online.
-          const lastUserId = await AsyncStorage.getItem(LAST_USER_KEY);
-          if (lastUserId !== user.id) {
-            queryClient.clear();
-            await persister.removeClient();
-            await clearAppState();
-            await AsyncStorage.setItem(LAST_USER_KEY, user.id);
-          }
+          await phase1.current;
+          lap("phase1 done");
 
-          const backendOnboarded = await syncUserWithBackend(getToken);
+          // 1. Wipe cache only when a different account signs in.
           try {
-            await user.reload();
-          } catch {
-            // user.reload() can fail on flaky networks — continue with what we have.
+            const lastUserId = await AsyncStorage.getItem(LAST_USER_KEY);
+            if (lastUserId !== user.id) {
+              queryClient.clear();
+              await persister.removeClient();
+              await clearAppState();
+              await AsyncStorage.setItem(LAST_USER_KEY, user.id);
+            }
+          } catch {}
+          lap("storage");
+
+          // 2. Sync: the only thing we must wait for before routing, because
+          //    isOnboarded decides the destination.
+          let isOnboarded = await syncUserWithBackend(() =>
+            getTokenRef.current(),
+          );
+          if (isOnboarded === null) {
+            await new Promise((r) => setTimeout(r, 800));
+            isOnboarded = await syncUserWithBackend(() =>
+              getTokenRef.current({ skipCache: true }),
+            );
           }
+          const synced = isOnboarded !== null;
+          if (!synced) isOnboarded = !!user.publicMetadata?.onboarded;
+          lap(`sync (${synced ? "ok" : "failed"})`);
 
-          const isOnboarded = backendOnboarded ?? !!user.publicMetadata?.onboarded;
+          // 3. Route immediately. The gate in authToken.ts keeps every other
+          //    authed request waiting until the right work below is finished.
+          const data = await getOnboardingData();
 
-          // Update the app state cache for next cold start
-          await setAppState({ isSignedIn: true, isOnboarded, userId: user.id });
+          if (isOnboarded) {
+            if (synced) markBackendReady();
+            void setAppState({
+              isSignedIn: true,
+              isOnboarded: true,
+              userId: user.id,
+            });
+            router.replace("/(tabs)");
+          } else if (data && data.length > 0) {
+            void setAppState({
+              isSignedIn: true,
+              isOnboarded: false,
+              userId: user.id,
+            });
+            router.replace("/(onboarding)/QuizResults");
+            setNavReady();
 
-          // Only navigate if the real state differs from what the cache predicted,
-          // or if there was no cached navigation at all.
-          const cached = cachedNavState.current;
-          const needsNav =
-            !cached ||
-            cached.isSignedIn !== true ||
-            cached.isOnboarded !== isOnboarded;
-
-          if (needsNav) {
-            router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+            // Background: submit the cached answers, then open the gate so
+            // analyze and friends can fire.
+            void (async () => {
+              try {
+                if (synced) {
+                  await submitQuizRef.current(data);
+                  await clearOnboardingData(); // only after success
+                  lap("quiz submitted");
+                }
+              } catch (e) {
+                // Keep the answers; useAutoSubmitQuiz retries later.
+                console.warn("[quiz] submit failed, keeping local answers", e);
+              } finally {
+                if (synced) markBackendReady();
+              }
+            })();
+          } else {
+            if (synced) markBackendReady();
+            void setAppState({
+              isSignedIn: true,
+              isOnboarded: false,
+              userId: user.id,
+            });
+            router.replace("/(onboarding)/quiz");
           }
-        } catch {
-          // If everything fails, still navigate — a new user goes to quiz,
-          // an existing user goes to tabs based on whatever metadata we have.
-          const isOnboarded = !!user.publicMetadata?.onboarded;
-          router.replace(isOnboarded ? "/(tabs)" : "/(onboarding)/quiz");
+          lap("routed");
+        } catch (e) {
+          console.warn("[auth] post-sign-in routing failed", e);
+          router.replace(
+            user.publicMetadata?.onboarded ? "/(tabs)" : "/(onboarding)/quiz",
+          );
         } finally {
-          // Destination is mounted — let the animated splash fade out.
           setNavReady();
         }
       })();
     } else {
-      // Clerk says signed out. That's only trustworthy if we can reach the
-      // network — offline it can't refresh the session and reports `false` for a
-      // perfectly valid account. `hadSession` covers both the cold-start case
-      // (cache says they were signed in) and a mid-session blip. A deliberate
-      // sign-out always sets the suppression flag first, so it skips the guard
-      // and takes effect immediately.
-      const hadSession =
-        !isSessionExpirySuppressed() &&
-        (hasEverBeenSignedIn.current || !!cachedNavState.current?.isSignedIn);
+      void (async () => {
+        await phase1.current; // cachedNavState must be populated first
+        if (stale) return;
 
-      if (hadSession) {
-        // Grace period: when the app is killed and restarted, Clerk's JWT is
-        // often expired and isSignedIn briefly reads `false` while the token is
-        // being refreshed. Wait it out before wiping everything.
-        const armGuard = () => {
-          coldStartTimer.current = setTimeout(async () => {
-            coldStartTimer.current = null;
-            // Still nothing from Clerk. Before destroying the user's cached
-            // data, make sure this isn't just an outage — otherwise a subway
-            // ride ends with them signed out and their offline data gone.
-            if ((await checkConnectivity()) !== "online") {
-              armGuard(); // keep watching; nothing destructive while offline
-              return;
-            }
-            hasEverBeenSignedIn.current = true; // prevent re-entering this guard
-            markAuthSettled();
-            navigatedForSignIn.current = false;
-            suppressSessionExpiry();
-            queryClient.clear();
-            void persister.removeClient();
-            void AsyncStorage.removeItem(LAST_USER_KEY);
-            void clearAppState();
-            router.replace("/auth");
-          }, 10000);
-        };
-        if (!coldStartTimer.current) armGuard();
-        // Don't wipe yet — wait for Clerk to potentially refresh.
-        setNavReady();
-        return;
-      }
+        const hadSession =
+          !isSessionExpirySuppressed() &&
+          (hasEverBeenSignedIn.current || !!cachedNavState.current?.isSignedIn);
 
-      navigatedForSignIn.current = false;
-      markAuthSettled();
-      // NOTE: Do NOT resetSessionExpiry() here — it races with in-flight token
-      // retries that call emitSessionExpired() after sign-out, causing a spurious
-      // "session expired" toast. Suppression is reset when the user signs back in.
-      // Signed out: drop the cache and its persisted snapshot so it can't
-      // rehydrate into the next account.
-      queryClient.clear();
-      void persister.removeClient();
-      void AsyncStorage.removeItem(LAST_USER_KEY);
-      void clearAppState();
-
-      const cached = cachedNavState.current;
-      if (!cached || cached.isSignedIn !== false) {
-        if (segments[0] !== "auth") {
-          router.replace("/auth");
+        if (hadSession) {
+          const armGuard = () => {
+            coldStartTimer.current = setTimeout(async () => {
+              coldStartTimer.current = null;
+              if ((await checkConnectivity()) !== "online") {
+                armGuard();
+                return;
+              }
+              hasEverBeenSignedIn.current = true;
+              markAuthSettled();
+              navigatedForSignIn.current = false;
+              suppressSessionExpiry();
+              resetBackendReady();
+              queryClient.clear();
+              void persister.removeClient();
+              void AsyncStorage.removeItem(LAST_USER_KEY);
+              void clearAppState();
+              router.replace("/auth");
+            }, 10000);
+          };
+          if (!coldStartTimer.current) armGuard();
+          setNavReady();
+          return;
         }
-      }
-      // Signed-out destination resolved (already on or navigating to /auth).
-      setNavReady();
+
+        navigatedForSignIn.current = false;
+        markAuthSettled();
+        resetBackendReady();
+        // Do NOT resetSessionExpiry() here (races with in-flight token retries).
+        queryClient.clear();
+        void persister.removeClient();
+        void AsyncStorage.removeItem(LAST_USER_KEY);
+        void clearAppState();
+
+        const cached = cachedNavState.current;
+        if (!cached || cached.isSignedIn !== false) {
+          const hadAccount =
+            hasEverBeenSignedIn.current || !!cached?.isSignedIn;
+          const onGuestScreen = segmentsRef.current.some(
+            (s) => s === "auth" || s === "Welcome",
+          );
+          hasSeenWelcome()
+            .catch(() => true)
+            .then((seen) => {
+              if (!hadAccount && !seen) {
+                if (!onGuestScreen) router.replace("/Welcome");
+              } else if (!onGuestScreen) {
+                router.replace("/auth");
+              }
+            })
+            .finally(() => setNavReady());
+          return;
+        }
+        setNavReady();
+      })();
     }
-  }, [isSignedIn, isLoaded, user]);
+
+    return () => {
+      stale = true;
+    };
+  }, [isSignedIn, isLoaded, user?.id]);
 
   return (
-    <Stack screenOptions={{ headerShown: false }} initialRouteName="(screens)/auth">
+    <Stack
+      screenOptions={{ headerShown: false }}
+      initialRouteName="(screens)/auth"
+    >
+      <Stack.Screen
+        name="Welcome"
+        options={{ animation: "fade", headerShown: false }}
+      />
       <Stack.Screen name="(screens)/auth" options={{ animation: "fade" }} />
       <Stack.Screen name="(onboarding)" options={{ animation: "fade" }} />
-      <Stack.Screen name="(tabs)" options={{animation:'fade'}}/>
-      <Stack.Screen name="(screens)/skin-log-modal" options={{ presentation: "modal" }} />
+      <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
+      <Stack.Screen
+        name="(screens)/skin-log-modal"
+        options={{ presentation: "modal" }}
+      />
       <Stack.Screen
         name="(screens)/routine-steps"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
@@ -471,74 +542,49 @@ function AuthRouter() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    SFProRounded_Regular: require('../../src/assets/fonts/SF-Pro-Rounded-Regular.otf'),
-    SFProRounded_Medium: require('../../src/assets/fonts/SF-Pro-Rounded-Medium.otf'),
-    SFProRounded_Semibold: require('../../src/assets/fonts/SF-Pro-Rounded-Semibold.otf'),
-    SFProRounded_Bold: require('../../src/assets/fonts/SF-Pro-Rounded-Bold.otf'),
+    SFProRounded_Regular: require("../../src/assets/fonts/SF-Pro-Rounded-Regular.otf"),
+    SFProRounded_Medium: require("../../src/assets/fonts/SF-Pro-Rounded-Medium.otf"),
+    SFProRounded_Semibold: require("../../src/assets/fonts/SF-Pro-Rounded-Semibold.otf"),
+    SFProRounded_Bold: require("../../src/assets/fonts/SF-Pro-Rounded-Bold.otf"),
   });
   const [splashDone, setSplashDone] = useState(false);
 
-  // Connectivity lives above ClerkProvider on purpose: offline, Clerk may never
-  // finish loading, and `ClerkLoaded` would then never render `AuthRouter`. The
-  // gate has to work regardless, so the user gets "turn on your data" instead of
-  // a splash that fades into nothing.
-  //
-  // The gate goes first so its patient launch probe is the one in flight when
-  // the watcher mounts — the watcher then skips its own stricter check rather
-  // than racing it to a worse answer.
   const startedOffline = useColdStartGate();
   const reachability = useReachability();
   useEffect(() => {
     return startConnectivityWatch();
   }, []);
 
-  // The gate lets a returning user in without a connection rather than blocking
-  // them, so this is where they're told. It waits for the splash because toasts
-  // render underneath that overlay, and it re-checks reachability because the
-  // connection often comes back during the splash — in which case there's
-  // nothing to report and saying so would just be wrong.
   useEffect(() => {
     if (!splashDone || !startedOffline) return;
-    if (reachability === 'online') return;
+    if (reachability === "online") return;
     toast.error(
-      reachability === 'no-radio'
-        ? 'Showing your saved data. Check your mobile data or Wi-Fi.'
+      reachability === "no-radio"
+        ? "Showing your saved data. Check your mobile data or Wi-Fi."
         : "Showing your saved data. We'll refresh once we can reach Radiance.",
       { title: "You're offline" },
     );
   }, [splashDone, startedOffline, reachability]);
 
-  // Native splash stays up (preventAutoHideAsync) until fonts resolve and the
-  // animated overlay mounts, so this early return shows no blank frame. Proceed
-  // on a font error too, otherwise the held native splash would never hide.
   if (!fontsLoaded && !fontError) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* Analytics sits above Clerk on purpose. It doesn't depend on Clerk, and
-          inside `ClerkLoaded` it never initialised on the offline cold start
-          handled below — losing `Application Opened` for precisely the sessions
-          worth investigating. Above the ErrorBoundary too, so a crash that
-          unmounts the tree still has a live client to report through. */}
       <AnalyticsProvider>
         <ErrorBoundary>
           <BottomSheetModalProvider>
-            <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+            <ClerkProvider
+              publishableKey={publishableKey}
+              tokenCache={tokenCache}
+            >
               <ClerkLoaded>
                 <PersistQueryClientProvider
                   client={queryClient}
                   persistOptions={persistOptions}
-                  // Writes queued in a previous session are restored paused; they
-                  // only replay once something asks them to. (React Query resumes
-                  // automatically when `onlineManager` flips online, but nothing
-                  // flips on a launch that's already online.)
                   onSuccess={() => queryClient.resumePausedMutations()}
                 >
                   <RevenueCatProvider>
                     <NotificationsProvider>
-                      {/* Renders nothing; needs Clerk's session and the router
-                          above it, so it sits with AuthRouter rather than in
-                          the provider stack. */}
                       <AnalyticsTracker />
                       <AuthRouter />
                     </NotificationsProvider>

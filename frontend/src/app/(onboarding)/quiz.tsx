@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect } from "react";
+import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
+import { useRouter } from "expo-router";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -18,18 +18,23 @@ import Animated, {
   runOnJS,
   cancelAnimation,
   interpolate,
-} from 'react-native-reanimated';
-import { quizQuestions } from '../../constants/quiz';
-import { COLORS } from '../../constants/theme';
-import ProgressBar from '../../components/ui/ProgressBar';
-import QuestionCard from '../../components/quiz/QuestionCard';
-import ToneSwatches from '../../components/quiz/ToneSwatches';
-import Button from '../../components/ui/Button';
-import { useSubmitQuiz } from '../../hooks/queries/useQuiz';
-import { useTrack } from '../../hooks/useTrack';
-import { getErrorMessage } from '../../lib/errors';
-import { Entypo } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+} from "react-native-reanimated";
+import { quizQuestions } from "../../constants/quiz";
+import { COLORS } from "../../constants/theme";
+import ProgressBar from "../../components/ui/ProgressBar";
+import QuestionCard from "../../components/quiz/QuestionCard";
+import ToneSwatches from "../../components/quiz/ToneSwatches";
+import Button from "../../components/ui/Button";
+import { useAnalyzeSkin, useSubmitQuiz } from "../../hooks/queries/useQuiz";
+import { useTrack } from "../../hooks/useTrack";
+import { getErrorMessage } from "../../lib/errors";
+import { useAuth, useClerk } from "@clerk/clerk-expo";
+import { Entypo } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import {
+  markOnboardingComplete,
+  setOnboardingData,
+} from "@/src/lib/onboardingCache";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -40,6 +45,8 @@ export default function QuizScreen() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [animKey, setAnimKey] = useState(0);
   const submitQuiz = useSubmitQuiz();
+  const { isSignedIn } = useAuth();
+  const {user} = useClerk()
 
   const headerOpacity = useSharedValue(0);
   const headerTranslateY = useSharedValue(20);
@@ -56,9 +63,9 @@ export default function QuizScreen() {
   const dot1Scale = useSharedValue(0);
   const dot2Scale = useSharedValue(0);
 
-  const gender = answers[1] || '';
-  const isFemale = gender === 'Female';
-  const showAllQuestions = gender === 'Prefer not to say';
+  const gender = answers[1] || "";
+  const isFemale = gender === "Female";
+  const showAllQuestions = gender === "Prefer not to say";
 
   const filteredQuestions = quizQuestions.filter((q) => {
     if (q.femaleOnly && !isFemale && !showAllQuestions) return false;
@@ -69,14 +76,20 @@ export default function QuizScreen() {
   const safeIndex = Math.min(currentIndex, filteredQuestions.length - 1);
   const question = filteredQuestions[safeIndex];
   const progress = (safeIndex + 1) / filteredQuestions.length;
-  const currentAnswer = answers[question.id] || '';
+  const currentAnswer = answers[question.id] || "";
 
   // Trigger enter animation on question change
   useEffect(() => {
     headerOpacity.value = 0;
     headerTranslateY.value = 20;
-    headerOpacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) });
-    headerTranslateY.value = withTiming(0, { duration: 450, easing: Easing.out(Easing.cubic) });
+    headerOpacity.value = withTiming(1, {
+      duration: 400,
+      easing: Easing.out(Easing.cubic),
+    });
+    headerTranslateY.value = withTiming(0, {
+      duration: 450,
+      easing: Easing.out(Easing.cubic),
+    });
     setAnimKey((k) => k + 1);
   }, [safeIndex]);
 
@@ -84,14 +97,16 @@ export default function QuizScreen() {
   // list shrinks or grows as branching answers come in, which is why every
   // `question_viewed` below carries its own total rather than trusting this one.
   useEffect(() => {
-    track('onboarding_quiz_started', { total_questions: filteredQuestions.length });
+    track("onboarding_quiz_started", {
+      total_questions: filteredQuestions.length,
+    });
   }, [track]);
 
   // Per-question drop-off — the whole point of instrumenting the quiz. Keyed on
   // the question id as well as the index, because branching can swap which
   // question sits at a given index.
   useEffect(() => {
-    track('onboarding_quiz_question_viewed', {
+    track("onboarding_quiz_question_viewed", {
       question_id: question.id,
       question_index: safeIndex,
       total_questions: filteredQuestions.length,
@@ -106,26 +121,26 @@ export default function QuizScreen() {
 
   const setAnswer = (value: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (question.type === 'multiple') {
-      const current = currentAnswer ? currentAnswer.split(',') : [];
+    if (question.type === "multiple") {
+      const current = currentAnswer ? currentAnswer.split(",") : [];
       const updated = current.includes(value)
         ? current.filter((v) => v !== value)
         : [...current, value];
-      setAnswers({ ...answers, [question.id]: updated.join(',') });
+      setAnswers({ ...answers, [question.id]: updated.join(",") });
     } else {
       setAnswers({ ...answers, [question.id]: value });
     }
   };
 
   const isLastQuestion = safeIndex === filteredQuestions.length - 1;
-  const canProceed = question.type === 'text' || !!currentAnswer;
+  const canProceed = question.type === "text" || !!currentAnswer;
   const canSkip = question.femaleOnly && showAllQuestions;
 
   // Animated styles for expanding card
   const cardAnimStyle = useAnimatedStyle(() => ({
     height: cardHeight.value,
     borderRadius: cardRadius.value,
-    overflow: 'hidden' as const,
+    overflow: "hidden" as const,
   }));
 
   const buttonLabelStyle = useAnimatedStyle(() => ({
@@ -134,7 +149,9 @@ export default function QuizScreen() {
 
   const expandedContentStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
-    transform: [{ translateY: interpolate(contentOpacity.value, [0, 1], [15, 0]) }],
+    transform: [
+      { translateY: interpolate(contentOpacity.value, [0, 1], [15, 0]) },
+    ],
   }));
 
   const skipAnimStyle = useAnimatedStyle(() => ({
@@ -181,7 +198,7 @@ export default function QuizScreen() {
     // Fade in inner content
     contentOpacity.value = withDelay(
       350,
-      withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) })
+      withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) }),
     );
 
     // Start spinner rotation
@@ -190,18 +207,18 @@ export default function QuizScreen() {
       withRepeat(
         withTiming(360, { duration: 1000, easing: Easing.linear }),
         -1,
-        false
-      )
+        false,
+      ),
     );
 
     // Pulsing dots (staggered)
     const dotPulse = withRepeat(
       withSequence(
         withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) }),
-        withTiming(0.3, { duration: 400, easing: Easing.in(Easing.cubic) })
+        withTiming(0.3, { duration: 400, easing: Easing.in(Easing.cubic) }),
       ),
       -1,
-      true
+      true,
     );
     dot0Scale.value = withDelay(400, dotPulse);
     dot1Scale.value = withDelay(530, dotPulse);
@@ -228,27 +245,40 @@ export default function QuizScreen() {
     dot2Scale.value = 0;
   };
 
-  const submitAnswers = () => {
-    const formatted = Object.entries(answers).map(([id, answer]) => ({
-      questionId: parseInt(id),
-      answer,
-    }));
-    // Count only — the answers themselves are health-adjacent and never leave
-    // the device (see the PII note in lib/analytics/events.ts).
-    track('onboarding_quiz_submitted', {
+  const submitAnswers = async () => {
+    const visibleIds = new Set(filteredQuestions.map((q) => q.id));
+    const formatted = Object.entries(answers)
+      .filter(([id]) => visibleIds.has(Number(id)))
+      .map(([id, answer]) => ({ questionId: Number(id), answer }));
+
+    track("onboarding_quiz_submitted", {
       answered_count: formatted.length,
       total_questions: filteredQuestions.length,
     });
-    submitQuiz.mutate(formatted, {
-      onSuccess: () =>
-        router.replace({ pathname: '/(onboarding)/face-scan', params: { onboarding: '1' } }),
-      onError: (err) => {
-        track('onboarding_quiz_submit_failed', { message: getErrorMessage(err) });
-        resetExpandAnimation();
-      },
-    });
-  };
 
+    try {
+      await setOnboardingData(formatted);
+      if (isSignedIn) {
+        // await submitQuiz.mutateAsync(formatted);  // if that's what it's for
+        submitQuiz.mutate(formatted, {
+          onSuccess: () => {
+            router.replace("/(onboarding)/QuizResults");
+          },
+          onError: (err) => {
+            track("onboarding_quiz_submit_failed", {
+              message: getErrorMessage(err),
+            });
+            resetExpandAnimation();
+          },
+        });
+      } else {
+        router.replace("/(screens)/auth");
+      }
+    } catch (e) {
+      console.warn(getErrorMessage(e));
+      resetExpandAnimation(); // only reset on failure
+    }
+  };
   const handleNext = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!isLastQuestion) {
@@ -260,7 +290,7 @@ export default function QuizScreen() {
 
   const handleSkip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    track('onboarding_quiz_question_skipped', {
+    track("onboarding_quiz_question_skipped", {
       question_id: question.id,
       question_index: safeIndex,
     });
@@ -284,7 +314,7 @@ export default function QuizScreen() {
   };
 
   const renderOptions = () => {
-    if (question.type === 'tone' && question.options) {
+    if (question.type === "tone" && question.options) {
       return (
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
           <ToneSwatches
@@ -296,26 +326,28 @@ export default function QuizScreen() {
       );
     }
 
-    if (question.type === 'yesno') {
+    if (question.type === "yesno") {
       return (
         <View className="flex-row gap-[13px] mt-[30px]">
-          {['Yes', 'No'].map((opt, i) => (
+          {["Yes", "No"].map((opt, i) => (
             <Animated.View
               key={`${animKey}-${opt}`}
               className="flex-1"
-              entering={FadeInDown.delay(200 + i * 80).duration(350).easing(Easing.out(Easing.cubic))}
+              entering={FadeInDown.delay(200 + i * 80)
+                .duration(350)
+                .easing(Easing.out(Easing.cubic))}
             >
               <Pressable
                 onPress={() => setAnswer(opt)}
                 className={`h-[110px] rounded-xl items-center justify-center ${
                   currentAnswer === opt
-                    ? 'border-[1.5px] border-primary bg-primary-light'
-                    : 'border-[1.5px] border-skin-border bg-surface'
+                    ? "border-[1.5px] border-primary bg-primary-light"
+                    : "border-[1.5px] border-skin-border bg-surface"
                 }`}
               >
                 <Text
                   className={`text-xl font-poppins-bold ${
-                    currentAnswer === opt ? 'text-primary' : 'text-skin-text'
+                    currentAnswer === opt ? "text-primary" : "text-skin-text"
                   }`}
                 >
                   {opt}
@@ -327,7 +359,7 @@ export default function QuizScreen() {
       );
     }
 
-    if (question.type === 'text') {
+    if (question.type === "text") {
       return (
         <Animated.View
           key={`${animKey}-text`}
@@ -335,11 +367,13 @@ export default function QuizScreen() {
         >
           <TextInput
             className="mt-[26px] border-[1.5px] border-skin-border rounded-md bg-surface p-4 text-[17px] text-skin-text min-h-[120px]"
-            style={{ textAlignVertical: 'top' }}
+            style={{ textAlignVertical: "top" }}
             placeholder="Type your answer..."
             placeholderTextColor={COLORS.textTertiary}
             value={currentAnswer}
-            onChangeText={(text) => setAnswers({ ...answers, [question.id]: text })}
+            onChangeText={(text) =>
+              setAnswers({ ...answers, [question.id]: text })
+            }
             multiline
             numberOfLines={4}
           />
@@ -350,23 +384,27 @@ export default function QuizScreen() {
     // single or multiple choice
     return (
       <View className="gap-[11px] mt-[26px]">
-        {question.type === 'multiple' && (
-          <Text className="text-[13px] font-poppins-medium text-skin-text-tertiary mb-[-4px]">Select all that apply</Text>
+        {question.type === "multiple" && (
+          <Text className="text-[13px] font-poppins-medium text-skin-text-tertiary mb-[-4px]">
+            Select all that apply
+          </Text>
         )}
         {question.options?.map((opt, i) => (
           <Animated.View
             key={`${animKey}-${opt}`}
-            entering={FadeInDown.delay(150 + i * 60).duration(350).easing(Easing.out(Easing.cubic))}
+            entering={FadeInDown.delay(150 + i * 60)
+              .duration(350)
+              .easing(Easing.out(Easing.cubic))}
           >
             <QuestionCard
               label={opt}
               selected={
-                question.type === 'multiple'
-                  ? currentAnswer.split(',').includes(opt)
+                question.type === "multiple"
+                  ? currentAnswer.split(",").includes(opt)
                   : currentAnswer === opt
               }
               onPress={() => setAnswer(opt)}
-              multiSelect={question.type === 'multiple'}
+              multiSelect={question.type === "multiple"}
             />
           </Animated.View>
         ))}
@@ -381,29 +419,43 @@ export default function QuizScreen() {
         entering={FadeIn.duration(500)}
       >
         {safeIndex > 0 ? (
-          <Pressable className="w-[38px] h-[38px] rounded-full bg-surface-alt items-center justify-center" onPress={handleBack}>
-            <Entypo name='chevron-left' size={24}/>
+          <Pressable
+            className="w-[38px] h-[38px] rounded-full bg-surface-alt items-center justify-center"
+            onPress={handleBack}
+          >
+            <Entypo name="chevron-left" size={24} />
           </Pressable>
         ) : (
           <View className="w-[38px]" />
         )}
-        <View className="flex-1" >
+        <View className="flex-1">
           <ProgressBar progress={progress} />
         </View>
-        <Text className="text-sm font-poppins-semibold text-skin-text-tertiary" style={{ fontVariant: ['tabular-nums'] }}>
+        <Text
+          className="text-sm font-poppins-semibold text-skin-text-tertiary"
+          style={{ fontVariant: ["tabular-nums"] }}
+        >
           {Math.round(progress * 100)}%
         </Text>
       </Animated.View>
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 24, paddingTop: 26, paddingBottom: 20 }}
+        contentContainerStyle={{
+          padding: 24,
+          paddingTop: 26,
+          paddingBottom: 20,
+        }}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={headerAnimStyle}>
-          <Text className="text-[30px] font-poppins-extrabold tracking-[-0.6px] leading-[34px] text-skin-text">{question.text}</Text>
+          <Text className="text-[30px] font-poppins-extrabold tracking-[-0.6px] leading-[34px] text-skin-text">
+            {question.text}
+          </Text>
           {question.subtitle && (
-            <Text className="text-[15px] text-skin-text-secondary mt-2 leading-[21px] font-poppins">{question.subtitle}</Text>
+            <Text className="text-[15px] text-skin-text-secondary mt-2 leading-[21px] font-poppins">
+              {question.subtitle}
+            </Text>
           )}
         </Animated.View>
         {renderOptions()}
@@ -420,8 +472,8 @@ export default function QuizScreen() {
             style={[
               {
                 backgroundColor: COLORS.primary,
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: "center",
+                justifyContent: "center",
                 shadowColor: COLORS.primary,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.3,
@@ -434,7 +486,7 @@ export default function QuizScreen() {
           >
             {/* Button label — fades out */}
             <Animated.Text
-              style={[buttonLabelStyle, { position: 'absolute' }]}
+              style={[buttonLabelStyle, { position: "absolute" }]}
               className="text-lg font-poppins-bold text-white"
             >
               Submit
@@ -442,7 +494,7 @@ export default function QuizScreen() {
 
             {/* Expanded content — fades in */}
             <Animated.View
-              style={[expandedContentStyle, { position: 'absolute' }]}
+              style={[expandedContentStyle, { position: "absolute" }]}
               className="items-center justify-center gap-4"
             >
               {/* Spinner ring */}
@@ -454,8 +506,8 @@ export default function QuizScreen() {
                     height: 48,
                     borderRadius: 24,
                     borderWidth: 3,
-                    borderColor: 'rgba(255,255,255,0.3)',
-                    borderTopColor: '#fff',
+                    borderColor: "rgba(255,255,255,0.3)",
+                    borderTopColor: "#fff",
                   },
                 ]}
               />
@@ -463,13 +515,37 @@ export default function QuizScreen() {
               {/* Pulsing dots */}
               <View className="flex-row gap-2.5">
                 <Animated.View
-                  style={[dot0Style, { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }]}
+                  style={[
+                    dot0Style,
+                    {
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: "#fff",
+                    },
+                  ]}
                 />
                 <Animated.View
-                  style={[dot1Style, { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }]}
+                  style={[
+                    dot1Style,
+                    {
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: "#fff",
+                    },
+                  ]}
                 />
                 <Animated.View
-                  style={[dot2Style, { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }]}
+                  style={[
+                    dot2Style,
+                    {
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: "#fff",
+                    },
+                  ]}
                 />
               </View>
 

@@ -3,7 +3,7 @@
  * health-probe URL without importing `apiClient.ts` (which imports connectivity
  * back to report transport failures — that would be a cycle).
  */
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+export const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 /** Root of the API, e.g. `https://api.example.com/api`. */
 export function getBaseUrl() {

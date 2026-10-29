@@ -164,16 +164,6 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const offs = await Purchases.getOfferings();
-        console.log(
-          '[RevenueCat] getOfferings result:',
-          '\n  current offering:', offs.current?.identifier ?? '(none)',
-          '\n  packages:', offs.current?.availablePackages?.map((p) => ({
-            id: p.identifier,
-            productId: p.product.identifier,
-            price: p.product.price,
-            title: p.product.title,
-          })),
-        );
         setOfferings(offs);
         const pkgs = offs.current?.availablePackages ?? [];
         setProducts(pkgs.map((p) => p.product));
@@ -224,7 +214,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     try {
       // TEMP DIAGNOSTIC: VERBOSE to see the exact product identifiers StoreKit
       // requests and which come back "invalid". Revert to WARN once resolved.
-      Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.ERROR);
+      Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.WARN : LOG_LEVEL.ERROR);
       Purchases.configure({ apiKey: API_KEY, storeKitVersion: STOREKIT_VERSION.STOREKIT_1 });
       setConfigured(true);
 

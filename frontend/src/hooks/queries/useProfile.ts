@@ -1,13 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useApi } from '../useApi';
-import type { User, SkinProfile } from '../../types/api';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useApi } from "../useApi";
+import type { User, SkinProfile } from "../../types/api";
+import { useAuth } from "@clerk/clerk-expo";
 
 export function useProfile() {
   const api = useApi();
+  const { isSignedIn } = useAuth();
   return useQuery({
-    queryKey: ['profile'],
-    queryFn: () => api.fetch<User>('/users/me'),
+    queryKey: ["profile"],
+    queryFn: () => api.fetch<User>("/users/me"),
     staleTime: 5 * 60 * 1000,
+    enabled: !!isSignedIn,
   });
 }
 
@@ -16,24 +19,29 @@ export function useUpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: { name?: string; avatarUrl?: string }) =>
-      api.fetch<User>('/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile'] }),
+      api.fetch<User>("/users/me", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
   });
 }
 
 export function useDeleteAccount() {
   const api = useApi();
   return useMutation({
-    mutationFn: () => api.fetch<null>('/users/me', { method: 'DELETE' }),
+    mutationFn: () => api.fetch<null>("/users/me", { method: "DELETE" }),
   });
 }
 
 export function useSkinProfile() {
   const api = useApi();
+  const { isSignedIn } = useAuth();
   return useQuery({
-    queryKey: ['skinProfile'],
-    queryFn: () => api.fetch<SkinProfile>('/skin-profile'),
+    queryKey: ["skinProfile"],
+    queryFn: () => api.fetch<SkinProfile>("/skin-profile"),
     staleTime: 5 * 60 * 1000,
+    enabled: !!isSignedIn,
   });
 }
 
@@ -51,13 +59,13 @@ export function useUpdateSkinProfile() {
       productBudget?: string;
       ingredientsToAvoid?: string[];
     }) =>
-      api.fetch<SkinProfile>('/skin-profile', {
-        method: 'POST',
+      api.fetch<SkinProfile>("/skin-profile", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['skinProfile'] });
-      queryClient.invalidateQueries({ queryKey: ['weeklyPlan'] });
+      queryClient.invalidateQueries({ queryKey: ["skinProfile"] });
+      queryClient.invalidateQueries({ queryKey: ["weeklyPlan"] });
     },
   });
 }

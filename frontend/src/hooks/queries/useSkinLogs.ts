@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '../useApi';
 import { useTrack } from '../useTrack';
 import type { SkinLog } from '../../types/api';
+import { useAuth } from '@clerk/clerk-expo';
 
 export function useCreateSkinLog() {
   const api = useApi();
@@ -26,10 +27,12 @@ export function useCreateSkinLog() {
 
 export function useSkinLogs() {
   const api = useApi();
+  const { isSignedIn } = useAuth();
   return useQuery({
     queryKey: ['skinLogs'],
     queryFn: () => api.fetch<SkinLog[]>('/skin-logs'),
     staleTime: 5 * 60 * 1000,
+    enabled:!!isSignedIn
   });
 }
 

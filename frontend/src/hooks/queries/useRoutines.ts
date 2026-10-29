@@ -8,6 +8,7 @@ import {
   type ToggleStepVars,
 } from '../../lib/mutationDefaults';
 import type { Routine, RoutineStep, DetailedInsight } from '../../types/api';
+import { useAuth } from '@clerk/clerk-expo';
 
 /**
  * Feature-usage events live on the mutation hooks rather than the screens.
@@ -25,10 +26,12 @@ type RoutinesSnapshot = { previous?: Routine[] };
 
 export function useRoutines() {
   const api = useApi();
+  const { isSignedIn } = useAuth();
   return useQuery({
     queryKey: ['routines'],
     queryFn: () => api.fetch<Routine[]>('/routines'),
     staleTime: 5 * 60 * 1000,
+    enabled:!!isSignedIn
   });
 }
 

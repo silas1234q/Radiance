@@ -17,6 +17,9 @@ export interface AuthSource {
 let getTokenFn: ClerkGetToken | null = null;
 let signedIn: boolean | undefined;
 
+let resolveReady!: () => void;
+let ready = new Promise<void>((r) => (resolveReady = r));
+
 export function setClerkAuth(getToken: ClerkGetToken, isSignedIn: boolean | undefined): void {
   getTokenFn = getToken;
   signedIn = isSignedIn;
@@ -37,3 +40,19 @@ export function getAuthSource(): AuthSource {
     isSignedIn: signedIn,
   };
 }
+
+
+export const markBackendReady = () => resolveReady();
+export const resetBackendReady = () => {
+  ready = new Promise<void>((r) => (resolveReady = r));
+};
+
+// Waits for sync to finish, but never hangs forever if sync failed.
+export const waitForBackendReady = (timeoutMs = 8000) =>
+  new Promise<void>((resolve) => {
+    const t = setTimeout(resolve, timeoutMs);
+    ready.then(() => {
+      clearTimeout(t);
+      resolve();
+    });
+  });
