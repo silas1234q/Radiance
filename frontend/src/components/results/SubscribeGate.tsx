@@ -10,6 +10,8 @@ import { useRevenueCat } from '../../providers/RevenueCatProvider';
 import { useTrack } from '../../hooks/useTrack';
 import LegalModal, { type LegalDoc } from '../legal/LegalModal';
 import { toast } from '../../lib/toast';
+import CircleIconButton from '../ui/CircleIconButton';
+import { router } from 'expo-router';
 
 const BENEFITS: {
   icon: keyof typeof Ionicons.glyphMap;
@@ -197,11 +199,13 @@ export default function SubscribeGate({
       entering={SlideInDown.duration(320)}
       style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 ,paddingTop : top + 10,}]}
     >
+         <CircleIconButton icon="close" size={45} onPress={() => router.push('/(tabs)')} style={{alignSelf:'flex-end', marginRight:20}}/>
       <ScrollView
         bounces={false}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+ 
     
 
       {/* Header — left aligned, brand mark inline */}
@@ -311,15 +315,6 @@ export default function SubscribeGate({
             </>
           )}
         </LinearGradient>
-      </Pressable>
-
-      {/* "Risk it" — skip the accurate scan analysis and fall back to the
-          free, quiz-only OpenAI estimate. */}
-      <Pressable onPress={onSkip} disabled={loading} hitSlop={8} style={styles.skip}>
-        <Text style={styles.skipTitle}>Risk it — use the free estimate</Text>
-        <Text style={styles.skipCaption}>
-          Quiz-only analysis, without your scan. Less accurate than Radiance Pro.
-        </Text>
       </Pressable>
 
       {/* Footer legal links */}
@@ -536,6 +531,7 @@ const styles = StyleSheet.create({
     shadowColor: COLORS.primary,
     shadowOpacity: 0.45,
     shadowRadius: 16,
+    marginVertical:15,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
@@ -545,6 +541,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginVertical:15,
   },
   ctaText: {
     fontSize: 16.5,
@@ -562,7 +559,7 @@ const styles = StyleSheet.create({
   skipTitle: {
     fontSize: 14,
     fontFamily: 'SFProRounded_Semibold',
-    color: COLORS.textSecondary,
+    color: COLORS.primaryDark,
     textDecorationLine: 'underline',
   },
   skipCaption: {

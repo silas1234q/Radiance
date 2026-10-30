@@ -1,3 +1,4 @@
+import { waitForBackendReady } from '../lib/authToken';
 import { reportNetworkFailure } from '../lib/connectivity';
 import { ERROR_TYPES } from '../lib/errors';
 import { getBaseUrl } from './baseUrl';
@@ -47,6 +48,10 @@ function defaultTimeoutFor(url: string): number {
 export async function apiCall<T = unknown>(url: string, options: ApiCallOptions): Promise<T> {
   const { timeoutMs = defaultTimeoutFor(url), signal, ...init } = options;
 
+  // Hold authed requests until /auth/sync has finished (sync itself is exempt).
+  const hasAuth = !!(init.headers as Record<string, string> | undefined)?.Authorization;
+  if (hasAuth && url !== '/auth/sync') await waitForBackendReady();
+
   const controller = new AbortController();
   let timedOut = false;
   let cancelled = false;
@@ -90,6 +95,7 @@ export async function apiCall<T = unknown>(url: string, options: ApiCallOptions)
   }
 
   if (response.status === 204) return null as T;
+  if (response.status === 401) console.log("401", url, await response.clone().text());
 
   let data: T;
   try {

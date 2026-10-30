@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useRef,
+  useCallback,
+  useEffect,
+} from "react";
 import {
   View,
   Text,
@@ -42,6 +48,7 @@ import { COLORS } from "../../constants/theme";
 import { toast } from "../../lib/toast";
 import { suppressSessionExpiry } from "../../lib/sessionExpiry";
 import { useGetToken } from "../../hooks/useApi";
+import { clearWelcomeSeen } from "@/src/lib/welcomeCache";
 
 const DOT_SIZE = 6;
 const DOT_ACTIVE_W = 16;
@@ -73,7 +80,13 @@ function PaginationDots({ activeIndex }: { activeIndex: number }) {
   }));
 
   return (
-    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: DOT_GAP }}>
+    <View
+      style={{
+        flexDirection: "row-reverse",
+        alignItems: "center",
+        gap: DOT_GAP,
+      }}
+    >
       {/* 3 static background dots */}
       {[0, 1, 2].map((i) => (
         <View
@@ -82,7 +95,7 @@ function PaginationDots({ activeIndex }: { activeIndex: number }) {
             width: DOT_SIZE,
             height: DOT_SIZE,
             borderRadius: DOT_SIZE / 2,
-            backgroundColor: 'rgba(28, 28, 30, 0.15)',
+            backgroundColor: "rgba(28, 28, 30, 0.15)",
           }}
         />
       ))}
@@ -90,12 +103,12 @@ function PaginationDots({ activeIndex }: { activeIndex: number }) {
       <Animated.View
         style={[
           {
-            position: 'absolute',
+            position: "absolute",
             right: -(DOT_ACTIVE_W - DOT_SIZE) / 2,
             width: DOT_ACTIVE_W,
             height: DOT_SIZE,
             borderRadius: DOT_SIZE / 2,
-            backgroundColor: 'rgba(28, 28, 30, 1)',
+            backgroundColor: "rgba(28, 28, 30, 1)",
           },
           activeStyle,
         ]}
@@ -139,7 +152,9 @@ export default function ProfileScreen() {
   const handlePickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      toast.info("Please allow access to your photo library.", { title: "Permission needed" });
+      toast.info("Please allow access to your photo library.", {
+        title: "Permission needed",
+      });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -152,11 +167,16 @@ export default function ProfileScreen() {
     setAvatarUploading(true);
     try {
       const token = await getToken();
-      if (!token) { toast.error("Could not authenticate. Please try again."); return; }
+      if (!token) {
+        toast.error("Could not authenticate. Please try again.");
+        return;
+      }
       const url = await uploadSkinPhoto(result.assets[0].uri, token);
       updateProfile.mutate({ avatarUrl: url });
     } catch {
-      toast.error("Could not update your avatar. Please try again.", { title: "Upload failed" });
+      toast.error("Could not update your avatar. Please try again.", {
+        title: "Upload failed",
+      });
     } finally {
       setAvatarUploading(false);
     }
@@ -196,7 +216,9 @@ export default function ProfileScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteAccount.mutateAsync();
+              await deleteAccount.mutateAsync(undefined, {
+                onSuccess: async () => await clearWelcomeSeen(),
+              });
               suppressSessionExpiry();
               queryClient.cancelQueries();
               queryClient.clear();
@@ -315,30 +337,81 @@ export default function ProfileScreen() {
     [CALENDAR_WIDTH, monthsList, monthOffset],
   );
 
-  const personalItems: { label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[] = [
-    { label: "My Skin Profile", icon: "happy-outline", onPress: () => router.push("/edit-skin-profile") },
-    { label: "Routine Preferences", icon: "options-outline", onPress: () => router.push("/routine-preferences") },
-    { label: "Routine for you", icon: "sparkles-outline", onPress: () => router.push("/(tabs)/routine") },
-    { label: "My Shelf", icon: "layers-outline", onPress: () => router.push("/my-shelf") },
-    { label: "Progress Tracking", icon: "sync-outline", onPress: () => router.push("/(tabs)/progress") },
+  const personalItems: {
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    onPress: () => void;
+  }[] = [
+    {
+      label: "My Skin Profile",
+      icon: "happy-outline",
+      onPress: () => router.push("/edit-skin-profile"),
+    },
+    {
+      label: "Routine Preferences",
+      icon: "options-outline",
+      onPress: () => router.push("/routine-preferences"),
+    },
+    {
+      label: "Routine for you",
+      icon: "sparkles-outline",
+      onPress: () => router.push("/(tabs)/routine"),
+    },
+    {
+      label: "My Shelf",
+      icon: "layers-outline",
+      onPress: () => router.push("/my-shelf"),
+    },
+    {
+      label: "Progress Tracking",
+      icon: "sync-outline",
+      onPress: () => router.push("/(tabs)/progress"),
+    },
   ];
 
-  const helpItems: { label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void }[] = [
-    { label: "Frequently Asked Questions", icon: "help-circle-outline", onPress: () => router.push("/faq") },
-    { label: "App Settings", icon: "settings-outline", onPress: () => router.push("/app-settings") },
-    { label: "Contact us", icon: "chatbubble-ellipses-outline", onPress: () => router.push("/contact-us") },
+  const helpItems: {
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    onPress: () => void;
+  }[] = [
+    {
+      label: "Frequently Asked Questions",
+      icon: "help-circle-outline",
+      onPress: () => router.push("/faq"),
+    },
+    {
+      label: "App Settings",
+      icon: "settings-outline",
+      onPress: () => router.push("/app-settings"),
+    },
+    {
+      label: "Contact us",
+      icon: "chatbubble-ellipses-outline",
+      onPress: () => router.push("/contact-us"),
+    },
   ];
 
   return (
-    <SafeAreaView className="flex-1" edges={["top"]} style={{ backgroundColor: "#F2F2F7" }}>
+    <SafeAreaView
+      className="flex-1"
+      edges={["top"]}
+      style={{ backgroundColor: "#F2F2F7" }}
+    >
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Avatar */}
-        <Animated.View entering={FadeInDown.duration(500).springify()} className="items-center py-8">
-          <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.7} style={{ position: "relative", marginBottom: 16 }}>
+        <Animated.View
+          entering={FadeInDown.duration(500).springify()}
+          className="items-center py-8"
+        >
+          <TouchableOpacity
+            onPress={handlePickAvatar}
+            activeOpacity={0.7}
+            style={{ position: "relative", marginBottom: 16 }}
+          >
             {/* Only the avatar gets a skeleton — "no avatar" is a real state
                 (we show initials), so it must not be confused with "loading". */}
             {profileLoading ? (
@@ -414,398 +487,494 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Scans & Diary Calendar */}
-        <Animated.View entering={FadeInDown.delay(150).duration(500).springify()}>
-        <GlassCard style={{ marginBottom: 20 }} noPadding>
-          {/* Calendar header */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: 20,
-              paddingTop: 20,
-              marginBottom: 16,
-            }}
-          >
+        <Animated.View
+          entering={FadeInDown.delay(150).duration(500).springify()}
+        >
+          <GlassCard style={{ marginBottom: 20 }} noPadding>
+            {/* Calendar header */}
             <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 20,
+                paddingTop: 20,
+                marginBottom: 16,
+              }}
             >
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color={COLORS.textSecondary}
-              />
-              <Animated.Text
-                style={[{ fontSize: 16, fontWeight: "600", color: COLORS.text }, titleAnimStyle]}
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
               >
-                Scans & Diary – {currentMonthData.monthName}
-              </Animated.Text>
-            </View>
-          </View>
-
-          {/* Day-of-week headers */}
-          <View
-            style={{
-              flexDirection: "row",
-              marginBottom: 8,
-              paddingHorizontal: 20,
-            }}
-          >
-            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-              <View key={i} style={{ flex: 1, alignItems: "center" }}>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: "500",
-                    color: COLORS.textTertiary,
-                  }}
+                <Ionicons
+                  name="calendar-outline"
+                  size={18}
+                  color={COLORS.textSecondary}
+                />
+                <Animated.Text
+                  style={[
+                    { fontSize: 16, fontWeight: "600", color: COLORS.text },
+                    titleAnimStyle,
+                  ]}
                 >
-                  {d}
-                </Text>
+                  Scans & Diary – {currentMonthData.monthName}
+                </Animated.Text>
               </View>
-            ))}
-          </View>
+            </View>
 
-          {/* Swipeable calendar months */}
-          <FlatList
-            ref={calendarListRef}
-            data={monthsList}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            initialScrollIndex={CENTER_INDEX}
-            getItemLayout={(_, index) => ({
-              length: CALENDAR_WIDTH,
-              offset: CALENDAR_WIDTH * index,
-              index,
-            })}
-            onMomentumScrollEnd={onCalendarScroll}
-            keyExtractor={(item) => `month-${item}`}
-            renderItem={({ item: offset }) => {
-              const data = getMonthData(offset);
-              const cells: React.ReactNode[] = [];
-              for (let i = 0; i < data.startDow; i++) {
-                cells.push(
-                  <View key={`empty-${i}`} style={{ flex: 1, height: 48 }} />,
-                );
-              }
-              for (let day = 1; day <= data.daysInMonth; day++) {
-                const isToday = day === data.todayDate;
-                const hasLog = data.logDates.has(day);
-                const hasScan = data.scanDates.has(day);
-                const scanPhoto = data.scanPhotos.get(day);
-                cells.push(
-                  <View
-                    key={day}
+            {/* Day-of-week headers */}
+            <View
+              style={{
+                flexDirection: "row",
+                marginBottom: 8,
+                paddingHorizontal: 20,
+              }}
+            >
+              {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                <View key={i} style={{ flex: 1, alignItems: "center" }}>
+                  <Text
                     style={{
-                      flex: 1,
-                      alignItems: "center",
-                      paddingVertical: 4,
+                      fontSize: 12,
+                      fontWeight: "500",
+                      color: COLORS.textTertiary,
                     }}
                   >
+                    {d}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Swipeable calendar months */}
+            <FlatList
+              ref={calendarListRef}
+              data={monthsList}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              initialScrollIndex={CENTER_INDEX}
+              getItemLayout={(_, index) => ({
+                length: CALENDAR_WIDTH,
+                offset: CALENDAR_WIDTH * index,
+                index,
+              })}
+              onMomentumScrollEnd={onCalendarScroll}
+              keyExtractor={(item) => `month-${item}`}
+              renderItem={({ item: offset }) => {
+                const data = getMonthData(offset);
+                const cells: React.ReactNode[] = [];
+                for (let i = 0; i < data.startDow; i++) {
+                  cells.push(
+                    <View key={`empty-${i}`} style={{ flex: 1, height: 48 }} />,
+                  );
+                }
+                for (let day = 1; day <= data.daysInMonth; day++) {
+                  const isToday = day === data.todayDate;
+                  const hasLog = data.logDates.has(day);
+                  const hasScan = data.scanDates.has(day);
+                  const scanPhoto = data.scanPhotos.get(day);
+                  cells.push(
                     <View
+                      key={day}
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
+                        flex: 1,
                         alignItems: "center",
-                        justifyContent: "center",
-                        overflow: "hidden",
-                        backgroundColor: scanPhoto
-                          ? "transparent"
-                          : hasScan
-                            ? COLORS.primary
-                            : isToday
-                              ? `${COLORS.primary}15`
-                              : "transparent",
+                        paddingVertical: 4,
                       }}
                     >
-                      {scanPhoto ? (
-                        <>
-                          <Image
-                            source={{ uri: scanPhoto }}
-                            style={{
-                              position: "absolute",
-                              width: 36,
-                              height: 36,
-                              borderRadius: 18,
-                            }}
-                          />
-                          <View
-                            style={{
-                              position: "absolute",
-                              width: 36,
-                              height: 36,
-                              borderRadius: 18,
-                              backgroundColor: "rgba(0,0,0,0.2)",
-                            }}
-                          />
+                      <View
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          overflow: "hidden",
+                          backgroundColor: scanPhoto
+                            ? "transparent"
+                            : hasScan
+                              ? COLORS.primary
+                              : isToday
+                                ? `${COLORS.primary}15`
+                                : "transparent",
+                        }}
+                      >
+                        {scanPhoto ? (
+                          <>
+                            <Image
+                              source={{ uri: scanPhoto }}
+                              style={{
+                                position: "absolute",
+                                width: 36,
+                                height: 36,
+                                borderRadius: 18,
+                              }}
+                            />
+                            <View
+                              style={{
+                                position: "absolute",
+                                width: 36,
+                                height: 36,
+                                borderRadius: 18,
+                                backgroundColor: "rgba(0,0,0,0.2)",
+                              }}
+                            />
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: "700",
+                                color: "#fff",
+                                zIndex: 1,
+                              }}
+                            >
+                              {day}
+                            </Text>
+                          </>
+                        ) : (
                           <Text
                             style={{
-                              fontSize: 12,
-                              fontWeight: "700",
-                              color: "#fff",
-                              zIndex: 1,
+                              fontSize: 14,
+                              fontWeight: isToday || hasScan ? "700" : "400",
+                              color: hasScan
+                                ? "#fff"
+                                : isToday
+                                  ? COLORS.primary
+                                  : COLORS.text,
                             }}
                           >
                             {day}
                           </Text>
-                        </>
-                      ) : (
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: isToday || hasScan ? "700" : "400",
-                            color: hasScan
-                              ? "#fff"
-                              : isToday
-                                ? COLORS.primary
-                                : COLORS.text,
-                          }}
-                        >
-                          {day}
-                        </Text>
-                      )}
-                    </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        gap: 3,
-                        height: 6,
-                        marginTop: 2,
-                      }}
-                    >
-                      {hasLog && !scanPhoto && (
-                        <View
-                          style={{
-                            width: 5,
-                            height: 5,
-                            borderRadius: 2.5,
-                            backgroundColor: COLORS.primary,
-                          }}
-                        />
-                      )}
-                    </View>
-                  </View>,
-                );
-              }
-              const rows: React.ReactNode[] = [];
-              for (let i = 0; i < cells.length; i += 7) {
-                const row = cells.slice(i, i + 7);
-                const padCount = 7 - row.length;
-                rows.push(
-                  <View key={`row-${i}`} style={{ flexDirection: "row" }}>
-                    {row}
-                    {padCount > 0 &&
-                      Array.from({ length: padCount }).map((_, j) => (
-                        <View
-                          key={`pad-${j}`}
-                          style={{ flex: 1, height: 48 }}
-                        />
-                      ))}
-                  </View>,
-                );
-              }
-              return (
-                <View style={{ width: CALENDAR_WIDTH, paddingHorizontal: 20 }}>
-                  {rows}
-                </View>
-              );
-            }}
-          />
-
-          {/* Bottom: nav hint + dots */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: 20,
-              paddingBottom: 16,
-              paddingTop: 8,
-            }}
-          >
-            <Pressable
-              onPress={() => {
-                const newOffset = monthOffset - 1;
-                const newIndex = monthsList.indexOf(newOffset);
-                if (newIndex >= 0) {
-                  calendarListRef.current?.scrollToIndex({ index: newIndex, animated: true });
-                  setMonthOffset(newOffset);
+                        )}
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 3,
+                          height: 6,
+                          marginTop: 2,
+                        }}
+                      >
+                        {hasLog && !scanPhoto && (
+                          <View
+                            style={{
+                              width: 5,
+                              height: 5,
+                              borderRadius: 2.5,
+                              backgroundColor: COLORS.primary,
+                            }}
+                          />
+                        )}
+                      </View>
+                    </View>,
+                  );
                 }
+                const rows: React.ReactNode[] = [];
+                for (let i = 0; i < cells.length; i += 7) {
+                  const row = cells.slice(i, i + 7);
+                  const padCount = 7 - row.length;
+                  rows.push(
+                    <View key={`row-${i}`} style={{ flexDirection: "row" }}>
+                      {row}
+                      {padCount > 0 &&
+                        Array.from({ length: padCount }).map((_, j) => (
+                          <View
+                            key={`pad-${j}`}
+                            style={{ flex: 1, height: 48 }}
+                          />
+                        ))}
+                    </View>,
+                  );
+                }
+                return (
+                  <View
+                    style={{ width: CALENDAR_WIDTH, paddingHorizontal: 20 }}
+                  >
+                    {rows}
+                  </View>
+                );
               }}
+            />
+
+            {/* Bottom: nav hint + dots */}
+            <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 8,
-                borderWidth: 1,
-                borderColor: "#000",
-                borderRadius: 999,
-                paddingHorizontal: 10,
-                paddingVertical: 8,
+                justifyContent: "space-between",
+                paddingHorizontal: 20,
+                paddingBottom: 16,
+                paddingTop: 8,
               }}
             >
-              <Ionicons name="arrow-back" size={15} color="black" />
-              <Animated.Text
-                key={`prev-${monthOffset}`}
-                entering={FadeIn.duration(250)}
-                style={{ fontSize: 15, color: "#000", fontWeight: "600" }}
+              <Pressable
+                onPress={() => {
+                  const newOffset = monthOffset - 1;
+                  const newIndex = monthsList.indexOf(newOffset);
+                  if (newIndex >= 0) {
+                    calendarListRef.current?.scrollToIndex({
+                      index: newIndex,
+                      animated: true,
+                    });
+                    setMonthOffset(newOffset);
+                  }
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  borderWidth: 1,
+                  borderColor: "#000",
+                  borderRadius: 999,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                }}
               >
-                {new Date(
-                  new Date().getFullYear(),
-                  new Date().getMonth() + monthOffset - 1,
-                  1,
-                ).toLocaleString("default", { month: "short" })}
-              </Animated.Text>
-            </Pressable>
-            {/* Page dots */}
-            <PaginationDots activeIndex={((monthOffset % 3) + 3) % 3} />
-            <View style={{ width: 50 }} />
-          </View>
-        </GlassCard>
+                <Ionicons name="arrow-back" size={15} color="black" />
+                <Animated.Text
+                  key={`prev-${monthOffset}`}
+                  entering={FadeIn.duration(250)}
+                  style={{ fontSize: 15, color: "#000", fontWeight: "600" }}
+                >
+                  {new Date(
+                    new Date().getFullYear(),
+                    new Date().getMonth() + monthOffset - 1,
+                    1,
+                  ).toLocaleString("default", { month: "short" })}
+                </Animated.Text>
+              </Pressable>
+              {/* Page dots */}
+              <PaginationDots activeIndex={((monthOffset % 3) + 3) % 3} />
+              <View style={{ width: 50 }} />
+            </View>
+          </GlassCard>
         </Animated.View>
 
         {/* Personal Section */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500).springify()}>
-        <Text style={{ fontSize: 12, fontWeight: "600", color: COLORS.textTertiary, letterSpacing: 0.5, marginBottom: 8, marginLeft: 4 }}>
-          PERSONAL
-        </Text>
-        <GlassCard noPadding style={{ marginBottom: 24 }}>
-          {personalItems.map((item, i) => (
-            <Pressable
-              key={item.label}
-              onPress={item.onPress}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 15,
-                paddingHorizontal: 18,
-                gap: 14,
-                borderBottomWidth: i < personalItems.length - 1 ? 1 : 0,
-                borderBottomColor: "rgba(0,0,0,0.05)",
-              }}
-            >
-              <Ionicons name={item.icon} size={20} color={COLORS.text} />
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color: COLORS.text }}>
-                {item.label}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textTertiary} />
-            </Pressable>
-          ))}
-        </GlassCard>
+        <Animated.View
+          entering={FadeInDown.delay(300).duration(500).springify()}
+        >
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "600",
+              color: COLORS.textTertiary,
+              letterSpacing: 0.5,
+              marginBottom: 8,
+              marginLeft: 4,
+            }}
+          >
+            PERSONAL
+          </Text>
+          <GlassCard noPadding style={{ marginBottom: 24 }}>
+            {personalItems.map((item, i) => (
+              <Pressable
+                key={item.label}
+                onPress={item.onPress}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 15,
+                  paddingHorizontal: 18,
+                  gap: 14,
+                  borderBottomWidth: i < personalItems.length - 1 ? 1 : 0,
+                  borderBottomColor: "rgba(0,0,0,0.05)",
+                }}
+              >
+                <Ionicons name={item.icon} size={20} color={COLORS.text} />
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 15,
+                    fontWeight: "500",
+                    color: COLORS.text,
+                  }}
+                >
+                  {item.label}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.textTertiary}
+                />
+              </Pressable>
+            ))}
+          </GlassCard>
         </Animated.View>
 
         {/* Need Help Section */}
-        <Animated.View entering={FadeInDown.delay(450).duration(500).springify()}>
-        <Text style={{ fontSize: 12, fontWeight: "600", color: COLORS.textTertiary, letterSpacing: 0.5, marginBottom: 8, marginLeft: 4 }}>
-          NEED HELP?
-        </Text>
-        <GlassCard noPadding style={{ marginBottom: 24 }}>
-          {helpItems.map((item, i) => (
-            <Pressable
-              key={item.label}
-              onPress={item.onPress}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 15,
-                paddingHorizontal: 18,
-                gap: 14,
-                borderBottomWidth: i < helpItems.length - 1 ? 1 : 0,
-                borderBottomColor: "rgba(0,0,0,0.05)",
-              }}
-            >
-              <Ionicons name={item.icon} size={20} color={COLORS.text} />
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color: COLORS.text }}>
-                {item.label}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textTertiary} />
-            </Pressable>
-          ))}
-        </GlassCard>
+        <Animated.View
+          entering={FadeInDown.delay(450).duration(500).springify()}
+        >
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "600",
+              color: COLORS.textTertiary,
+              letterSpacing: 0.5,
+              marginBottom: 8,
+              marginLeft: 4,
+            }}
+          >
+            NEED HELP?
+          </Text>
+          <GlassCard noPadding style={{ marginBottom: 24 }}>
+            {helpItems.map((item, i) => (
+              <Pressable
+                key={item.label}
+                onPress={item.onPress}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 15,
+                  paddingHorizontal: 18,
+                  gap: 14,
+                  borderBottomWidth: i < helpItems.length - 1 ? 1 : 0,
+                  borderBottomColor: "rgba(0,0,0,0.05)",
+                }}
+              >
+                <Ionicons name={item.icon} size={20} color={COLORS.text} />
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 15,
+                    fontWeight: "500",
+                    color: COLORS.text,
+                  }}
+                >
+                  {item.label}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.textTertiary}
+                />
+              </Pressable>
+            ))}
+          </GlassCard>
         </Animated.View>
 
         {/* Legal Section */}
-        <Animated.View entering={FadeInDown.delay(600).duration(500).springify()}>
-        <Text style={{ fontSize: 12, fontWeight: "600", color: COLORS.textTertiary, letterSpacing: 0.5, marginBottom: 8, marginLeft: 4 }}>
-          LEGAL
-        </Text>
-        <GlassCard noPadding style={{ marginBottom: 24 }}>
-          {([
-            { label: "Privacy Policy", onPress: () => setLegalModal('privacy') },
-            { label: "Terms of Use", onPress: () => setLegalModal('terms') },
-          ] as const).map((item, i, arr) => (
-            <Pressable
-              key={item.label}
-              onPress={item.onPress}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 15,
-                paddingHorizontal: 18,
-                borderBottomWidth: i < arr.length - 1 ? 1 : 0,
-                borderBottomColor: "rgba(0,0,0,0.05)",
-              }}
-            >
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color: COLORS.text }}>
-                {item.label}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.textTertiary} />
-            </Pressable>
-          ))}
-        </GlassCard>
+        <Animated.View
+          entering={FadeInDown.delay(600).duration(500).springify()}
+        >
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "600",
+              color: COLORS.textTertiary,
+              letterSpacing: 0.5,
+              marginBottom: 8,
+              marginLeft: 4,
+            }}
+          >
+            LEGAL
+          </Text>
+          <GlassCard noPadding style={{ marginBottom: 24 }}>
+            {(
+              [
+                {
+                  label: "Privacy Policy",
+                  onPress: () => setLegalModal("privacy"),
+                },
+                {
+                  label: "Terms of Use",
+                  onPress: () => setLegalModal("terms"),
+                },
+              ] as const
+            ).map((item, i, arr) => (
+              <Pressable
+                key={item.label}
+                onPress={item.onPress}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 15,
+                  paddingHorizontal: 18,
+                  borderBottomWidth: i < arr.length - 1 ? 1 : 0,
+                  borderBottomColor: "rgba(0,0,0,0.05)",
+                }}
+              >
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 15,
+                    fontWeight: "500",
+                    color: COLORS.text,
+                  }}
+                >
+                  {item.label}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={COLORS.textTertiary}
+                />
+              </Pressable>
+            ))}
+          </GlassCard>
         </Animated.View>
 
         {/* Log Out & Delete Account */}
-        <Animated.View entering={FadeInDown.delay(750).duration(500).springify()}>
-        <Pressable
-          onPress={handleSignOut}
-          disabled={signingOut}
-          style={{
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "row",
-            gap: 8,
-            paddingVertical: 14,
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            marginBottom: 12,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.04,
-            shadowRadius: 4,
-            elevation: 1,
-            opacity: signingOut ? 0.6 : 1,
-          }}
+        <Animated.View
+          entering={FadeInDown.delay(750).duration(500).springify()}
         >
-          {signingOut && <ActivityIndicator size="small" color={COLORS.text} />}
-          <Text style={{ fontSize: 16, fontWeight: "600", color: COLORS.text }}>
-            {signingOut ? "Signing out…" : "Log Out"}
-          </Text>
-        </Pressable>
+          <Pressable
+            onPress={handleSignOut}
+            disabled={signingOut}
+            style={{
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "row",
+              gap: 8,
+              paddingVertical: 14,
+              backgroundColor: "#fff",
+              borderRadius: 16,
+              marginBottom: 12,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04,
+              shadowRadius: 4,
+              elevation: 1,
+              opacity: signingOut ? 0.6 : 1,
+            }}
+          >
+            {signingOut && (
+              <ActivityIndicator size="small" color={COLORS.text} />
+            )}
+            <Text
+              style={{ fontSize: 16, fontWeight: "600", color: COLORS.text }}
+            >
+              {signingOut ? "Signing out…" : "Log Out"}
+            </Text>
+          </Pressable>
 
-        <Pressable
-          onPress={handleDeleteAccount}
-          disabled={deleteAccount.isPending}
-          style={{
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "row",
-            gap: 8,
-            paddingVertical: 14,
-            backgroundColor: "rgba(0,0,0,0.03)",
-            borderRadius: 16,
-            marginBottom: 16,
-            opacity: deleteAccount.isPending ? 0.6 : 1,
-          }}
-        >
-          {deleteAccount.isPending && (
-            <ActivityIndicator size="small" color={COLORS.textTertiary} />
-          )}
-          <Text style={{ fontSize: 16, fontWeight: "500", color: COLORS.textTertiary }}>
-            {deleteAccount.isPending ? "Deleting…" : "Delete Account"}
-          </Text>
-        </Pressable>
+          <Pressable
+            onPress={handleDeleteAccount}
+            disabled={deleteAccount.isPending}
+            style={{
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "row",
+              gap: 8,
+              paddingVertical: 14,
+              backgroundColor: "rgba(0,0,0,0.03)",
+              borderRadius: 16,
+              marginBottom: 16,
+              opacity: deleteAccount.isPending ? 0.6 : 1,
+            }}
+          >
+            {deleteAccount.isPending && (
+              <ActivityIndicator size="small" color={COLORS.textTertiary} />
+            )}
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "500",
+                color: COLORS.textTertiary,
+              }}
+            >
+              {deleteAccount.isPending ? "Deleting…" : "Delete Account"}
+            </Text>
+          </Pressable>
         </Animated.View>
       </ScrollView>
 
@@ -813,4 +982,3 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
-

@@ -10,13 +10,14 @@
  * conclude the session is dead after confirming we can actually reach the
  * backend.
  */
-import { apiCall, authHeaders, type ApiCallOptions } from './apiClient';
-import { emitSessionExpired } from '../lib/sessionExpiry';
-import { checkConnectivity, getIsOnline } from '../lib/connectivity';
-import { getAuthSource, type AuthSource } from '../lib/authToken';
+import { apiCall, authHeaders, type ApiCallOptions } from "./apiClient";
+import { emitSessionExpired } from "../lib/sessionExpiry";
+import { checkConnectivity, getIsOnline } from "../lib/connectivity";
+import { getAuthSource, type AuthSource } from "../lib/authToken";
+import { ERROR_TYPES } from "../lib/errors";
 
 function networkError() {
-  return { type: 'NETWORK_ERROR', message: 'Network request failed' };
+  return { type: "NETWORK_ERROR", message: "Network request failed" };
 }
 
 // Module-level singleton so concurrent callers share one retry loop.
@@ -28,29 +29,31 @@ async function getTokenWithRetry(
   delay = 800,
 ): Promise<string> {
   for (let i = 0; i < retries; i++) {
-    // Known offline — retrying can't help, and burning 6.4s here just delays
-    // the cached data the screen is waiting to show.
     if (!getIsOnline()) throw networkError();
 
     const token = await auth.getToken();
     if (token) return token;
 
-    // Clerk definitively says signed out — no point retrying further.
-    if (auth.isSignedIn === false) break;
+    // Definitively signed out: nothing to retry, nothing to expire.
+    if (auth.isSignedIn === false) {
+      console.log("[auth] token requested while signed out", new Error().stack);
+      throw { type: ERROR_TYPES.CANCELLED, message: "Not signed in" };
+    }
+
     if (i < retries - 1) {
       await new Promise((r) => setTimeout(r, delay));
     }
   }
 
-  // Out of attempts. Before treating this as an expired session, verify we can
-  // reach the backend — Clerk failing to mint a token and the network being
-  // down look identical from here.
-  if ((await checkConnectivity()) !== 'online') throw networkError();
+  // isSignedIn is true or still unknown, but Clerk never produced a token.
+  if ((await checkConnectivity()) !== "online") throw networkError();
 
   emitSessionExpired();
-  throw { type: 'UNAUTHORIZED', message: 'Your session expired. Please sign in again.' };
+  throw {
+    type: "UNAUTHORIZED",
+    message: "Your session expired. Please sign in again.",
+  };
 }
-
 function deduplicatedGetToken(auth: AuthSource): Promise<string> {
   if (inflightTokenPromise) return inflightTokenPromise;
   inflightTokenPromise = getTokenWithRetry(auth).finally(() => {
@@ -76,7 +79,7 @@ export async function authedFetch<T = unknown>(
     });
   } catch (error: any) {
     // On 401, force-refresh the token and retry once before giving up.
-    if (error?.type === 'UNAUTHORIZED' || error?.status === 401) {
+    if (error?.type === "UNAUTHORIZED" || error?.status === 401) {
       const freshToken = await auth.getToken({ skipCache: true });
       if (freshToken && freshToken !== token) {
         try {
@@ -90,14 +93,17 @@ export async function authedFetch<T = unknown>(
         } catch (retryError: any) {
           // A 401 from our own server proves we reached it, so this one really
           // is a dead session.
-          if (retryError?.type === 'UNAUTHORIZED' || retryError?.status === 401) {
+          if (
+            retryError?.type === "UNAUTHORIZED" ||
+            retryError?.status === 401
+          ) {
             emitSessionExpired();
           }
           throw retryError;
         }
       }
       // Couldn't get a fresh token. Only a dead session if we're actually online.
-      if ((await checkConnectivity()) !== 'online') throw networkError();
+      if ((await checkConnectivity()) !== "online") throw networkError();
       emitSessionExpired();
     }
     throw error;

@@ -733,7 +733,7 @@ function LockedResults({
   scanLoader?: boolean;
   errorMessage?: string | null;
   retryLabel?: string;
-}) {
+}): React.JSX.Element {
   return (
     <View className="flex-1" style={{ backgroundColor: COLORS.dark }}>
       <Hero photoUrl={photoUrl} score={PLACEHOLDER_SCORE} />

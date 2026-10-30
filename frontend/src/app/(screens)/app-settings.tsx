@@ -333,7 +333,7 @@ export default function AppSettingsScreen() {
                   App Version
                 </Text>
                 <Text style={{ fontSize: 15, color: COLORS.textSecondary }}>
-                  1.0.0
+                  1.0.1
                 </Text>
               </View>
               <View style={{ paddingVertical: 14, paddingHorizontal: 18 }}>

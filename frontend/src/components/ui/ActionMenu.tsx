@@ -7,6 +7,7 @@ import {
   BottomSheetView,
 } from '@gorhom/bottom-sheet';
 import { COLORS, FONTS, RADIUS, SPACING } from '../../constants/theme';
+import CircleIconButton from './CircleIconButton';
 
 export interface ActionMenuItem {
   icon: keyof typeof Ionicons.glyphMap;
@@ -69,9 +70,8 @@ const ActionMenu = forwardRef<BottomSheetModal, ActionMenuProps>(
           {/* ── Header ── */}
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
-            <TouchableOpacity onPress={dismiss} hitSlop={10} style={styles.closeBtn} activeOpacity={0.6}>
-              <Ionicons name="close" size={14} color={COLORS.textSecondary} />
-            </TouchableOpacity>
+            <CircleIconButton icon='close' onPress={dismiss}/>
+           
           </View>
 
           {subtitle ? (
