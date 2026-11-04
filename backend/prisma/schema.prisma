@@ -130,6 +130,18 @@ model RoutineStep {
   @@index([routineId])
 }
 
+model RoutineShare {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  creatorId String
+  name      String
+  steps     Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  @@index([creatorId])
+}
+
 model SkinLog {
   id               String   @id @default(uuid())
   userId           String

@@ -1,4 +1,10 @@
-import React, { useRef, useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -46,19 +52,33 @@ import TimePickerSheet from "../../components/routine/TimePickerSheet";
 import FrequencyPickerSheet from "../../components/routine/FrequencyPickerSheet";
 import { COLORS } from "../../constants/theme";
 import type { Routine, RoutineStep } from "../../types/api";
+import { BASE_URL } from "@/src/api/baseUrl";
+import { useAuth } from "@clerk/clerk-expo";
 
 function getProductDescription(category?: string, brand?: string): string {
-  if (!category) return brand ? `By ${brand}` : 'Custom skincare step';
+  if (!category) return brand ? `By ${brand}` : "Custom skincare step";
   const cat = category.toLowerCase();
-  if (cat.includes('cleanser') || cat.includes('wash') || cat.includes('cleansing')) return 'Cleanse & refresh your skin';
-  if (cat.includes('moisturizer') || cat.includes('cream') || cat.includes('lotion')) return 'Hydrate & nourish your skin';
-  if (cat.includes('sunscreen') || cat.includes('spf')) return 'Shield from UV damage';
-  if (cat.includes('serum')) return 'Target specific concerns';
-  if (cat.includes('toner')) return 'Balance & prep your skin';
-  if (cat.includes('mask')) return 'Deep treatment for your skin';
-  if (cat.includes('eye')) return 'Nourish the eye area';
-  if (cat.includes('exfoli') || cat.includes('scrub') || cat.includes('peel')) return 'Smooth & renew your skin';
-  return brand ? `By ${brand}` : 'Custom skincare step';
+  if (
+    cat.includes("cleanser") ||
+    cat.includes("wash") ||
+    cat.includes("cleansing")
+  )
+    return "Cleanse & refresh your skin";
+  if (
+    cat.includes("moisturizer") ||
+    cat.includes("cream") ||
+    cat.includes("lotion")
+  )
+    return "Hydrate & nourish your skin";
+  if (cat.includes("sunscreen") || cat.includes("spf"))
+    return "Shield from UV damage";
+  if (cat.includes("serum")) return "Target specific concerns";
+  if (cat.includes("toner")) return "Balance & prep your skin";
+  if (cat.includes("mask")) return "Deep treatment for your skin";
+  if (cat.includes("eye")) return "Nourish the eye area";
+  if (cat.includes("exfoli") || cat.includes("scrub") || cat.includes("peel"))
+    return "Smooth & renew your skin";
+  return brand ? `By ${brand}` : "Custom skincare step";
 }
 
 export default function RoutineScreen() {
@@ -71,9 +91,9 @@ export default function RoutineScreen() {
   const openAddSheet = useCallback(() => addSheetRef.current?.present(), []);
   const { data: routines, isLoading, isFetching } = useRoutines();
   const { data: skinProfile } = useSkinProfile();
+  const {getToken} = useAuth()
   const { data: weeklyCompletions } = useWeeklyCompletions();
   const [xpToastVisible, setXpToastVisible] = useState(false);
-
 
   const addStep = useAddStep();
   const updateStep = useUpdateStep();
@@ -82,17 +102,26 @@ export default function RoutineScreen() {
   const completeRoutine = useCompleteRoutine();
   const { refreshing, onRefresh } = useRefreshQueries();
 
+
+
   // React Query v4 reports a *queued* (paused) mutation as loading, so check
   // both — otherwise these buttons stay disabled for the whole time a write is
   // sitting in the offline queue. (`isPending` is v5 API and was always
   // undefined here, which is why nothing was ever actually disabled before.)
-  const isCompletingRoutine = completeRoutine.isLoading && !completeRoutine.isPaused;
+  const isCompletingRoutine =
+    completeRoutine.isLoading && !completeRoutine.isPaused;
   const isTogglingStep = toggleStep.isLoading && !toggleStep.isPaused;
 
   const [pendingAddProduct, setPendingAddProduct] = useState<{
-    id: string; name: string; brand: string; imageUrl?: string; category?: string;
+    id: string;
+    name: string;
+    brand: string;
+    imageUrl?: string;
+    category?: string;
   } | null>(null);
-  const [pendingAddSection, setPendingAddSection] = useState<'morning' | 'evening' | null>(null);
+  const [pendingAddSection, setPendingAddSection] = useState<
+    "morning" | "evening" | null
+  >(null);
 
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>("default");
 
@@ -193,37 +222,54 @@ export default function RoutineScreen() {
   }, []);
 
   const handleShare = useCallback(async () => {
-    const lines: string[] = [];
-    if (selectedRoutineId === "default") {
-      if (amSteps.length > 0) {
-        lines.push("Morning Routine:");
-        amSteps.forEach((s, i: number) =>
-          lines.push(
-            `${i + 1}. ${s.name}${s.description ? " \u2014 " + s.description : ""}`,
-          ),
-        );
-        lines.push("");
+    const routine =
+      selectedRoutineId === "default"
+        ? {
+            name: "My Skincare Routine",
+            steps: [
+              ...amSteps.map((s) => ({ ...s, timeOfDay: "morning" })),
+              ...pmSteps.map((s) => ({ ...s, timeOfDay: "evening" })),
+            ],
+          }
+        : selectedCustomRoutine
+          ? {
+              name: selectedCustomRoutine.name,
+              steps: selectedCustomRoutine.steps ?? [],
+            }
+          : null;
+
+    if (!routine || routine.steps.length === 0) {
+      return;
+    }
+
+    try {
+        const token = await getToken() // Get the token from Clerk
+      const response = await fetch(`${BASE_URL}/api/routines/share`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(routine),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create share link");
       }
-      if (pmSteps.length > 0) {
-        lines.push("Evening Routine:");
-        pmSteps.forEach((s, i: number) =>
-          lines.push(
-            `${i + 1}. ${s.name}${s.description ? " \u2014 " + s.description : ""}`,
-          ),
-        );
-      }
-    } else if (selectedCustomRoutine && (selectedCustomRoutine.steps?.length ?? 0) > 0) {
-      lines.push(`${selectedCustomRoutine.name}:`);
-      selectedCustomRoutine.steps!.forEach((s, i: number) =>
-        lines.push(
-          `${i + 1}. ${s.name}${s.description ? " \u2014 " + s.description : ""}`,
-        ),
+
+      const { shareUrl } = await response.json();
+
+      await Share.share({
+        message: `Check out my skincare routine on Radiance!\n\n${shareUrl}`,
+      });
+    } catch (error) {
+      console.error("Failed to share routine:", error);
+      Alert.alert(
+        "Unable to share",
+        "We couldn't create your routine link. Please try again.",
       );
     }
-    if (lines.length > 0) {
-      await Share.share({ message: lines.join("\n") });
-    }
-  }, [selectedRoutineId, selectedCustomRoutine, amSteps, pmSteps]);
+  }, [selectedRoutineId, selectedCustomRoutine, amSteps, pmSteps, getToken]);
 
   const handleDeleteRoutine = useCallback(() => {
     if (selectedRoutineId === "default" || !selectedCustomRoutine) return;
@@ -269,7 +315,13 @@ export default function RoutineScreen() {
 
   // ─── Add product as step flow: product → time → frequency → create ───
   const handleAddProductSelect = useCallback(
-    (product: { id: string; name: string; brand: string; imageUrl?: string; category?: string }) => {
+    (product: {
+      id: string;
+      name: string;
+      brand: string;
+      imageUrl?: string;
+      category?: string;
+    }) => {
       setPendingAddProduct(product);
       setTimeout(() => timePickerRef.current?.present(), 300);
     },
@@ -277,7 +329,7 @@ export default function RoutineScreen() {
   );
 
   const handleTimeSelect = useCallback(
-    (section: 'morning' | 'evening') => {
+    (section: "morning" | "evening") => {
       if (!pendingAddProduct) return;
       setPendingAddSection(section);
       setTimeout(() => frequencyPickerRef.current?.present(), 300);
@@ -291,15 +343,18 @@ export default function RoutineScreen() {
       const section = pendingAddSection;
       // For the default view, pick the AM or PM routine; for custom, use the selected routine
       const targetRoutineId =
-        selectedRoutineId === 'default'
-          ? section === 'morning'
+        selectedRoutineId === "default"
+          ? section === "morning"
             ? amRoutine?.id
             : pmRoutine?.id
           : selectedRoutineId;
       if (!targetRoutineId) return;
 
-      const desc = getProductDescription(pendingAddProduct.category, pendingAddProduct.brand);
-      const sectionTag = section === 'morning' ? '[AM]' : '[PM]';
+      const desc = getProductDescription(
+        pendingAddProduct.category,
+        pendingAddProduct.brand,
+      );
+      const sectionTag = section === "morning" ? "[AM]" : "[PM]";
 
       addStep.mutate({
         routineId: targetRoutineId,
@@ -310,7 +365,14 @@ export default function RoutineScreen() {
       setPendingAddProduct(null);
       setPendingAddSection(null);
     },
-    [pendingAddProduct, pendingAddSection, selectedRoutineId, amRoutine, pmRoutine, addStep],
+    [
+      pendingAddProduct,
+      pendingAddSection,
+      selectedRoutineId,
+      amRoutine,
+      pmRoutine,
+      addStep,
+    ],
   );
 
   const actionGroups = useMemo((): ActionMenuGroup[] => {
@@ -473,6 +535,11 @@ export default function RoutineScreen() {
           className="relative items-center justify-center mt-2 mb-5"
           style={{ height: 44 }}
         >
+          <CircleIconButton
+            icon="share-outline"
+            onPress={() => openAddSheet()}
+            style={{ position: "absolute", left: 0 }}
+          />
           <Text
             className="text-[20px] tracking-[-0.4px] text-skin-text"
             style={{ fontWeight: "600" }}
@@ -480,7 +547,10 @@ export default function RoutineScreen() {
             {headerTitle}
           </Text>
           <View className="absolute right-0 flex-row items-center gap-2">
-            <CircleIconButton icon="ellipsis-horizontal" onPress={openActionSheet} />
+            <CircleIconButton
+              icon="ellipsis-horizontal"
+              onPress={openActionSheet}
+            />
             <CircleIconButton icon="add" onPress={() => openAddSheet()} />
           </View>
         </View>
@@ -809,7 +879,12 @@ export default function RoutineScreen() {
           pmSteps.length === 0 &&
           !isLoading && (
             <View className="items-center py-[60px]">
-              <Ionicons name="sparkles" size={48} color="#F06680" style={{ marginBottom: 16 }} />
+              <Ionicons
+                name="sparkles"
+                size={48}
+                color="#F06680"
+                style={{ marginBottom: 16 }}
+              />
               <Text className="text-base text-skin-text-secondary text-center max-w-[260px] leading-[22px] mb-5">
                 Scan your skin to unlock a personalized routine
               </Text>
@@ -829,21 +904,43 @@ export default function RoutineScreen() {
                 </Text>
               </Pressable>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 20 }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
-                <Text style={{ fontSize: 13, fontFamily: 'SFProRounded_Medium', color: COLORS.textTertiary }}>or</Text>
-                <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  marginTop: 20,
+                  marginBottom: 20,
+                }}
+              >
+                <View
+                  style={{ flex: 1, height: 1, backgroundColor: COLORS.border }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontFamily: "SFProRounded_Medium",
+                    color: COLORS.textTertiary,
+                  }}
+                >
+                  or
+                </Text>
+                <View
+                  style={{ flex: 1, height: 1, backgroundColor: COLORS.border }}
+                />
               </View>
 
               <Pressable
                 onPress={() => router.push("/new-routine")}
                 className="flex-row items-center h-[48px] px-6 rounded-full"
-                style={({ pressed }) => [{
-                  borderWidth: 1.5,
-                  borderColor: COLORS.border,
-                  backgroundColor: '#fff',
-                  opacity: pressed ? 0.7 : 1,
-                }]}
+                style={({ pressed }) => [
+                  {
+                    borderWidth: 1.5,
+                    borderColor: COLORS.border,
+                    backgroundColor: "#fff",
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
               >
                 <Ionicons
                   name="add"
@@ -879,7 +976,10 @@ export default function RoutineScreen() {
       />
 
       <TimePickerSheet ref={timePickerRef} onSelect={handleTimeSelect} />
-      <FrequencyPickerSheet ref={frequencyPickerRef} onSelect={handleFrequencySelect} />
+      <FrequencyPickerSheet
+        ref={frequencyPickerRef}
+        onSelect={handleFrequencySelect}
+      />
 
       <ActionMenu
         ref={actionSheetRef}

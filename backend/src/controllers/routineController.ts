@@ -3,6 +3,17 @@ import prisma from '../config/db.config';
 import NotFoundError from '../errors/NotFoundError';
 import ValidationErrors from '../errors/ValidationError';
 import * as gamificationService from '../services/gamificationService';
+import { getAuth } from '@clerk/express';
+import { randomBytes } from 'crypto';
+import AuthError from '../errors/AuthError';
+
+let APP_URL = process.env.PUBLIC_APP_URL;
+
+
+if (!APP_URL) {
+  throw new Error("PUBLIC_APP_URL is not configured");
+}
+
 
 async function invalidateInsightCache(userId: string) {
   await prisma.routineInsightCache.deleteMany({ where: { userId } });
@@ -341,4 +352,106 @@ export const reorderSteps = catchAsync(async (req, res) => {
 
   await invalidateInsightCache(req.user!.id);
   res.json({ success: true });
+});
+
+
+
+
+
+
+
+export const shareRoutineWithToken = catchAsync(async (req, res) => {
+  const { token } = req.params;
+
+  if (typeof token !== "string" || !/^[a-f0-9]{48}$/.test(token)) {
+    throw new NotFoundError("Routine not found or expired");
+  }
+
+  try {
+    const share = await prisma.routineShare.findUnique({
+      where: { token },
+    });
+
+    if (!share || (share.expiresAt && share.expiresAt <= new Date())) {
+      return res.status(404).json({ error: "Routine not found or expired" });
+    }
+
+    return res.json({
+      name: share.name,
+      steps: share.steps,
+      createdAt: share.createdAt,
+    });
+  } catch (error) {
+    console.error("Fetch shared routine failed:", error);
+    return res.status(500).json({ error: "Unable to load routine" });
+  }
+})
+
+
+export const shareRoutine = catchAsync(async (req, res) => {
+  const { userId } = getAuth(req);
+
+  if (!userId) {
+    throw new AuthError("User not authenticated");
+  }
+
+  const { name, steps } = req.body;
+
+  if (
+    typeof name !== "string" ||
+    !name.trim() ||
+    name.length > 120 ||
+    !Array.isArray(steps) ||
+    steps.length === 0 ||
+    steps.length > 100
+  ) {
+    throw new ValidationErrors([{ field: "routineName", message: "Invalid routine name or steps" }]);
+  }
+
+  // Keep only the fields the recipient needs.
+  const safeSteps = [];
+
+  for (const step of steps) {
+    if (
+      !step ||
+      typeof step.name !== "string" ||
+      !step.name.trim() ||
+      step.name.length > 200
+    ) {
+     throw new ValidationErrors([{ field: "stepName", message: "Invalid step name" }]);
+    }
+
+    safeSteps.push({
+      name: step.name.trim(),
+      description:
+        typeof step.description === "string"
+          ? step.description.slice(0, 1000)
+          : "",
+      ...(step.timeOfDay === "morning" ||
+      step.timeOfDay === "evening"
+        ? { timeOfDay: step.timeOfDay }
+        : {}),
+        product: step.product
+    });
+  }
+
+  try {
+    const share = await prisma.routineShare.create({
+      data: {
+        token: randomBytes(24).toString("hex"),
+        creatorId: userId,
+        name: name.trim(),
+        steps: safeSteps,
+      },
+    });
+
+    return res.status(201).json({
+      shareUrl: `${APP_URL.replace(/\/$/, "")}/routine/${share.token}`,
+      token: share.token,
+    });
+  } catch (error) {
+    console.error("Create routine share failed:", error);
+    return res.status(500).json({ error: "Unable to share routine" });
+  }
+
 });

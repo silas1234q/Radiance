@@ -2,14 +2,17 @@
   "expo": {
     "name": "Radiance",
     "slug": "radiance",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./src/assets/images/icon.png",
     "scheme": "radiance",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
+      "associatedDomains": [
+        "applinks:radianceskin.fit",
+        "applinks:www.radianceskin.fit"
+      ],
       "bundleIdentifier": "com.silas.radiance",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -42,7 +45,7 @@
     },
     "plugins": [
       "expo-router",
-       [
+      [
         "expo-build-properties",
         {
           "ios": {
