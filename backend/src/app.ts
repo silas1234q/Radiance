@@ -5,6 +5,7 @@ import { clerkAuth } from "./middleware/clerkAuth";
 import routes from "./routes/routes";
 import webhookRoutes from "./routes/webhookRoutes";
 import { globalErrorHandler } from "./middleware/globalErrorHandler";
+import { shareRoutineWithToken } from "./controllers/routineController";
 
 const app = express();
 
@@ -17,6 +18,9 @@ app.use(morgan("dev", { skip: (req) => req.headers["user-agent"] === "radiance-k
 app.use("/api/webhooks", webhookRoutes);
 
 app.use(express.json({ limit: '20mb' }));
+
+app.get("/api/routines/share/:token",shareRoutineWithToken)
+
 app.use(clerkAuth);
 
 app.use("/api", routes);

@@ -14,6 +14,7 @@ import NotFound from './routes/not-found'
 import { privacyPolicy, termsOfUse } from './content/legal'
 import { faceScan, routines, productScanner } from './content/features'
 import { posthog, initAnalytics } from './lib/analytics'
+import { Routine } from './routes/sharedRoutine'
 
 initAnalytics()
 
@@ -35,6 +36,11 @@ const router = createBrowserRouter([
       {
         path: 'routines',
         element: <FeatureRoute page={routines} />,
+        loader: () => null,
+      },
+       {
+        path: 'routines/:token',
+        element: <Routine />,
         loader: () => null,
       },
       {
