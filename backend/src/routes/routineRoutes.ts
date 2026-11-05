@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/clerkAuth';
 import { syncUser } from '../middleware/syncUser';
-import { getRoutines, createRoutine, createCustomRoutine, updateRoutine, addStep, toggleStep, completeRoutine, updateStep, deleteRoutine, deleteStep, reorderSteps } from '../controllers/routineController';
+import { getRoutines, createRoutine, createCustomRoutine, updateRoutine, addStep, toggleStep, completeRoutine, updateStep, deleteRoutine, deleteStep, reorderSteps, shareRoutine, shareRoutineWithToken } from '../controllers/routineController';
 import { getRoutineInsight, getDetailedInsight } from '../controllers/routineInsightController';
 
 const router = Router();
@@ -10,6 +10,8 @@ router.get('/', getRoutines);
 router.post('/', createRoutine);
 router.post('/custom', createCustomRoutine);
 router.patch('/:id', updateRoutine);
+router.post('/share',shareRoutine);
+//  router.get("/share/:token",shareRoutineWithToken)
 router.post('/insight', getRoutineInsight);
 router.get('/insight/detailed', getDetailedInsight);
 router.post('/:id/complete', completeRoutine);
