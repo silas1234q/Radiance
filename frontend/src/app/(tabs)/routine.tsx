@@ -535,11 +535,7 @@ export default function RoutineScreen() {
           className="relative items-center justify-center mt-2 mb-5"
           style={{ height: 44 }}
         >
-          <CircleIconButton
-            icon="share-outline"
-            onPress={() => openAddSheet()}
-            style={{ position: "absolute", left: 0 }}
-          />
+        
           <Text
             className="text-[20px] tracking-[-0.4px] text-skin-text"
             style={{ fontWeight: "600" }}
