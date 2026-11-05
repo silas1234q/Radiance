@@ -446,7 +446,7 @@ export const shareRoutine = catchAsync(async (req, res) => {
     });
 
     return res.status(201).json({
-      shareUrl: `${APP_URL.replace(/\/$/, "")}/routine/${share.token}`,
+      shareUrl: `${APP_URL.replace(/\/$/, "")}/routines/${share.token}`,
       token: share.token,
     });
   } catch (error) {
